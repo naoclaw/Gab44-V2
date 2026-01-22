@@ -1,34 +1,134 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+/* Gab44 Custom Styles */
+
+/* Remove default text centering */
+.App {
+  min-height: 100vh;
+  background: #050505;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+/* Hero gradient overlay */
+.hero-gradient {
+  background: linear-gradient(180deg, 
+    rgba(5, 5, 5, 0.4) 0%, 
+    rgba(5, 5, 5, 0.6) 50%,
+    rgba(5, 5, 5, 0.95) 100%
+  );
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+/* Chat bubbles */
+.chat-bubble-user {
+  background: linear-gradient(135deg, hsl(45 93% 47% / 0.15) 0%, hsl(45 93% 47% / 0.05) 100%);
+  border: 1px solid hsl(45 93% 47% / 0.2);
 }
 
-.App-link {
-    color: #61dafb;
+.chat-bubble-assistant {
+  background: linear-gradient(135deg, hsl(240 3.7% 15.9%) 0%, hsl(240 10% 8%) 100%);
+  border: 1px solid hsl(240 3.7% 20% / 0.5);
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+/* Birth chart styling */
+.chart-wheel {
+  background: radial-gradient(circle, 
+    rgba(99, 102, 241, 0.1) 0%, 
+    rgba(5, 5, 5, 0) 70%
+  );
+}
+
+/* Transit card hover */
+.transit-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.transit-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 30px rgba(212, 175, 55, 0.1);
+}
+
+/* Pricing card popular */
+.pricing-popular {
+  border: 2px solid hsl(45 93% 47%);
+  box-shadow: 0 0 40px rgba(212, 175, 55, 0.15);
+}
+
+/* Navigation blur */
+.nav-blur {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Feature card gradient */
+.feature-card {
+  background: linear-gradient(180deg, 
+    rgba(255, 255, 255, 0.03) 0%, 
+    rgba(255, 255, 255, 0) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.feature-card:hover {
+  border-color: rgba(212, 175, 55, 0.2);
+  background: linear-gradient(180deg, 
+    rgba(212, 175, 55, 0.05) 0%, 
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+
+/* Zodiac sign badges */
+.zodiac-badge {
+  background: linear-gradient(135deg, 
+    hsl(45 93% 47% / 0.15) 0%, 
+    hsl(45 93% 47% / 0.05) 100%
+  );
+  border: 1px solid hsl(45 93% 47% / 0.3);
+  color: hsl(45 93% 60%);
+}
+
+/* Stats counter animation */
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.stat-number {
+  animation: countUp 0.8s ease-out forwards;
+}
+
+/* Testimonial cards */
+.testimonial-card {
+  background: linear-gradient(180deg, 
+    rgba(255, 255, 255, 0.02) 0%, 
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+
+/* Loading skeleton */
+.skeleton {
+  background: linear-gradient(90deg, 
+    hsl(240 3.7% 15.9%) 25%, 
+    hsl(240 3.7% 20%) 50%, 
+    hsl(240 3.7% 15.9%) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-loading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Sidebar dashboard */
+.sidebar-link {
+  transition: background-color 0.2s ease, color 0.2s ease, padding-left 0.2s ease;
+}
+
+.sidebar-link:hover {
+  background-color: hsl(240 3.7% 15.9%);
+  padding-left: 1.25rem;
+}
+
+.sidebar-link.active {
+  background-color: hsl(45 93% 47% / 0.1);
+  border-left: 2px solid hsl(45 93% 47%);
+  color: hsl(45 93% 60%);
 }
