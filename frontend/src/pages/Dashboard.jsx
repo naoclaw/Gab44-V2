@@ -16,10 +16,14 @@ import {
   Star,
   Zap,
   TrendingUp,
-  Target
+  Target,
+  Settings,
+  Share2,
+  Menu,
+  X
 } from "lucide-react";
 
-const Sidebar = ({ activeTab, setActiveTab }) => {
+const Sidebar = ({ activeTab, setActiveTab, mobileOpen, setMobileOpen }) => {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
@@ -29,6 +33,8 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
     { id: "chat", icon: MessageCircle, label: "AI Coach", href: "/chat" },
     { id: "chart", icon: Sun, label: "Birth Chart", href: "/chart" },
     { id: "transits", icon: Calendar, label: "Transits", href: "/transits" },
+    { id: "share", icon: Share2, label: "Share Chart", href: "/share" },
+    { id: "settings", icon: Settings, label: "Settings", href: "/settings" },
   ];
 
   const handleNavClick = (item) => {
@@ -37,10 +43,11 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
     } else {
       setActiveTab(item.id);
     }
+    setMobileOpen(false);
   };
 
-  return (
-    <aside className="w-64 bg-card/50 backdrop-blur-sm border-r border-border flex flex-col h-screen fixed left-0 top-0">
+  const sidebarContent = (
+    <>
       <div className="p-6 border-b border-border">
         <Link to="/" className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
@@ -50,7 +57,7 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
         </Link>
       </div>
 
-      <nav className="flex-1 p-4">
+      <nav className="flex-1 p-4 overflow-y-auto">
         <ul className="space-y-1">
           {navItems.map((item) => (
             <li key={item.id}>
@@ -72,7 +79,6 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
       </nav>
 
       <div className="p-4 border-t border-border space-y-4">
-        {/* Theme Toggle */}
         <button
           onClick={toggleTheme}
           className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
@@ -108,7 +114,65 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
           Sign Out
         </Button>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Desktop Sidebar */}
+      <aside className="hidden lg:flex w-64 bg-card/50 backdrop-blur-sm border-r border-border flex-col h-screen fixed left-0 top-0 z-40">
+        {sidebarContent}
+      </aside>
+
+      {/* Mobile Overlay */}
+      {mobileOpen && (
+        <div 
+          className="lg:hidden fixed inset-0 bg-black/50 z-40"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* Mobile Sidebar */}
+      <aside className={`lg:hidden fixed top-0 left-0 h-screen w-72 bg-card border-r border-border flex flex-col z-50 transform transition-transform duration-300 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <button 
+          onClick={() => setMobileOpen(false)}
+          className="absolute top-4 right-4 w-8 h-8 rounded-lg bg-muted flex items-center justify-center"
+        >
+          <X className="w-5 h-5" />
+        </button>
+        {sidebarContent}
+      </aside>
+    </>
+  );
+};
+
+const MobileHeader = ({ setMobileOpen }) => {
+  const { theme, toggleTheme } = useTheme();
+  
+  return (
+    <header className="lg:hidden fixed top-0 left-0 right-0 z-30 glass-header p-4">
+      <div className="flex items-center justify-between">
+        <button 
+          onClick={() => setMobileOpen(true)}
+          className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center"
+          data-testid="mobile-menu-btn"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+        
+        <Link to="/" className="flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-primary" />
+          <span className="font-serif text-lg text-foreground">Gab44</span>
+        </Link>
+
+        <button
+          onClick={toggleTheme}
+          className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center"
+        >
+          {theme === "dark" ? <Sun className="w-5 h-5 text-primary" /> : <Moon className="w-5 h-5" />}
+        </button>
+      </div>
+    </header>
   );
 };
 
@@ -143,7 +207,7 @@ const DashboardOverview = () => {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
         {[1, 2, 3, 4, 5, 6].map((i) => (
           <div key={i} className="glass-card rounded-xl p-6 h-48 skeleton" />
         ))}
@@ -152,13 +216,13 @@ const DashboardOverview = () => {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 lg:space-y-8">
       {/* Welcome Header */}
       <div>
-        <h1 className="font-serif text-3xl text-foreground mb-2">
+        <h1 className="font-serif text-2xl lg:text-3xl text-foreground mb-2">
           Welcome back, {user?.name?.split(" ")[0]}
         </h1>
-        <p className="text-muted-foreground">
+        <p className="text-muted-foreground text-sm lg:text-base">
           {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         </p>
       </div>
@@ -166,16 +230,16 @@ const DashboardOverview = () => {
       {/* Bento Grid Layout */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Daily Energy - Large */}
-        <div className="glass-card rounded-xl p-6 lg:col-span-2 lg:row-span-2" data-testid="daily-energy-card">
+        <div className="glass-card rounded-xl p-5 lg:p-6 md:col-span-2 lg:row-span-2" data-testid="daily-energy-card">
           <div className="flex items-center gap-2 mb-4">
             <Sun className="w-5 h-5 text-primary" />
             <h2 className="font-medium text-foreground">Daily Energy</h2>
           </div>
-          <p className="text-muted-foreground mb-6 leading-relaxed">
+          <p className="text-muted-foreground mb-6 leading-relaxed text-sm lg:text-base">
             {dailyGuidance?.overall_energy || "Loading your cosmic guidance..."}
           </p>
           
-          <div className="space-y-4">
+          <div className="space-y-3 lg:space-y-4">
             <h3 className="text-sm font-medium text-foreground">Focus Areas Today</h3>
             {dailyGuidance?.focus_areas?.map((area, i) => (
               <div key={i} className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -186,7 +250,7 @@ const DashboardOverview = () => {
           </div>
 
           <Button 
-            className="mt-6 bg-primary/10 text-primary hover:bg-primary/20 rounded-xl"
+            className="mt-6 bg-primary/10 text-primary hover:bg-primary/20 rounded-xl w-full sm:w-auto"
             onClick={() => navigate("/chat")}
             data-testid="ask-coach-btn"
           >
@@ -196,27 +260,27 @@ const DashboardOverview = () => {
         </div>
 
         {/* Sun Sign Card */}
-        <div className="glass-card rounded-xl p-6 card-lift" data-testid="sun-sign-card">
+        <div className="glass-card rounded-xl p-5 lg:p-6 card-lift" data-testid="sun-sign-card">
           <div className="flex items-center justify-between mb-4">
-            <Sun className="w-8 h-8 text-primary" />
+            <Sun className="w-7 lg:w-8 h-7 lg:h-8 text-primary" />
             <span className="zodiac-badge rounded-full px-3 py-1 text-xs">Sun</span>
           </div>
-          <p className="font-serif text-2xl text-foreground mb-1">{user?.sun_sign || "Unknown"}</p>
+          <p className="font-serif text-xl lg:text-2xl text-foreground mb-1">{user?.sun_sign || "Unknown"}</p>
           <p className="text-xs text-muted-foreground">Your core identity</p>
         </div>
 
         {/* Quick Stats */}
-        <div className="glass-card rounded-xl p-6 card-lift" data-testid="quick-stats-card">
+        <div className="glass-card rounded-xl p-5 lg:p-6 card-lift" data-testid="quick-stats-card">
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp className="w-5 h-5 text-green-500" />
             <span className="text-sm text-green-500 font-medium">Active Transits</span>
           </div>
-          <p className="font-serif text-3xl text-foreground mb-1">{transits.length}</p>
+          <p className="font-serif text-2xl lg:text-3xl text-foreground mb-1">{transits.length}</p>
           <p className="text-xs text-muted-foreground">Influencing your chart</p>
         </div>
 
         {/* Action Items */}
-        <div className="glass-card rounded-xl p-6 lg:col-span-2" data-testid="action-items-card">
+        <div className="glass-card rounded-xl p-5 lg:p-6 md:col-span-2" data-testid="action-items-card">
           <div className="flex items-center gap-2 mb-4">
             <Zap className="w-5 h-5 text-primary" />
             <h2 className="font-medium text-foreground">Today's Actions</h2>
@@ -237,7 +301,7 @@ const DashboardOverview = () => {
       {/* Upcoming Transits */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-serif text-xl text-foreground">Upcoming Transits</h2>
+          <h2 className="font-serif text-lg lg:text-xl text-foreground">Upcoming Transits</h2>
           <Button 
             variant="ghost" 
             className="text-primary"
@@ -253,7 +317,7 @@ const DashboardOverview = () => {
           {transits.map((transit, i) => (
             <div 
               key={transit.id} 
-              className="transit-card glass-card rounded-xl p-5 card-lift"
+              className="transit-card glass-card rounded-xl p-4 lg:p-5 card-lift"
               data-testid={`transit-card-${i}`}
             >
               <div className="flex items-center justify-between mb-3">
@@ -278,18 +342,44 @@ const DashboardOverview = () => {
           ))}
         </div>
       </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { icon: MessageCircle, label: "Chat", href: "/chat", color: "text-blue-500" },
+          { icon: Sun, label: "Chart", href: "/chart", color: "text-amber-500" },
+          { icon: Share2, label: "Share", href: "/share", color: "text-purple-500" },
+          { icon: Settings, label: "Settings", href: "/settings", color: "text-slate-500" }
+        ].map((action) => (
+          <Link 
+            key={action.label}
+            to={action.href}
+            className="glass-card rounded-xl p-4 flex flex-col items-center gap-2 card-lift hover:border-primary/30 transition-all"
+          >
+            <action.icon className={`w-6 h-6 ${action.color}`} />
+            <span className="text-sm text-foreground">{action.label}</span>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 };
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("overview");
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <MobileHeader setMobileOpen={setMobileOpen} />
+      <Sidebar 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        mobileOpen={mobileOpen}
+        setMobileOpen={setMobileOpen}
+      />
       
-      <main className="ml-64 p-8">
+      <main className="lg:ml-64 p-4 lg:p-8 pt-20 lg:pt-8">
         <DashboardOverview />
       </main>
     </div>
