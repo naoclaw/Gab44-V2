@@ -1,8 +1,9 @@
 import { useState, useEffect, createContext, useContext } from "react";
 import "@/App.css";
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import axios from "axios";
 import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "@/context/ThemeContext";
 
 // Pages
 import LandingPage from "@/pages/LandingPage";
@@ -88,7 +89,7 @@ const ProtectedRoute = ({ children }) => {
   
   if (loading) {
     return (
-      <div className="min-h-screen bg-cosmic-void flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-pulse-glow w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
           <div className="w-8 h-8 rounded-full bg-primary/40" />
         </div>
@@ -105,51 +106,53 @@ const ProtectedRoute = ({ children }) => {
 
 function App() {
   return (
-    <AuthProvider>
-      <div className="App min-h-screen bg-cosmic-void">
-        <div className="noise-overlay" />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/auth" element={<AuthPage />} />
-            <Route path="/pricing" element={<PricingPage />} />
-            <Route 
-              path="/dashboard" 
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/chat" 
-              element={
-                <ProtectedRoute>
-                  <ChatPage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/chart" 
-              element={
-                <ProtectedRoute>
-                  <ChartPage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/transits" 
-              element={
-                <ProtectedRoute>
-                  <TransitsPage />
-                </ProtectedRoute>
-              } 
-            />
-          </Routes>
-        </BrowserRouter>
-        <Toaster position="top-right" />
-      </div>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <div className="App min-h-screen bg-background theme-transition">
+          <div className="noise-overlay" />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/auth" element={<AuthPage />} />
+              <Route path="/pricing" element={<PricingPage />} />
+              <Route 
+                path="/dashboard" 
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/chat" 
+                element={
+                  <ProtectedRoute>
+                    <ChatPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/chart" 
+                element={
+                  <ProtectedRoute>
+                    <ChartPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/transits" 
+                element={
+                  <ProtectedRoute>
+                    <TransitsPage />
+                  </ProtectedRoute>
+                } 
+              />
+            </Routes>
+          </BrowserRouter>
+          <Toaster position="top-right" />
+        </div>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 
