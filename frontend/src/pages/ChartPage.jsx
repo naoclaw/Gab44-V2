@@ -10,7 +10,8 @@ import {
   Sun,
   Moon,
   Star,
-  ChevronRight
+  ChevronRight,
+  Share2
 } from "lucide-react";
 import {
   Tooltip,
@@ -101,14 +102,25 @@ export default function ChartPage() {
             </p>
           </div>
           
-          <Button 
-            onClick={() => navigate("/chat")}
-            className="bg-primary/10 text-primary hover:bg-primary/20 rounded-xl"
-            data-testid="discuss-chart-btn"
-          >
-            Discuss with AI Coach
-            <ChevronRight className="w-4 h-4 ml-1" />
-          </Button>
+          <div className="flex gap-3">
+            <Button 
+              onClick={() => navigate("/share")}
+              variant="outline"
+              className="border-border rounded-xl"
+              data-testid="share-chart-btn"
+            >
+              <Share2 className="w-4 h-4 mr-2" />
+              Share
+            </Button>
+            <Button 
+              onClick={() => navigate("/chat")}
+              className="bg-primary/10 text-primary hover:bg-primary/20 rounded-xl"
+              data-testid="discuss-chart-btn"
+            >
+              Discuss with AI Coach
+              <ChevronRight className="w-4 h-4 ml-1" />
+            </Button>
+          </div>
         </div>
 
         {/* Big Three */}
