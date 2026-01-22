@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth, API } from "@/App";
+import { useTheme } from "@/context/ThemeContext";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,12 +13,15 @@ import {
   MessageCircle,
   Plus,
   Clock,
-  User
+  User,
+  Sun,
+  Moon
 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function ChatPage() {
   const { user, token } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -28,6 +32,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     fetchSessions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -97,17 +102,26 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="min-h-screen bg-cosmic-void flex">
+    <div className="min-h-screen bg-background flex">
       {/* Sessions Sidebar */}
-      <aside className="w-72 bg-black/40 border-r border-white/5 flex flex-col h-screen">
-        <div className="p-4 border-b border-white/5">
-          <Link to="/dashboard" className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4">
-            <ArrowLeft className="w-4 h-4" />
-            <span className="text-sm">Back to Dashboard</span>
-          </Link>
+      <aside className="w-72 bg-card/50 backdrop-blur-sm border-r border-border flex flex-col h-screen">
+        <div className="p-4 border-b border-border space-y-4">
+          <div className="flex items-center justify-between">
+            <Link to="/dashboard" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+              <ArrowLeft className="w-4 h-4" />
+              <span className="text-sm">Dashboard</span>
+            </Link>
+            <button
+              onClick={toggleTheme}
+              className="w-8 h-8 rounded-lg bg-muted/50 flex items-center justify-center"
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? <Sun className="w-4 h-4 text-primary" /> : <Moon className="w-4 h-4" />}
+            </button>
+          </div>
           
           <Button 
-            className="w-full bg-primary/10 text-primary hover:bg-primary/20"
+            className="w-full bg-primary/10 text-primary hover:bg-primary/20 rounded-xl"
             onClick={startNewSession}
             data-testid="new-chat-btn"
           >
@@ -122,14 +136,14 @@ export default function ChatPage() {
               <button
                 key={session.session_id}
                 onClick={() => loadSession(session.session_id)}
-                className={`w-full text-left p-3 rounded-lg transition-colors ${
+                className={`w-full text-left p-3 rounded-xl transition-all ${
                   sessionId === session.session_id 
                     ? 'bg-primary/10 border border-primary/20' 
-                    : 'hover:bg-white/5'
+                    : 'hover:bg-muted'
                 }`}
                 data-testid={`session-${session.session_id}`}
               >
-                <p className="text-sm text-cosmic-starlight truncate mb-1">
+                <p className="text-sm text-foreground truncate mb-1">
                   {session.preview}...
                 </p>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -152,15 +166,15 @@ export default function ChatPage() {
       {/* Chat Area */}
       <main className="flex-1 flex flex-col h-screen">
         {/* Header */}
-        <header className="p-4 border-b border-white/5 bg-black/20">
+        <header className="p-4 border-b border-border bg-card/30 backdrop-blur-sm">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
               <Sparkles className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h1 className="font-medium text-cosmic-starlight">Gab44 AI Coach</h1>
-              <p className="text-xs text-green-400 flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-green-400" />
+              <h1 className="font-medium text-foreground">Gab44 AI Coach</h1>
+              <p className="text-xs text-green-500 flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-green-500" />
                 Online - Ready to guide you
               </p>
             </div>
@@ -172,13 +186,13 @@ export default function ChatPage() {
           <div className="max-w-3xl mx-auto space-y-6">
             {messages.length === 0 && (
               <div className="text-center py-16">
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4 border border-primary/20">
                   <Sparkles className="w-8 h-8 text-primary" />
                 </div>
-                <h2 className="font-serif text-xl text-cosmic-starlight mb-2">
+                <h2 className="font-serif text-xl text-foreground mb-2">
                   Hello, {user?.name?.split(" ")[0]}
                 </h2>
-                <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                <p className="text-muted-foreground mb-6 max-w-md mx-auto leading-relaxed">
                   I'm your personal astrology AI coach. Ask me anything about your chart, 
                   transits, relationships, career timing, or life guidance.
                 </p>
@@ -192,7 +206,7 @@ export default function ChatPage() {
                     <Button
                       key={prompt}
                       variant="outline"
-                      className="border-white/10 text-sm"
+                      className="border-border text-sm rounded-xl"
                       onClick={() => setInput(prompt)}
                       data-testid={`prompt-${prompt.replace(/\s+/g, '-').toLowerCase()}`}
                     >
@@ -209,7 +223,7 @@ export default function ChatPage() {
                 className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 {message.role === 'assistant' && (
-                  <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 border border-primary/20">
                     <Sparkles className="w-4 h-4 text-primary" />
                   </div>
                 )}
@@ -222,13 +236,13 @@ export default function ChatPage() {
                   }`}
                   data-testid={`message-${index}`}
                 >
-                  <p className="text-sm text-cosmic-starlight whitespace-pre-wrap leading-relaxed">
+                  <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
                     {message.content}
                   </p>
                 </div>
 
                 {message.role === 'user' && (
-                  <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center flex-shrink-0">
+                  <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                     <User className="w-4 h-4 text-muted-foreground" />
                   </div>
                 )}
@@ -237,7 +251,7 @@ export default function ChatPage() {
 
             {loading && (
               <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20">
                   <Sparkles className="w-4 h-4 text-primary animate-pulse" />
                 </div>
                 <div className="chat-bubble-assistant rounded-2xl rounded-tl-sm p-4">
@@ -255,19 +269,19 @@ export default function ChatPage() {
         </ScrollArea>
 
         {/* Input */}
-        <div className="p-4 border-t border-white/5 bg-black/20">
+        <div className="p-4 border-t border-border bg-card/30 backdrop-blur-sm">
           <form onSubmit={sendMessage} className="max-w-3xl mx-auto flex gap-3">
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask your AI coach anything..."
-              className="flex-1 bg-black/30 border-white/10 h-12"
+              className="flex-1 bg-muted/30 border-border h-12 rounded-xl focus-glow"
               disabled={loading}
               data-testid="chat-input"
             />
             <Button 
               type="submit" 
-              className="bg-primary text-primary-foreground h-12 px-6"
+              className="bg-primary text-primary-foreground h-12 px-6 rounded-xl"
               disabled={loading || !input.trim()}
               data-testid="send-btn"
             >

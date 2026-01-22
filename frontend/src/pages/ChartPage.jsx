@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth, API } from "@/App";
+import { useTheme } from "@/context/ThemeContext";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { 
@@ -9,8 +10,7 @@ import {
   Sun,
   Moon,
   Star,
-  ChevronRight,
-  Info
+  ChevronRight
 } from "lucide-react";
 import {
   Tooltip,
@@ -20,38 +20,13 @@ import {
 } from "@/components/ui/tooltip";
 
 const PLANET_SYMBOLS = {
-  sun: "☉",
-  moon: "☽",
-  mercury: "☿",
-  venus: "♀",
-  mars: "♂",
-  jupiter: "♃",
-  saturn: "♄",
-  uranus: "♅",
-  neptune: "♆",
-  pluto: "♇"
+  sun: "☉", moon: "☽", mercury: "☿", venus: "♀", mars: "♂",
+  jupiter: "♃", saturn: "♄", uranus: "♅", neptune: "♆", pluto: "♇"
 };
 
 const SIGN_SYMBOLS = {
-  Aries: "♈",
-  Taurus: "♉",
-  Gemini: "♊",
-  Cancer: "♋",
-  Leo: "♌",
-  Virgo: "♍",
-  Libra: "♎",
-  Scorpio: "♏",
-  Sagittarius: "♐",
-  Capricorn: "♑",
-  Aquarius: "♒",
-  Pisces: "♓"
-};
-
-const ELEMENT_COLORS = {
-  Fire: "text-orange-400",
-  Earth: "text-green-400",
-  Air: "text-cyan-400",
-  Water: "text-blue-400"
+  Aries: "♈", Taurus: "♉", Gemini: "♊", Cancer: "♋", Leo: "♌", Virgo: "♍",
+  Libra: "♎", Scorpio: "♏", Sagittarius: "♐", Capricorn: "♑", Aquarius: "♒", Pisces: "♓"
 };
 
 const getElement = (sign) => {
@@ -64,8 +39,13 @@ const getElement = (sign) => {
   return elements[sign] || "Unknown";
 };
 
+const ELEMENT_COLORS = {
+  Fire: "text-orange-500", Earth: "text-green-500", Air: "text-cyan-500", Water: "text-blue-500"
+};
+
 export default function ChartPage() {
   const { user, token } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [chart, setChart] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -88,7 +68,7 @@ export default function ChartPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-cosmic-void flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-pulse-glow w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
           <div className="w-8 h-8 rounded-full bg-primary/40" />
         </div>
@@ -97,16 +77,25 @@ export default function ChartPage() {
   }
 
   return (
-    <div className="min-h-screen bg-cosmic-void p-8">
+    <div className="min-h-screen bg-background p-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <Link to="/dashboard" className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4">
-              <ArrowLeft className="w-4 h-4" />
-              <span className="text-sm">Back to Dashboard</span>
-            </Link>
-            <h1 className="font-serif text-3xl text-cosmic-starlight">Your Birth Chart</h1>
+            <div className="flex items-center gap-4 mb-4">
+              <Link to="/dashboard" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+                <ArrowLeft className="w-4 h-4" />
+                <span className="text-sm">Dashboard</span>
+              </Link>
+              <button
+                onClick={toggleTheme}
+                className="w-8 h-8 rounded-lg bg-muted/50 flex items-center justify-center"
+                aria-label="Toggle theme"
+              >
+                {theme === "dark" ? <Sun className="w-4 h-4 text-primary" /> : <Moon className="w-4 h-4" />}
+              </button>
+            </div>
+            <h1 className="font-serif text-3xl text-foreground">Your Birth Chart</h1>
             <p className="text-muted-foreground">
               Born {user?.birth_date} in {user?.birth_place}
             </p>
@@ -114,7 +103,7 @@ export default function ChartPage() {
           
           <Button 
             onClick={() => navigate("/chat")}
-            className="bg-primary/10 text-primary hover:bg-primary/20"
+            className="bg-primary/10 text-primary hover:bg-primary/20 rounded-xl"
             data-testid="discuss-chart-btn"
           >
             Discuss with AI Coach
@@ -124,59 +113,41 @@ export default function ChartPage() {
 
         {/* Big Three */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="glass-card rounded-xl p-6" data-testid="sun-sign-card">
-            <div className="flex items-center justify-between mb-4">
-              <Sun className="w-8 h-8 text-primary" />
-              <span className="text-2xl">{SIGN_SYMBOLS[chart?.sun_sign]}</span>
+          {[
+            { icon: Sun, label: "Sun Sign", sign: chart?.sun_sign, color: "text-primary" },
+            { icon: Moon, label: "Moon Sign", sign: chart?.moon_sign, color: "text-muted-foreground" },
+            { icon: Star, label: "Rising Sign", sign: chart?.rising_sign, color: "text-chart-2" }
+          ].map(({ icon: Icon, label, sign, color }) => (
+            <div key={label} className="glass-card rounded-xl p-6 card-lift" data-testid={`${label.toLowerCase().replace(' ', '-')}-card`}>
+              <div className="flex items-center justify-between mb-4">
+                <Icon className={`w-8 h-8 ${color}`} />
+                <span className="text-2xl">{SIGN_SYMBOLS[sign]}</span>
+              </div>
+              <p className="text-sm text-muted-foreground mb-1">{label}</p>
+              <p className="font-serif text-2xl text-foreground">{sign}</p>
+              <p className={`text-sm mt-2 ${ELEMENT_COLORS[getElement(sign)]}`}>
+                {getElement(sign)} Element
+              </p>
             </div>
-            <p className="text-sm text-muted-foreground mb-1">Sun Sign</p>
-            <p className="font-serif text-2xl text-cosmic-starlight">{chart?.sun_sign}</p>
-            <p className={`text-sm mt-2 ${ELEMENT_COLORS[getElement(chart?.sun_sign)]}`}>
-              {getElement(chart?.sun_sign)} Element
-            </p>
-          </div>
-
-          <div className="glass-card rounded-xl p-6" data-testid="moon-sign-card">
-            <div className="flex items-center justify-between mb-4">
-              <Moon className="w-8 h-8 text-cosmic-silver" />
-              <span className="text-2xl">{SIGN_SYMBOLS[chart?.moon_sign]}</span>
-            </div>
-            <p className="text-sm text-muted-foreground mb-1">Moon Sign</p>
-            <p className="font-serif text-2xl text-cosmic-starlight">{chart?.moon_sign}</p>
-            <p className={`text-sm mt-2 ${ELEMENT_COLORS[getElement(chart?.moon_sign)]}`}>
-              {getElement(chart?.moon_sign)} Element
-            </p>
-          </div>
-
-          <div className="glass-card rounded-xl p-6" data-testid="rising-sign-card">
-            <div className="flex items-center justify-between mb-4">
-              <Star className="w-8 h-8 text-cosmic-nebula" />
-              <span className="text-2xl">{SIGN_SYMBOLS[chart?.rising_sign]}</span>
-            </div>
-            <p className="text-sm text-muted-foreground mb-1">Rising Sign</p>
-            <p className="font-serif text-2xl text-cosmic-starlight">{chart?.rising_sign}</p>
-            <p className={`text-sm mt-2 ${ELEMENT_COLORS[getElement(chart?.rising_sign)]}`}>
-              {getElement(chart?.rising_sign)} Element
-            </p>
-          </div>
+          ))}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Planetary Positions */}
           <div className="glass-card rounded-xl p-6" data-testid="planets-card">
-            <h2 className="font-serif text-xl text-cosmic-starlight mb-6">Planetary Positions</h2>
+            <h2 className="font-serif text-xl text-foreground mb-6">Planetary Positions</h2>
             
-            <div className="space-y-4">
+            <div className="space-y-3">
               <TooltipProvider>
                 {chart?.planets && Object.entries(chart.planets).map(([planet, data]) => (
                   <div 
                     key={planet}
-                    className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                    className="flex items-center justify-between p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex items-center gap-3">
                       <span className="text-2xl w-8 text-center">{PLANET_SYMBOLS[planet]}</span>
                       <div>
-                        <p className="font-medium text-cosmic-starlight capitalize">{planet}</p>
+                        <p className="font-medium text-foreground capitalize">{planet}</p>
                         <p className="text-xs text-muted-foreground">House {data.house}</p>
                       </div>
                     </div>
@@ -185,7 +156,7 @@ export default function ChartPage() {
                       <Tooltip>
                         <TooltipTrigger>
                           <div className="text-right">
-                            <p className="text-sm text-cosmic-starlight">{data.sign}</p>
+                            <p className="text-sm text-foreground">{data.sign}</p>
                             <p className="text-xs text-muted-foreground font-mono">{data.degree.toFixed(1)}°</p>
                           </div>
                         </TooltipTrigger>
@@ -201,38 +172,31 @@ export default function ChartPage() {
             </div>
           </div>
 
-          {/* Houses */}
+          {/* Houses & Aspects */}
           <div className="space-y-6">
             <div className="glass-card rounded-xl p-6" data-testid="houses-card">
-              <h2 className="font-serif text-xl text-cosmic-starlight mb-6">House Cusps</h2>
+              <h2 className="font-serif text-xl text-foreground mb-6">House Cusps</h2>
               
               <div className="grid grid-cols-3 gap-3">
                 {chart?.houses && Object.entries(chart.houses).map(([house, sign]) => (
-                  <div 
-                    key={house}
-                    className="p-3 rounded-lg bg-white/5 text-center"
-                  >
+                  <div key={house} className="p-3 rounded-xl bg-muted/30 text-center">
                     <p className="text-xs text-muted-foreground mb-1">House {house}</p>
                     <p className="text-lg">{SIGN_SYMBOLS[sign]}</p>
-                    <p className="text-xs text-cosmic-starlight">{sign}</p>
+                    <p className="text-xs text-foreground">{sign}</p>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Aspects */}
             <div className="glass-card rounded-xl p-6" data-testid="aspects-card">
-              <h2 className="font-serif text-xl text-cosmic-starlight mb-6">Major Aspects</h2>
+              <h2 className="font-serif text-xl text-foreground mb-6">Major Aspects</h2>
               
               <div className="space-y-3">
                 {chart?.aspects?.map((aspect, i) => (
-                  <div 
-                    key={i}
-                    className="flex items-center justify-between p-3 rounded-lg bg-white/5"
-                  >
+                  <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-muted/30">
                     <div className="flex items-center gap-2">
                       <span className="text-lg">{PLANET_SYMBOLS[aspect.planet1]}</span>
-                      <span className="text-xs text-primary">{aspect.aspect}</span>
+                      <span className="text-xs text-primary font-medium">{aspect.aspect}</span>
                       <span className="text-lg">{PLANET_SYMBOLS[aspect.planet2]}</span>
                     </div>
                     <span className="text-xs text-muted-foreground font-mono">
@@ -243,19 +207,12 @@ export default function ChartPage() {
               </div>
             </div>
 
-            {/* Patterns */}
             {chart?.patterns?.length > 0 && (
               <div className="glass-card rounded-xl p-6" data-testid="patterns-card">
-                <h2 className="font-serif text-xl text-cosmic-starlight mb-4">Chart Patterns</h2>
-                
+                <h2 className="font-serif text-xl text-foreground mb-4">Chart Patterns</h2>
                 <div className="flex flex-wrap gap-2">
                   {chart.patterns.map((pattern, i) => (
-                    <span 
-                      key={i}
-                      className="zodiac-badge rounded-full px-4 py-2 text-sm"
-                    >
-                      {pattern}
-                    </span>
+                    <span key={i} className="zodiac-badge rounded-full px-4 py-2 text-sm">{pattern}</span>
                   ))}
                 </div>
               </div>
