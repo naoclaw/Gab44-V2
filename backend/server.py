@@ -382,10 +382,10 @@ async def get_my_chart(user: dict = Depends(get_current_user)):
     
     if not chart:
         # Generate a basic chart (in production, use Swiss Ephemeris)
-        sun_sign = user.get("sun_sign", calculate_sun_sign(user["birth_date"]))
+        sun_sign = user.get("sun_sign", calculate_sun_sign(user.get("birth_date", "1990-01-01")))
         
         # Simulated chart data - in production, calculate with Swiss Ephemeris
-        chart = {
+        chart_doc = {
             "id": str(uuid.uuid4()),
             "user_id": user["id"],
             "sun_sign": sun_sign,
@@ -416,7 +416,9 @@ async def get_my_chart(user: dict = Depends(get_current_user)):
             "patterns": ["T-Square", "Grand Trine (Water)"],
             "created_at": datetime.now(timezone.utc).isoformat()
         }
-        await db.birth_charts.insert_one(chart)
+        await db.birth_charts.insert_one(chart_doc)
+        # Return the chart without _id (which MongoDB adds during insert)
+        chart = {k: v for k, v in chart_doc.items() if k != "_id"}
     
     return chart
 
