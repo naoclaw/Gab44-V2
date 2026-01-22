@@ -1,18 +1,15 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth, API } from "@/App";
+import { useTheme } from "@/context/ThemeContext";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
-import { 
-  Sparkles, 
-  Check, 
-  ArrowLeft,
-  Star
-} from "lucide-react";
+import { Sparkles, Check, ArrowLeft, Star, Sun, Moon } from "lucide-react";
 
 export default function PricingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -32,31 +29,42 @@ export default function PricingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-cosmic-void flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-pulse-glow w-16 h-16 rounded-full bg-primary/20" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-cosmic-void p-8">
+    <div className="min-h-screen bg-background p-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-12">
-          <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-8">
-            <ArrowLeft className="w-4 h-4" />
-            <span className="text-sm">Back to Home</span>
-          </Link>
+          <div className="flex items-center justify-between mb-8">
+            <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+              <ArrowLeft className="w-4 h-4" />
+              <span className="text-sm">Back to Home</span>
+            </Link>
+            <button
+              onClick={toggleTheme}
+              className="w-10 h-10 rounded-xl bg-muted/50 hover:bg-muted flex items-center justify-center transition-colors border border-border/50"
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? <Sun className="w-5 h-5 text-primary" /> : <Moon className="w-5 h-5 text-muted-foreground" />}
+            </button>
+          </div>
           
           <div className="text-center">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <Sparkles className="w-6 h-6 text-primary" />
-              <span className="font-serif text-xl text-cosmic-starlight">Gab44</span>
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                <Sparkles className="w-5 h-5 text-primary" />
+              </div>
+              <span className="font-serif text-xl text-foreground">Gab44</span>
             </div>
-            <h1 className="font-serif text-4xl md:text-5xl text-cosmic-starlight mb-4">
+            <h1 className="font-serif text-foreground mb-4">
               Choose Your Path
             </h1>
-            <p className="text-muted-foreground max-w-xl mx-auto">
+            <p className="text-muted-foreground max-w-xl mx-auto leading-relaxed">
               Flexible plans designed to meet you wherever you are on your journey. 
               Start free and upgrade when you're ready for deeper guidance.
             </p>
@@ -68,21 +76,21 @@ export default function PricingPage() {
           {plans.map((plan, index) => (
             <div 
               key={plan.id}
-              className={`glass-card rounded-2xl p-6 relative ${plan.popular ? 'pricing-popular' : ''}`}
+              className={`glass-card rounded-2xl p-6 relative card-lift ${plan.popular ? 'pricing-popular' : ''}`}
               data-testid={`pricing-plan-${index}`}
             >
               {plan.popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-medium px-3 py-1 rounded-full flex items-center gap-1">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-semibold px-4 py-1.5 rounded-full flex items-center gap-1">
                   <Star className="w-3 h-3" />
                   Most Popular
                 </div>
               )}
               
-              <h3 className="font-serif text-xl text-cosmic-starlight mb-1">{plan.name}</h3>
+              <h3 className="font-serif text-xl text-foreground mb-1">{plan.name}</h3>
               <p className="text-sm text-muted-foreground mb-6">{plan.tagline}</p>
               
               <div className="mb-6">
-                <span className="font-serif text-4xl text-cosmic-starlight">${plan.price}</span>
+                <span className="font-serif text-4xl text-foreground">${plan.price}</span>
                 <span className="text-muted-foreground">/{plan.period}</span>
               </div>
 
@@ -96,7 +104,7 @@ export default function PricingPage() {
               </ul>
 
               <Button 
-                className={`w-full ${plan.popular ? 'glow-button bg-primary text-primary-foreground' : 'bg-secondary'}`}
+                className={`w-full rounded-xl ${plan.popular ? 'glow-button bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}
                 onClick={() => navigate(user ? "/dashboard" : "/auth?mode=register")}
                 data-testid={`pricing-cta-${index}`}
               >

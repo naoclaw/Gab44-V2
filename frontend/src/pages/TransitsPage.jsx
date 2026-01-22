@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth, API } from "@/App";
+import { useTheme } from "@/context/ThemeContext";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { 
@@ -8,23 +9,24 @@ import {
   Calendar,
   ChevronRight,
   Zap,
-  Clock,
   Target,
-  AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Sun,
+  Moon
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
 const ASPECT_COLORS = {
-  trine: "text-green-400 bg-green-400/10",
-  sextile: "text-cyan-400 bg-cyan-400/10",
-  conjunction: "text-primary bg-primary/10",
-  square: "text-orange-400 bg-orange-400/10",
-  opposition: "text-red-400 bg-red-400/10"
+  trine: "text-green-500 bg-green-500/10 border-green-500/20",
+  sextile: "text-cyan-500 bg-cyan-500/10 border-cyan-500/20",
+  conjunction: "text-primary bg-primary/10 border-primary/20",
+  square: "text-orange-500 bg-orange-500/10 border-orange-500/20",
+  opposition: "text-red-500 bg-red-500/10 border-red-500/20"
 };
 
 export default function TransitsPage() {
-  const { user, token } = useAuth();
+  const { token } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [transits, setTransits] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -52,25 +54,32 @@ export default function TransitsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-cosmic-void flex items-center justify-center">
-        <div className="animate-pulse-glow w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
-          <div className="w-8 h-8 rounded-full bg-primary/40" />
-        </div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-pulse-glow w-16 h-16 rounded-full bg-primary/20" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-cosmic-void p-8">
+    <div className="min-h-screen bg-background p-8">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <Link to="/dashboard" className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4">
-              <ArrowLeft className="w-4 h-4" />
-              <span className="text-sm">Back to Dashboard</span>
-            </Link>
-            <h1 className="font-serif text-3xl text-cosmic-starlight">Transit Forecast</h1>
+            <div className="flex items-center gap-4 mb-4">
+              <Link to="/dashboard" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+                <ArrowLeft className="w-4 h-4" />
+                <span className="text-sm">Dashboard</span>
+              </Link>
+              <button
+                onClick={toggleTheme}
+                className="w-8 h-8 rounded-lg bg-muted/50 flex items-center justify-center"
+                aria-label="Toggle theme"
+              >
+                {theme === "dark" ? <Sun className="w-4 h-4 text-primary" /> : <Moon className="w-4 h-4" />}
+              </button>
+            </div>
+            <h1 className="font-serif text-3xl text-foreground">Transit Forecast</h1>
             <p className="text-muted-foreground">
               Upcoming planetary activations for the next 90 days
             </p>
@@ -78,7 +87,7 @@ export default function TransitsPage() {
           
           <Button 
             onClick={() => navigate("/chat")}
-            className="bg-primary/10 text-primary hover:bg-primary/20"
+            className="bg-primary/10 text-primary hover:bg-primary/20 rounded-xl"
             data-testid="discuss-transits-btn"
           >
             Discuss with AI Coach
@@ -94,7 +103,7 @@ export default function TransitsPage() {
               variant={filter === f ? "default" : "outline"}
               size="sm"
               onClick={() => setFilter(f)}
-              className={filter === f ? "bg-primary" : "border-white/10"}
+              className={`rounded-xl ${filter === f ? "bg-primary text-primary-foreground" : "border-border"}`}
               data-testid={`filter-${f}`}
             >
               {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -107,24 +116,21 @@ export default function TransitsPage() {
           {filteredTransits.map((transit, index) => (
             <div 
               key={transit.id}
-              className="transit-card glass-card rounded-xl p-6"
+              className="transit-card glass-card rounded-xl p-6 card-lift"
               data-testid={`transit-${index}`}
             >
               <div className="flex flex-col md:flex-row md:items-start gap-6">
                 {/* Left: Date & Type */}
                 <div className="md:w-48 flex-shrink-0">
-                  <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm ${ASPECT_COLORS[transit.aspect] || 'bg-white/10'}`}>
+                  <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm border ${ASPECT_COLORS[transit.aspect] || 'bg-muted'}`}>
                     {transit.aspect}
                   </div>
-                  <h3 className="font-serif text-xl text-cosmic-starlight mt-3 mb-2">
+                  <h3 className="font-serif text-xl text-foreground mt-3 mb-2">
                     {transit.transit_type}
                   </h3>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Calendar className="w-4 h-4" />
-                    Peak: {new Date(transit.peak_date).toLocaleDateString('en-US', { 
-                      month: 'short', 
-                      day: 'numeric' 
-                    })}
+                    Peak: {new Date(transit.peak_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </div>
                 </div>
 
@@ -134,9 +140,8 @@ export default function TransitsPage() {
                     {transit.interpretation}
                   </p>
 
-                  {/* Action Items */}
                   <div className="space-y-2">
-                    <p className="text-sm font-medium text-cosmic-starlight flex items-center gap-2">
+                    <p className="text-sm font-medium text-foreground flex items-center gap-2">
                       <Target className="w-4 h-4 text-primary" />
                       Action Items
                     </p>
@@ -166,7 +171,7 @@ export default function TransitsPage() {
                       <span>Peak</span>
                       <span>End</span>
                     </div>
-                    <Progress value={50} className="h-2 bg-secondary" />
+                    <Progress value={50} className="h-2" />
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span>{new Date(transit.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                       <span>{new Date(transit.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
@@ -178,8 +183,8 @@ export default function TransitsPage() {
           ))}
 
           {filteredTransits.length === 0 && (
-            <div className="text-center py-12">
-              <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <div className="text-center py-12 glass-card rounded-xl">
+              <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">No transits found for this filter</p>
             </div>
           )}
@@ -190,12 +195,12 @@ export default function TransitsPage() {
           <div className="flex items-start gap-4">
             <Zap className="w-6 h-6 text-primary flex-shrink-0" />
             <div>
-              <h3 className="font-medium text-cosmic-starlight mb-2">Understanding Transits</h3>
+              <h3 className="font-medium text-foreground mb-2">Understanding Transits</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 Transits are the current movements of planets as they interact with your natal chart. 
                 They represent timing for different types of experiences and opportunities. 
-                <strong className="text-cosmic-starlight"> Harmonious aspects</strong> (trines, sextiles) indicate flow and ease, 
-                while <strong className="text-cosmic-starlight">challenging aspects</strong> (squares, oppositions) push for growth and change.
+                <strong className="text-foreground"> Harmonious aspects</strong> (trines, sextiles) indicate flow and ease, 
+                while <strong className="text-foreground">challenging aspects</strong> (squares, oppositions) push for growth and change.
               </p>
             </div>
           </div>
