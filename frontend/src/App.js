@@ -13,6 +13,8 @@ import ChatPage from "@/pages/ChatPage";
 import ChartPage from "@/pages/ChartPage";
 import TransitsPage from "@/pages/TransitsPage";
 import PricingPage from "@/pages/PricingPage";
+import SettingsPage from "@/pages/SettingsPage";
+import ShareChartPage from "@/pages/ShareChartPage";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
@@ -144,6 +146,22 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <TransitsPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/settings" 
+                element={
+                  <ProtectedRoute>
+                    <SettingsPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/share" 
+                element={
+                  <ProtectedRoute>
+                    <ShareChartPage />
                   </ProtectedRoute>
                 } 
               />
