@@ -1,0 +1,125 @@
+import { useState, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { useAuth, API } from "@/App";
+import axios from "axios";
+import { Button } from "@/components/ui/button";
+import { 
+  Sparkles, 
+  Check, 
+  ArrowLeft,
+  Star
+} from "lucide-react";
+
+export default function PricingPage() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [plans, setPlans] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPricing = async () => {
+      try {
+        const response = await axios.get(`${API}/pricing`);
+        setPlans(response.data.plans);
+      } catch (error) {
+        console.error("Error fetching pricing:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPricing();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-cosmic-void flex items-center justify-center">
+        <div className="animate-pulse-glow w-16 h-16 rounded-full bg-primary/20" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-cosmic-void p-8">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="mb-12">
+          <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-8">
+            <ArrowLeft className="w-4 h-4" />
+            <span className="text-sm">Back to Home</span>
+          </Link>
+          
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <Sparkles className="w-6 h-6 text-primary" />
+              <span className="font-serif text-xl text-cosmic-starlight">Gab44</span>
+            </div>
+            <h1 className="font-serif text-4xl md:text-5xl text-cosmic-starlight mb-4">
+              Choose Your Path
+            </h1>
+            <p className="text-muted-foreground max-w-xl mx-auto">
+              Flexible plans designed to meet you wherever you are on your journey. 
+              Start free and upgrade when you're ready for deeper guidance.
+            </p>
+          </div>
+        </div>
+
+        {/* Pricing Grid */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          {plans.map((plan, index) => (
+            <div 
+              key={plan.id}
+              className={`glass-card rounded-2xl p-6 relative ${plan.popular ? 'pricing-popular' : ''}`}
+              data-testid={`pricing-plan-${index}`}
+            >
+              {plan.popular && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-medium px-3 py-1 rounded-full flex items-center gap-1">
+                  <Star className="w-3 h-3" />
+                  Most Popular
+                </div>
+              )}
+              
+              <h3 className="font-serif text-xl text-cosmic-starlight mb-1">{plan.name}</h3>
+              <p className="text-sm text-muted-foreground mb-6">{plan.tagline}</p>
+              
+              <div className="mb-6">
+                <span className="font-serif text-4xl text-cosmic-starlight">${plan.price}</span>
+                <span className="text-muted-foreground">/{plan.period}</span>
+              </div>
+
+              <ul className="space-y-3 mb-6">
+                {plan.features.map((feature, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+
+              <Button 
+                className={`w-full ${plan.popular ? 'glow-button bg-primary text-primary-foreground' : 'bg-secondary'}`}
+                onClick={() => navigate(user ? "/dashboard" : "/auth?mode=register")}
+                data-testid={`pricing-cta-${index}`}
+              >
+                {plan.cta}
+              </Button>
+            </div>
+          ))}
+        </div>
+
+        {/* FAQ Link */}
+        <div className="text-center">
+          <p className="text-muted-foreground">
+            Have questions? Check our{" "}
+            <Link to="/#faq" className="text-primary hover:underline">
+              FAQ section
+            </Link>{" "}
+            or{" "}
+            <a href="mailto:contact@gab44.com" className="text-primary hover:underline">
+              contact us
+            </a>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
