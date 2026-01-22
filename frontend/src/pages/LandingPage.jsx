@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/App";
+import { useTheme } from "@/context/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -16,7 +17,6 @@ import {
   Shield,
   Zap,
   Users,
-  ChevronDown,
   Menu,
   X
 } from "lucide-react";
@@ -27,42 +27,62 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 
-const ZODIAC_SIGNS = [
-  "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
-  "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"
-];
-
 const Navigation = () => {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 20);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 nav-blur bg-black/60 border-b border-white/5">
+    <nav className={`fixed top-0 left-0 right-0 z-50 glass-header ${scrolled ? 'scrolled' : ''}`}>
       <div className="max-w-7xl mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2" data-testid="nav-logo">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-cosmic-nebula/20 flex items-center justify-center border border-primary/30">
+          <Link to="/" className="flex items-center gap-3" data-testid="nav-logo">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/20 shadow-sm">
               <Sparkles className="w-5 h-5 text-primary" />
             </div>
-            <span className="font-serif text-xl font-semibold text-cosmic-starlight">Gab44</span>
+            <span className="font-serif text-xl font-semibold text-foreground">Gab44</span>
           </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors link-hover">Features</a>
-            <a href="#testimonials" className="text-sm text-muted-foreground hover:text-foreground transition-colors link-hover">Testimonials</a>
-            <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors link-hover">Pricing</a>
-            <a href="#faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors link-hover">FAQ</a>
+            <a href="#features" className="nav-link text-sm text-muted-foreground hover:text-foreground link-hover">Features</a>
+            <a href="#testimonials" className="nav-link text-sm text-muted-foreground hover:text-foreground link-hover">Testimonials</a>
+            <a href="#pricing" className="nav-link text-sm text-muted-foreground hover:text-foreground link-hover">Pricing</a>
+            <a href="#faq" className="nav-link text-sm text-muted-foreground hover:text-foreground link-hover">FAQ</a>
           </div>
 
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-3">
+            {/* Theme Toggle */}
+            <button
+              onClick={toggleTheme}
+              className="w-10 h-10 rounded-xl bg-muted/50 hover:bg-muted flex items-center justify-center transition-colors border border-border/50"
+              data-testid="theme-toggle"
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? (
+                <Sun className="w-5 h-5 text-primary" />
+              ) : (
+                <Moon className="w-5 h-5 text-muted-foreground" />
+              )}
+            </button>
+
             {user ? (
               <>
                 <Button 
                   variant="ghost" 
                   onClick={() => navigate("/dashboard")}
                   data-testid="nav-dashboard-btn"
+                  className="text-foreground"
                 >
                   Dashboard
                 </Button>
@@ -70,7 +90,7 @@ const Navigation = () => {
                   variant="outline" 
                   onClick={logout}
                   data-testid="nav-logout-btn"
-                  className="border-white/10"
+                  className="border-border"
                 >
                   Sign Out
                 </Button>
@@ -81,6 +101,7 @@ const Navigation = () => {
                   variant="ghost" 
                   onClick={() => navigate("/auth")}
                   data-testid="nav-login-btn"
+                  className="text-foreground"
                 >
                   Sign In
                 </Button>
@@ -89,40 +110,47 @@ const Navigation = () => {
                   data-testid="nav-register-btn"
                   className="glow-button bg-primary text-primary-foreground hover:bg-primary/90"
                 >
-                  Create Free Chart
+                  Get Started
                 </Button>
               </>
             )}
           </div>
 
-          {/* Mobile menu button */}
-          <button 
-            className="md:hidden text-foreground"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            data-testid="mobile-menu-btn"
-          >
-            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
+          {/* Mobile controls */}
+          <div className="flex md:hidden items-center gap-2">
+            <button
+              onClick={toggleTheme}
+              className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center"
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? <Sun className="w-5 h-5 text-primary" /> : <Moon className="w-5 h-5" />}
+            </button>
+            <button 
+              className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              data-testid="mobile-menu-btn"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
 
         {/* Mobile menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden mt-4 pb-4 border-t border-white/5 pt-4">
-            <div className="flex flex-col gap-4">
-              <a href="#features" className="text-muted-foreground">Features</a>
-              <a href="#testimonials" className="text-muted-foreground">Testimonials</a>
-              <a href="#pricing" className="text-muted-foreground">Pricing</a>
-              <a href="#faq" className="text-muted-foreground">FAQ</a>
-              <div className="flex gap-2 mt-2">
-                {user ? (
-                  <Button onClick={() => navigate("/dashboard")} className="flex-1">Dashboard</Button>
-                ) : (
-                  <>
-                    <Button variant="outline" onClick={() => navigate("/auth")} className="flex-1">Sign In</Button>
-                    <Button onClick={() => navigate("/auth?mode=register")} className="flex-1 bg-primary">Get Started</Button>
-                  </>
-                )}
-              </div>
+          <div className="md:hidden mt-4 pb-4 border-t border-border pt-4 space-y-4">
+            <a href="#features" className="block text-muted-foreground hover:text-foreground py-2">Features</a>
+            <a href="#testimonials" className="block text-muted-foreground hover:text-foreground py-2">Testimonials</a>
+            <a href="#pricing" className="block text-muted-foreground hover:text-foreground py-2">Pricing</a>
+            <a href="#faq" className="block text-muted-foreground hover:text-foreground py-2">FAQ</a>
+            <div className="flex gap-2 pt-2">
+              {user ? (
+                <Button onClick={() => navigate("/dashboard")} className="flex-1 bg-primary">Dashboard</Button>
+              ) : (
+                <>
+                  <Button variant="outline" onClick={() => navigate("/auth")} className="flex-1">Sign In</Button>
+                  <Button onClick={() => navigate("/auth?mode=register")} className="flex-1 bg-primary">Get Started</Button>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -133,6 +161,7 @@ const Navigation = () => {
 
 const HeroSection = () => {
   const navigate = useNavigate();
+  const { theme } = useTheme();
   const [birthDate, setBirthDate] = useState("");
   const [sunSign, setSunSign] = useState(null);
 
@@ -179,24 +208,25 @@ const HeroSection = () => {
           backgroundImage: `url('https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?q=80&w=2000')`
         }}
       />
-      <div className="absolute inset-0 hero-gradient" />
+      <div className={`absolute inset-0 ${theme === 'dark' ? 'hero-gradient-dark' : 'hero-gradient-light'}`} />
+      <div className="absolute inset-0 cosmic-gradient" />
       
       {/* Floating elements */}
-      <div className="absolute top-1/4 left-10 w-2 h-2 rounded-full bg-primary/50 animate-float star" style={{ animationDelay: '0s' }} />
-      <div className="absolute top-1/3 right-20 w-1.5 h-1.5 rounded-full bg-cosmic-nebula/50 animate-float star" style={{ animationDelay: '1s' }} />
-      <div className="absolute bottom-1/3 left-1/4 w-1 h-1 rounded-full bg-white/30 animate-float star" style={{ animationDelay: '2s' }} />
+      <div className="absolute top-1/4 left-10 w-2 h-2 rounded-full bg-primary/50 animate-float" style={{ animationDelay: '0s' }} />
+      <div className="absolute top-1/3 right-20 w-1.5 h-1.5 rounded-full bg-chart-2/50 animate-float" style={{ animationDelay: '1s' }} />
+      <div className="absolute bottom-1/3 left-1/4 w-1 h-1 rounded-full bg-foreground/30 animate-float" style={{ animationDelay: '2s' }} />
 
       <div className="relative z-10 max-w-6xl mx-auto px-6 text-center">
-        <p className="text-primary font-medium mb-4 fade-in tracking-widest text-sm uppercase">
+        <p className="text-primary font-semibold mb-4 fade-in tracking-widest text-sm uppercase">
           Advanced Astrology AI Coaching
         </p>
         
-        <h1 className="font-serif text-5xl md:text-7xl lg:text-8xl font-semibold text-cosmic-starlight mb-6 fade-in fade-in-delay-1">
+        <h1 className="font-serif text-5xl md:text-7xl lg:text-8xl font-semibold text-foreground mb-6 fade-in fade-in-delay-1 hero-title">
           Discover Your <br />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-cosmic-gold to-primary">Truth</span>
+          <span className="gradient-text">Truth</span>
         </h1>
         
-        <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 fade-in fade-in-delay-2">
+        <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 fade-in fade-in-delay-2 leading-relaxed">
           Align with your truest self through holistic astrology, gematria, and numerology. 
           Experience accurate, non-judgmental AI coaching tailored to your unique cosmic blueprint.
         </p>
@@ -206,7 +236,7 @@ const HeroSection = () => {
             size="lg" 
             onClick={() => navigate("/auth?mode=register")}
             data-testid="hero-cta-btn"
-            className="glow-button bg-primary text-primary-foreground hover:bg-primary/90 text-base px-8 py-6"
+            className="glow-button bg-primary text-primary-foreground hover:bg-primary/90 text-base px-8 py-6 rounded-xl"
           >
             Create Your Free Chart
             <ArrowRight className="ml-2 w-5 h-5" />
@@ -216,7 +246,7 @@ const HeroSection = () => {
             variant="outline"
             onClick={() => document.getElementById('features').scrollIntoView({ behavior: 'smooth' })}
             data-testid="hero-features-btn"
-            className="border-white/20 hover:bg-white/5 text-base px-8 py-6"
+            className="border-border hover:bg-muted text-base px-8 py-6 rounded-xl"
           >
             Explore Features
           </Button>
@@ -224,7 +254,7 @@ const HeroSection = () => {
 
         {/* Quick Sign Calculator */}
         <div className="glass-card rounded-2xl p-6 md:p-8 max-w-md mx-auto fade-in fade-in-delay-4">
-          <h3 className="font-serif text-lg mb-4 text-cosmic-starlight">What's Your Cosmic Blueprint?</h3>
+          <h3 className="font-serif text-lg mb-4 text-foreground">What's Your Cosmic Blueprint?</h3>
           <p className="text-sm text-muted-foreground mb-4">Enter your birth date to reveal your Sun Sign archetype.</p>
           
           <div className="flex gap-3">
@@ -232,20 +262,20 @@ const HeroSection = () => {
               type="date"
               value={birthDate}
               onChange={(e) => setBirthDate(e.target.value)}
-              className="flex-1 bg-black/30 border-white/10 h-12"
+              className="flex-1 bg-background/50 border-border h-12 rounded-xl"
               data-testid="birth-date-input"
             />
             <Button 
               onClick={calculateSunSign}
               data-testid="reveal-sign-btn"
-              className="bg-primary text-primary-foreground px-6"
+              className="bg-primary text-primary-foreground px-6 rounded-xl"
             >
               Reveal
             </Button>
           </div>
 
           {sunSign && (
-            <div className="mt-6 p-4 rounded-lg bg-primary/10 border border-primary/20">
+            <div className="mt-6 p-4 rounded-xl bg-primary/10 border border-primary/20">
               <p className="text-sm text-muted-foreground">Your Sun Sign</p>
               <p className="font-serif text-2xl text-primary" data-testid="sun-sign-result">{sunSign}</p>
             </div>
@@ -255,15 +285,15 @@ const HeroSection = () => {
         {/* Stats */}
         <div className="flex flex-wrap justify-center gap-8 md:gap-16 mt-16 fade-in fade-in-delay-5">
           <div className="text-center">
-            <p className="font-serif text-3xl md:text-4xl text-cosmic-starlight stat-number">10k+</p>
+            <p className="font-serif text-3xl md:text-4xl text-foreground stat-number">10k+</p>
             <p className="text-sm text-muted-foreground">Users Guided</p>
           </div>
           <div className="text-center">
-            <p className="font-serif text-3xl md:text-4xl text-cosmic-starlight stat-number">99%</p>
+            <p className="font-serif text-3xl md:text-4xl text-foreground stat-number">99%</p>
             <p className="text-sm text-muted-foreground">Accuracy</p>
           </div>
           <div className="text-center">
-            <p className="font-serif text-3xl md:text-4xl text-cosmic-starlight stat-number">24/7</p>
+            <p className="font-serif text-3xl md:text-4xl text-foreground stat-number">24/7</p>
             <p className="text-sm text-muted-foreground">AI Coaching</p>
           </div>
         </div>
@@ -304,11 +334,11 @@ const FeaturesSection = () => {
     <section id="features" className="py-24 px-6 relative">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
-          <p className="text-primary font-medium mb-3 tracking-widest text-sm uppercase">Holistic Guidance</p>
-          <h2 className="font-serif text-4xl md:text-5xl text-cosmic-starlight mb-4">
+          <p className="text-primary font-semibold mb-3 tracking-widest text-sm uppercase">Holistic Guidance</p>
+          <h2 className="font-serif text-foreground mb-4">
             Ancient Wisdom Meets Modern AI
           </h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
             Our platform combines ancient wisdom with modern AI to provide comprehensive insights into every aspect of your life.
           </p>
         </div>
@@ -318,7 +348,7 @@ const FeaturesSection = () => {
           {features.map((feature, index) => (
             <div 
               key={feature.title} 
-              className="feature-card rounded-2xl overflow-hidden group transition-all duration-300"
+              className="feature-card rounded-2xl overflow-hidden group card-lift"
               data-testid={`feature-card-${index}`}
             >
               <div className="aspect-video overflow-hidden">
@@ -332,7 +362,7 @@ const FeaturesSection = () => {
                 <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
                   <feature.icon className="w-6 h-6 text-primary" />
                 </div>
-                <h3 className="font-serif text-xl text-cosmic-starlight mb-2">{feature.title}</h3>
+                <h3 className="font-serif text-xl text-foreground mb-2">{feature.title}</h3>
                 <p className="text-muted-foreground text-sm leading-relaxed">{feature.description}</p>
               </div>
             </div>
@@ -341,8 +371,8 @@ const FeaturesSection = () => {
 
         {/* Life Areas */}
         <div className="text-center mb-12">
-          <h3 className="font-serif text-3xl text-cosmic-starlight mb-4">Comprehensive Life Guidance</h3>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
+          <h3 className="font-serif text-foreground mb-4">Comprehensive Life Guidance</h3>
+          <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
             Our platform doesn't just look at the stars; it looks at how they influence every tangible aspect of your daily life.
           </p>
         </div>
@@ -351,14 +381,14 @@ const FeaturesSection = () => {
           {lifeAreas.map((area, index) => (
             <div 
               key={area.title}
-              className="glass-card rounded-xl p-6 hover:border-primary/30 transition-all duration-300"
+              className="glass-card rounded-xl p-6 card-lift"
               data-testid={`life-area-${index}`}
             >
               <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
                 <area.icon className="w-5 h-5 text-primary" />
               </div>
-              <h4 className="font-medium text-cosmic-starlight mb-2">{area.title}</h4>
-              <p className="text-sm text-muted-foreground">{area.description}</p>
+              <h4 className="font-medium text-foreground mb-2">{area.title}</h4>
+              <p className="text-sm text-muted-foreground leading-relaxed">{area.description}</p>
             </div>
           ))}
         </div>
@@ -369,7 +399,7 @@ const FeaturesSection = () => {
 
 const ChatPreview = () => {
   return (
-    <section className="py-24 px-6 bg-gradient-to-b from-transparent via-cosmic-nebula/5 to-transparent">
+    <section className="py-24 px-6">
       <div className="max-w-5xl mx-auto">
         <div className="glass-card rounded-2xl p-8 md:p-12">
           <div className="flex items-center gap-3 mb-8">
@@ -377,9 +407,9 @@ const ChatPreview = () => {
               <Sparkles className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <p className="font-medium text-cosmic-starlight">Gab44 Coach</p>
-              <p className="text-xs text-green-400 flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-green-400" />
+              <p className="font-medium text-foreground">Gab44 Coach</p>
+              <p className="text-xs text-green-500 flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-green-500" />
                 Online Now
               </p>
             </div>
@@ -387,20 +417,20 @@ const ChatPreview = () => {
 
           <div className="space-y-6">
             <div className="chat-bubble-assistant rounded-2xl rounded-tl-sm p-4 max-w-xl">
-              <p className="text-sm text-cosmic-starlight leading-relaxed">
+              <p className="text-sm text-foreground leading-relaxed">
                 Mercury is activating your career sector today. It's an excellent time for clear communication 
                 and strategic planning. How are you feeling about your current projects?
               </p>
             </div>
 
             <div className="chat-bubble-user rounded-2xl rounded-tr-sm p-4 max-w-md ml-auto">
-              <p className="text-sm text-cosmic-starlight">
+              <p className="text-sm text-foreground">
                 I've been feeling a bit stuck lately, actually.
               </p>
             </div>
 
             <div className="chat-bubble-assistant rounded-2xl rounded-tl-sm p-4 max-w-xl">
-              <p className="text-sm text-cosmic-starlight leading-relaxed">
+              <p className="text-sm text-foreground leading-relaxed">
                 That's completely natural with Saturn squaring your Mars right now. This tension is actually 
                 inviting you to slow down and restructure rather than push harder. Let's look at where you can simplify...
               </p>
@@ -438,8 +468,8 @@ const TestimonialsSection = () => {
     <section id="testimonials" className="py-24 px-6">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
-          <p className="text-primary font-medium mb-3 tracking-widest text-sm uppercase">Testimonials</p>
-          <h2 className="font-serif text-4xl md:text-5xl text-cosmic-starlight">
+          <p className="text-primary font-semibold mb-3 tracking-widest text-sm uppercase">Testimonials</p>
+          <h2 className="font-serif text-foreground">
             Trusted by Seekers Worldwide
           </h2>
         </div>
@@ -448,7 +478,7 @@ const TestimonialsSection = () => {
           {testimonials.map((testimonial, index) => (
             <div 
               key={testimonial.name}
-              className="testimonial-card glass-card rounded-2xl p-6"
+              className="testimonial-card glass-card rounded-2xl p-6 card-lift"
               data-testid={`testimonial-${index}`}
             >
               <div className="flex items-center gap-3 mb-4">
@@ -456,7 +486,7 @@ const TestimonialsSection = () => {
                   {testimonial.initial}
                 </div>
                 <div>
-                  <p className="font-medium text-cosmic-starlight">{testimonial.name}</p>
+                  <p className="font-medium text-foreground">{testimonial.name}</p>
                   <p className="text-xs text-muted-foreground">{testimonial.role}</p>
                 </div>
               </div>
@@ -522,8 +552,8 @@ const PricingSection = () => {
     <section id="pricing" className="py-24 px-6">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-16">
-          <p className="text-primary font-medium mb-3 tracking-widest text-sm uppercase">Pricing</p>
-          <h2 className="font-serif text-4xl md:text-5xl text-cosmic-starlight mb-4">
+          <p className="text-primary font-semibold mb-3 tracking-widest text-sm uppercase">Pricing</p>
+          <h2 className="font-serif text-foreground mb-4">
             Choose Your Path
           </h2>
           <p className="text-muted-foreground">
@@ -535,20 +565,20 @@ const PricingSection = () => {
           {plans.map((plan, index) => (
             <div 
               key={plan.name}
-              className={`glass-card rounded-2xl p-6 relative ${plan.popular ? 'pricing-popular' : ''}`}
+              className={`glass-card rounded-2xl p-6 relative card-lift ${plan.popular ? 'pricing-popular' : ''}`}
               data-testid={`pricing-plan-${index}`}
             >
               {plan.popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-medium px-3 py-1 rounded-full">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-semibold px-4 py-1.5 rounded-full">
                   Most Popular
                 </div>
               )}
               
-              <h3 className="font-serif text-xl text-cosmic-starlight mb-1">{plan.name}</h3>
-              <p className="text-sm text-muted-foreground mb-4">{plan.tagline}</p>
+              <h3 className="font-serif text-xl text-foreground mb-1">{plan.name}</h3>
+              <p className="text-sm text-muted-foreground mb-6">{plan.tagline}</p>
               
               <div className="mb-6">
-                <span className="font-serif text-4xl text-cosmic-starlight">${plan.price}</span>
+                <span className="font-serif text-4xl text-foreground">${plan.price}</span>
                 <span className="text-muted-foreground">/month</span>
               </div>
 
@@ -562,7 +592,7 @@ const PricingSection = () => {
               </ul>
 
               <Button 
-                className={`w-full ${plan.popular ? 'glow-button bg-primary text-primary-foreground' : 'bg-secondary'}`}
+                className={`w-full rounded-xl ${plan.popular ? 'glow-button bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}
                 onClick={() => navigate("/auth?mode=register")}
                 data-testid={`pricing-cta-${index}`}
               >
@@ -600,8 +630,8 @@ const FAQSection = () => {
     <section id="faq" className="py-24 px-6">
       <div className="max-w-3xl mx-auto">
         <div className="text-center mb-16">
-          <p className="text-primary font-medium mb-3 tracking-widest text-sm uppercase">FAQ</p>
-          <h2 className="font-serif text-4xl md:text-5xl text-cosmic-starlight">
+          <p className="text-primary font-semibold mb-3 tracking-widest text-sm uppercase">FAQ</p>
+          <h2 className="font-serif text-foreground">
             Frequently Asked Questions
           </h2>
         </div>
@@ -614,10 +644,10 @@ const FAQSection = () => {
               className="glass-card rounded-xl px-6 border-none"
               data-testid={`faq-item-${index}`}
             >
-              <AccordionTrigger className="text-left font-medium text-cosmic-starlight hover:no-underline py-6">
+              <AccordionTrigger className="text-left font-medium text-foreground hover:no-underline py-6">
                 {faq.question}
               </AccordionTrigger>
-              <AccordionContent className="text-muted-foreground pb-6">
+              <AccordionContent className="text-muted-foreground pb-6 leading-relaxed">
                 {faq.answer}
               </AccordionContent>
             </AccordionItem>
@@ -633,20 +663,20 @@ const CTASection = () => {
 
   return (
     <section className="py-24 px-6 relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-t from-primary/10 via-transparent to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-primary/5 via-transparent to-transparent" />
       
       <div className="max-w-4xl mx-auto text-center relative z-10">
-        <h2 className="font-serif text-4xl md:text-5xl text-cosmic-starlight mb-6">
+        <h2 className="font-serif text-foreground mb-6">
           Ready to Align with Your Truth?
         </h2>
-        <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
+        <p className="text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed">
           Join thousands of others who are discovering their sacred mission and living with greater purpose.
         </p>
         <Button 
           size="lg"
           onClick={() => navigate("/auth?mode=register")}
           data-testid="cta-final-btn"
-          className="glow-button bg-primary text-primary-foreground hover:bg-primary/90 text-base px-8 py-6"
+          className="glow-button bg-primary text-primary-foreground hover:bg-primary/90 text-base px-8 py-6 rounded-xl"
         >
           Create Your Free Chart
           <ArrowRight className="ml-2 w-5 h-5" />
@@ -658,14 +688,14 @@ const CTASection = () => {
 
 const Footer = () => {
   return (
-    <footer className="border-t border-white/5 py-12 px-6">
+    <footer className="border-t border-border py-12 px-6">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
               <Sparkles className="w-4 h-4 text-primary" />
             </div>
-            <span className="font-serif text-lg text-cosmic-starlight">Gab44</span>
+            <span className="font-serif text-lg text-foreground">Gab44</span>
           </div>
           
           <p className="text-sm text-muted-foreground">
@@ -685,7 +715,7 @@ const Footer = () => {
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-cosmic-void">
+    <div className="min-h-screen bg-background">
       <Navigation />
       <HeroSection />
       <FeaturesSection />
