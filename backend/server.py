@@ -618,6 +618,20 @@ async def root():
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
 
+# ============== Admin: Upgrade All Users ==============
+
+@api_router.post("/admin/upgrade-all-users")
+async def upgrade_all_users_to_advanced():
+    """Upgrade all existing users to advanced tier (temporary until payment setup)"""
+    result = await db.users.update_many(
+        {"subscription_tier": {"$ne": "advanced"}},
+        {"$set": {"subscription_tier": "advanced"}}
+    )
+    return {
+        "message": "All users upgraded to advanced tier",
+        "modified_count": result.modified_count
+    }
+
 # Include router and setup middleware
 app.include_router(api_router)
 
