@@ -292,7 +292,7 @@ async def register(user_data: UserCreate):
         "birth_latitude": user_data.birth_latitude,
         "birth_longitude": user_data.birth_longitude,
         "sun_sign": sun_sign,
-        "subscription_tier": "seeker",
+        "subscription_tier": "advanced",  # Default to advanced until payment is setup
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
