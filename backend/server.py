@@ -180,8 +180,12 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
         
-        # Add is_admin flag based on email
-        user["is_admin"] = user.get("email", "").lower() in [e.lower().strip() for e in ADMIN_EMAILS]
+        # Admin status from DB role OR from ADMIN_EMAILS env var (bootstrap)
+        user_email = user.get("email", "").lower()
+        is_admin_by_role = user.get("role") == "admin"
+        is_admin_by_env = user_email in ADMIN_EMAILS
+        user["is_admin"] = is_admin_by_role or is_admin_by_env
+        
         return user
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
