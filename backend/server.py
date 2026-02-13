@@ -7,7 +7,7 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone, timedelta
 import jwt
@@ -31,6 +31,9 @@ JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
 
 # LLM Configuration
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
+
+# Admin emails (can be set via environment variable)
+ADMIN_EMAILS = os.environ.get('ADMIN_EMAILS', 'admin@gab44.com').split(',')
 
 app = FastAPI(title="Gab44 - Astrology AI Coaching Platform")
 api_router = APIRouter(prefix="/api")
