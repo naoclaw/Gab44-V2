@@ -20,7 +20,8 @@ import {
   Settings,
   Share2,
   Menu,
-  X
+  X,
+  Shield
 } from "lucide-react";
 
 const Sidebar = ({ activeTab, setActiveTab, mobileOpen, setMobileOpen }) => {
@@ -35,6 +36,7 @@ const Sidebar = ({ activeTab, setActiveTab, mobileOpen, setMobileOpen }) => {
     { id: "transits", icon: Calendar, label: "Transits", href: "/transits" },
     { id: "share", icon: Share2, label: "Share Chart", href: "/share" },
     { id: "settings", icon: Settings, label: "Settings", href: "/settings" },
+    { id: "admin", icon: Shield, label: "Admin", href: "/admin" },
   ];
 
   const handleNavClick = (item) => {
