@@ -1088,6 +1088,13 @@ async def get_all_users(skip: int = 0, limit: int = 50, admin: dict = Depends(re
         {"_id": 0, "password": 0}
     ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
     
+    # Add is_admin flag to each user
+    for user in users:
+        user_email = user.get("email", "").lower()
+        is_admin_by_role = user.get("role") == "admin"
+        is_admin_by_env = user_email in ADMIN_EMAILS
+        user["is_admin"] = is_admin_by_role or is_admin_by_env
+    
     total = await db.users.count_documents({})
     
     return {
