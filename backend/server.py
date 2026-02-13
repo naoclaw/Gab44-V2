@@ -179,11 +179,20 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         user = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
+        
+        # Add is_admin flag based on email
+        user["is_admin"] = user.get("email", "").lower() in [e.lower().strip() for e in ADMIN_EMAILS]
         return user
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+async def require_admin(user: dict = Depends(get_current_user)) -> dict:
+    """Dependency that requires admin access"""
+    if not user.get("is_admin", False):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user
 
 # ============== Astrology Helpers ==============
 
