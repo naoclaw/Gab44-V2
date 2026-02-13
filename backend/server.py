@@ -250,6 +250,215 @@ def get_sign_modality(sign: str) -> str:
     }
     return modalities.get(sign, "Unknown")
 
+def get_sign_polarity(sign: str) -> str:
+    """Get the polarity (Yin/Yang) for a zodiac sign"""
+    yang_signs = ["Aries", "Gemini", "Leo", "Libra", "Sagittarius", "Aquarius"]
+    return "Yang" if sign in yang_signs else "Yin"
+
+def get_ruling_planet(sign: str) -> str:
+    """Get the ruling planet for a zodiac sign"""
+    rulers = {
+        "Aries": "Mars", "Taurus": "Venus", "Gemini": "Mercury", "Cancer": "Moon",
+        "Leo": "Sun", "Virgo": "Mercury", "Libra": "Venus", "Scorpio": "Pluto",
+        "Sagittarius": "Jupiter", "Capricorn": "Saturn", "Aquarius": "Uranus", "Pisces": "Neptune"
+    }
+    return rulers.get(sign, "Unknown")
+
+# ============== Compatibility Calculations ==============
+
+def calculate_element_compatibility(sign1: str, sign2: str) -> dict:
+    """Calculate compatibility based on elements"""
+    elem1 = get_sign_element(sign1)
+    elem2 = get_sign_element(sign2)
+    
+    # Same element = high compatibility
+    if elem1 == elem2:
+        return {"score": 95, "description": f"Both {elem1} signs - deep natural understanding and shared values"}
+    
+    # Compatible elements
+    compatible_pairs = {
+        ("Fire", "Air"): {"score": 85, "description": "Fire and Air fuel each other - exciting and stimulating"},
+        ("Earth", "Water"): {"score": 85, "description": "Earth and Water nurture each other - stable and emotionally supportive"},
+    }
+    
+    pair = tuple(sorted([elem1, elem2]))
+    if pair in compatible_pairs:
+        return compatible_pairs[pair]
+    if (elem2, elem1) in compatible_pairs:
+        return compatible_pairs[(elem2, elem1)]
+    
+    # Challenging but growth-oriented
+    challenging_pairs = {
+        ("Fire", "Water"): {"score": 55, "description": "Fire and Water create steam - passionate but requires balance"},
+        ("Fire", "Earth"): {"score": 60, "description": "Fire and Earth - different paces, but can ground and inspire each other"},
+        ("Air", "Water"): {"score": 58, "description": "Air and Water - mind vs heart, requires conscious communication"},
+        ("Air", "Earth"): {"score": 62, "description": "Air and Earth - ideas vs practicality, complementary if respected"},
+    }
+    
+    pair = tuple(sorted([elem1, elem2]))
+    if pair in challenging_pairs:
+        return challenging_pairs[pair]
+    if (elem2, elem1) in challenging_pairs:
+        return challenging_pairs[(elem2, elem1)]
+    
+    return {"score": 65, "description": "Neutral elemental compatibility"}
+
+def calculate_modality_compatibility(sign1: str, sign2: str) -> dict:
+    """Calculate compatibility based on modalities"""
+    mod1 = get_sign_modality(sign1)
+    mod2 = get_sign_modality(sign2)
+    
+    if mod1 == mod2:
+        if mod1 == "Fixed":
+            return {"score": 70, "description": "Both Fixed - loyal and stable, but may struggle with change"}
+        elif mod1 == "Cardinal":
+            return {"score": 72, "description": "Both Cardinal - dynamic leaders, may compete for direction"}
+        else:
+            return {"score": 78, "description": "Both Mutable - adaptable and flexible together"}
+    
+    # Mixed modalities
+    if "Cardinal" in [mod1, mod2] and "Fixed" in [mod1, mod2]:
+        return {"score": 75, "description": "Cardinal-Fixed: Initiative meets stability"}
+    if "Cardinal" in [mod1, mod2] and "Mutable" in [mod1, mod2]:
+        return {"score": 82, "description": "Cardinal-Mutable: Leadership meets adaptability"}
+    if "Fixed" in [mod1, mod2] and "Mutable" in [mod1, mod2]:
+        return {"score": 80, "description": "Fixed-Mutable: Stability meets flexibility"}
+    
+    return {"score": 75, "description": "Balanced modality interaction"}
+
+def calculate_synastry_aspects(chart1: dict, chart2: dict) -> list:
+    """Calculate synastry aspects between two charts"""
+    aspects = []
+    aspect_types = {
+        0: {"name": "conjunction", "harmony": 0.9, "category": "intense"},
+        60: {"name": "sextile", "harmony": 0.8, "category": "harmonious"},
+        90: {"name": "square", "harmony": 0.4, "category": "challenging"},
+        120: {"name": "trine", "harmony": 0.95, "category": "harmonious"},
+        180: {"name": "opposition", "harmony": 0.5, "category": "polarizing"}
+    }
+    
+    planets = ["sun", "moon", "mercury", "venus", "mars", "jupiter", "saturn"]
+    
+    for p1 in planets:
+        for p2 in planets:
+            if p1 in chart1.get("planets", {}) and p2 in chart2.get("planets", {}):
+                deg1 = chart1["planets"][p1].get("degree", 0)
+                deg2 = chart2["planets"][p2].get("degree", 0)
+                
+                # Calculate angular difference
+                diff = abs(deg1 - deg2) % 360
+                if diff > 180:
+                    diff = 360 - diff
+                
+                # Check for aspects with orb
+                for angle, aspect_info in aspect_types.items():
+                    orb = abs(diff - angle)
+                    if orb <= 8:  # 8 degree orb
+                        strength = 1 - (orb / 8)
+                        
+                        # Categorize the aspect
+                        category = "general"
+                        if p1 in ["venus", "mars"] or p2 in ["venus", "mars"]:
+                            category = "romantic"
+                        elif p1 == "moon" or p2 == "moon":
+                            category = "emotional"
+                        elif p1 in ["mercury"] or p2 in ["mercury"]:
+                            category = "communication"
+                        elif p1 in ["saturn", "pluto"] or p2 in ["saturn", "pluto"]:
+                            category = "karmic"
+                        elif p1 == "jupiter" or p2 == "jupiter":
+                            category = "growth"
+                        
+                        aspects.append({
+                            "person1_planet": p1,
+                            "person2_planet": p2,
+                            "aspect_type": aspect_info["name"],
+                            "orb": round(orb, 2),
+                            "strength": round(strength, 2),
+                            "harmony": aspect_info["harmony"],
+                            "category": category
+                        })
+    
+    return sorted(aspects, key=lambda x: x["strength"], reverse=True)[:15]
+
+def generate_composite_chart(chart1: dict, chart2: dict) -> dict:
+    """Generate a composite chart from two birth charts"""
+    composite = {"planets": {}, "houses": {}}
+    
+    planets = ["sun", "moon", "mercury", "venus", "mars", "jupiter", "saturn"]
+    
+    for planet in planets:
+        if planet in chart1.get("planets", {}) and planet in chart2.get("planets", {}):
+            deg1 = chart1["planets"][planet].get("degree", 0)
+            deg2 = chart2["planets"][planet].get("degree", 0)
+            
+            # Calculate midpoint
+            midpoint = (deg1 + deg2) / 2
+            if abs(deg1 - deg2) > 180:
+                midpoint = (midpoint + 180) % 360
+            
+            # Determine sign from degree
+            sign_index = int(midpoint / 30)
+            signs = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+                    "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
+            
+            composite["planets"][planet] = {
+                "degree": round(midpoint % 30, 2),
+                "sign": signs[sign_index % 12],
+                "house": chart1["planets"][planet].get("house", 1)
+            }
+    
+    return composite
+
+async def generate_compatibility_analysis(user: dict, partner_data: dict, synastry: list, scores: dict) -> str:
+    """Generate AI-powered compatibility analysis"""
+    
+    user_sun = user.get("sun_sign", "Unknown")
+    partner_sun = partner_data.get("sun_sign", "Unknown")
+    
+    # Format synastry aspects for analysis
+    aspect_summary = "\n".join([
+        f"- {a['person1_planet'].title()} {a['aspect_type']} {a['person2_planet'].title()} ({a['category']})"
+        for a in synastry[:8]
+    ])
+    
+    prompt = f"""Provide a comprehensive relationship compatibility analysis:
+
+PERSON 1: {user.get('name')} - {user_sun} Sun
+PERSON 2: {partner_data.get('name')} - {partner_sun} Sun
+
+COMPATIBILITY SCORES:
+- Overall: {scores.get('overall', 0)}%
+- Emotional: {scores.get('emotional', 0)}%
+- Communication: {scores.get('communication', 0)}%
+- Romance: {scores.get('romantic', 0)}%
+- Long-term: {scores.get('stability', 0)}%
+
+KEY SYNASTRY ASPECTS:
+{aspect_summary}
+
+Provide:
+1. Overall relationship dynamic and natural chemistry
+2. Key strengths of this pairing
+3. Potential challenges and how to navigate them
+4. Karmic or spiritual themes in this connection
+5. Practical advice for building a strong relationship
+
+Keep the analysis warm, insightful, and actionable. Focus on growth potential."""
+
+    try:
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"compatibility-{user['id']}-{uuid.uuid4()}",
+            system_message="You are Gab44, an expert relationship astrologer. Provide insightful, compassionate compatibility analysis that helps people understand their relationship dynamics and growth opportunities."
+        ).with_model("openai", "gpt-4o")
+        
+        response = await chat.send_message(UserMessage(text=prompt))
+        return response
+    except Exception as e:
+        logging.error(f"Compatibility analysis error: {e}")
+        return f"Based on the {user_sun}-{partner_sun} pairing, this relationship shows {scores.get('overall', 70)}% compatibility. Key themes include balancing {get_sign_element(user_sun)} and {get_sign_element(partner_sun)} energies."
+
 # ============== AI Coach ==============
 
 async def get_ai_coach_response(user: dict, message: str, session_id: str) -> str:
