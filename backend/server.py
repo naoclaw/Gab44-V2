@@ -793,6 +793,156 @@ async def get_daily_guidance(user: dict = Depends(get_current_user)):
     
     return DailyGuidance(**guidance)
 
+# ============== Compatibility Routes ==============
+
+@api_router.post("/compatibility/analyze")
+async def analyze_compatibility(request: CompatibilityRequest, user: dict = Depends(get_current_user)):
+    """Generate a comprehensive compatibility/synastry analysis"""
+    
+    # Get user's chart
+    user_chart = await db.birth_charts.find_one({"user_id": user["id"]}, {"_id": 0})
+    if not user_chart:
+        # Generate basic chart if not exists
+        user_chart = {
+            "sun_sign": user.get("sun_sign", calculate_sun_sign(user.get("birth_date", "1990-01-01"))),
+            "moon_sign": "Scorpio",
+            "rising_sign": "Leo",
+            "planets": {
+                "sun": {"sign": user.get("sun_sign", "Aries"), "degree": 15.5, "house": 10},
+                "moon": {"sign": "Scorpio", "degree": 22.3, "house": 4},
+                "mercury": {"sign": "Taurus", "degree": 8.7, "house": 10},
+                "venus": {"sign": "Gemini", "degree": 3.2, "house": 11},
+                "mars": {"sign": "Aries", "degree": 28.9, "house": 9},
+                "jupiter": {"sign": "Scorpio", "degree": 5.1, "house": 4},
+                "saturn": {"sign": "Pisces", "degree": 12.8, "house": 8}
+            }
+        }
+    
+    # Calculate partner's sun sign
+    partner_sun = calculate_sun_sign(request.partner_birth_date)
+    
+    # Generate partner chart (simulated - in production use Swiss Ephemeris)
+    partner_chart = {
+        "sun_sign": partner_sun,
+        "moon_sign": "Taurus",
+        "rising_sign": "Virgo",
+        "planets": {
+            "sun": {"sign": partner_sun, "degree": 12.3, "house": 7},
+            "moon": {"sign": "Taurus", "degree": 18.5, "house": 2},
+            "mercury": {"sign": partner_sun, "degree": 20.1, "house": 7},
+            "venus": {"sign": "Libra", "degree": 5.8, "house": 6},
+            "mars": {"sign": "Cancer", "degree": 15.2, "house": 4},
+            "jupiter": {"sign": "Gemini", "degree": 22.7, "house": 3},
+            "saturn": {"sign": "Aquarius", "degree": 8.4, "house": 11}
+        }
+    }
+    
+    # Calculate compatibility scores
+    element_compat = calculate_element_compatibility(user_chart["sun_sign"], partner_sun)
+    modality_compat = calculate_modality_compatibility(user_chart["sun_sign"], partner_sun)
+    
+    # Calculate synastry aspects
+    synastry_aspects = calculate_synastry_aspects(user_chart, partner_chart)
+    
+    # Generate composite chart
+    composite = generate_composite_chart(user_chart, partner_chart)
+    
+    # Calculate category scores
+    romantic_aspects = [a for a in synastry_aspects if a["category"] == "romantic"]
+    emotional_aspects = [a for a in synastry_aspects if a["category"] == "emotional"]
+    comm_aspects = [a for a in synastry_aspects if a["category"] == "communication"]
+    karmic_aspects = [a for a in synastry_aspects if a["category"] == "karmic"]
+    
+    category_scores = {
+        "romantic": min(95, 60 + len(romantic_aspects) * 8 + sum(a["harmony"] * 10 for a in romantic_aspects)),
+        "emotional": min(95, 55 + len(emotional_aspects) * 10 + sum(a["harmony"] * 12 for a in emotional_aspects)),
+        "communication": min(95, 50 + len(comm_aspects) * 12 + sum(a["harmony"] * 15 for a in comm_aspects)),
+        "stability": (element_compat["score"] + modality_compat["score"]) / 2,
+        "karmic": min(95, 40 + len(karmic_aspects) * 15)
+    }
+    
+    # Overall score
+    overall_score = (
+        element_compat["score"] * 0.25 +
+        modality_compat["score"] * 0.15 +
+        category_scores["romantic"] * 0.25 +
+        category_scores["emotional"] * 0.20 +
+        category_scores["communication"] * 0.15
+    )
+    
+    # Generate AI analysis
+    scores_for_ai = {
+        "overall": round(overall_score),
+        **{k: round(v) for k, v in category_scores.items()}
+    }
+    
+    partner_data = {"name": request.partner_name, "sun_sign": partner_sun}
+    ai_analysis = await generate_compatibility_analysis(user, partner_data, synastry_aspects, scores_for_ai)
+    
+    # Determine strengths and challenges based on aspects
+    strengths = []
+    challenges = []
+    
+    for aspect in synastry_aspects[:10]:
+        if aspect["harmony"] >= 0.7:
+            strengths.append(f"{aspect['person1_planet'].title()}-{aspect['person2_planet'].title()} {aspect['aspect_type']}: Natural harmony in {aspect['category']} matters")
+        elif aspect["harmony"] <= 0.5:
+            challenges.append(f"{aspect['person1_planet'].title()}-{aspect['person2_planet'].title()} {aspect['aspect_type']}: Growth opportunity in {aspect['category']} areas")
+    
+    # Build the report
+    report = {
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "partner_name": request.partner_name,
+        "partner_birth_date": request.partner_birth_date,
+        "partner_sun_sign": partner_sun,
+        "overall_score": round(overall_score, 1),
+        "category_scores": {k: round(v, 1) for k, v in category_scores.items()},
+        "synastry_aspects": synastry_aspects,
+        "composite_chart": composite,
+        "element_compatibility": element_compat,
+        "modality_compatibility": modality_compat,
+        "strengths": strengths[:5],
+        "challenges": challenges[:5],
+        "karmic_themes": [
+            f"Soul growth through {get_sign_element(user_chart['sun_sign'])}-{get_sign_element(partner_sun)} integration",
+            f"Learning {modality_compat['description'].lower()}"
+        ],
+        "growth_opportunities": [
+            "Embrace differences as complementary strengths",
+            "Use challenges as catalysts for personal evolution",
+            "Build on natural harmonies while working on friction points"
+        ],
+        "ai_analysis": ai_analysis,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    # Save to database
+    await db.compatibility_reports.insert_one(report)
+    
+    # Return without _id
+    return {k: v for k, v in report.items() if k != "_id"}
+
+@api_router.get("/compatibility/reports")
+async def get_compatibility_reports(user: dict = Depends(get_current_user)):
+    """Get all compatibility reports for the current user"""
+    reports = await db.compatibility_reports.find(
+        {"user_id": user["id"]},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(20)
+    return reports
+
+@api_router.get("/compatibility/reports/{report_id}")
+async def get_compatibility_report(report_id: str, user: dict = Depends(get_current_user)):
+    """Get a specific compatibility report"""
+    report = await db.compatibility_reports.find_one(
+        {"id": report_id, "user_id": user["id"]},
+        {"_id": 0}
+    )
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return report
+
 # ============== Pricing/Subscription Info ==============
 
 @api_router.get("/pricing")
