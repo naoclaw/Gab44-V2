@@ -204,6 +204,16 @@ export default function AdminPage() {
             </p>
             <p className="text-sm text-muted-foreground">Advanced Users</p>
           </div>
+
+          <div className="glass-card rounded-xl p-6" data-testid="stat-compatibility">
+            <div className="flex items-center justify-between mb-4">
+              <Heart className="w-8 h-8 text-pink-500" />
+            </div>
+            <p className="font-serif text-3xl text-foreground mb-1">
+              {stats?.total_compatibility_reports || 0}
+            </p>
+            <p className="text-sm text-muted-foreground">Compatibility Reports</p>
+          </div>
         </div>
 
         {/* Subscription Breakdown & Sun Signs */}
