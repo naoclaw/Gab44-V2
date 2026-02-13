@@ -22,12 +22,15 @@ import {
   Moon,
   ArrowLeft,
   Shield,
+  ShieldCheck,
+  ShieldOff,
   Crown,
   Search,
   RefreshCw,
   BarChart3,
   Calendar,
-  Star
+  Star,
+  Heart
 } from "lucide-react";
 
 const TIER_COLORS = {
