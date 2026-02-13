@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useTheme } from "@/context/ThemeContext";
+import { useAuth } from "@/App";
 import { API } from "@/App";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
