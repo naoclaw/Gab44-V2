@@ -632,6 +632,74 @@ async def upgrade_all_users_to_advanced():
         "modified_count": result.modified_count
     }
 
+@api_router.get("/admin/stats")
+async def get_admin_stats():
+    """Get platform statistics for admin dashboard"""
+    total_users = await db.users.count_documents({})
+    
+    # Subscription breakdown
+    subscription_stats = await db.users.aggregate([
+        {"$group": {"_id": "$subscription_tier", "count": {"$sum": 1}}}
+    ]).to_list(10)
+    
+    # Sun sign distribution
+    sign_stats = await db.users.aggregate([
+        {"$group": {"_id": "$sun_sign", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}}
+    ]).to_list(12)
+    
+    # Total chats
+    total_chats = await db.chat_messages.count_documents({})
+    total_sessions = len(await db.chat_messages.distinct("session_id"))
+    
+    # Recent signups (last 7 days)
+    from datetime import timedelta
+    week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    recent_signups = await db.users.count_documents({"created_at": {"$gte": week_ago}})
+    
+    return {
+        "total_users": total_users,
+        "recent_signups": recent_signups,
+        "subscription_breakdown": {s["_id"]: s["count"] for s in subscription_stats},
+        "sun_sign_distribution": {s["_id"]: s["count"] for s in sign_stats if s["_id"]},
+        "total_chat_messages": total_chats,
+        "total_chat_sessions": total_sessions
+    }
+
+@api_router.get("/admin/users")
+async def get_all_users(skip: int = 0, limit: int = 50):
+    """Get all users for admin dashboard"""
+    users = await db.users.find(
+        {},
+        {"_id": 0, "password": 0}
+    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    total = await db.users.count_documents({})
+    
+    return {
+        "users": users,
+        "total": total,
+        "skip": skip,
+        "limit": limit
+    }
+
+@api_router.put("/admin/users/{user_id}/tier")
+async def update_user_tier(user_id: str, tier: str):
+    """Update a user's subscription tier"""
+    valid_tiers = ["seeker", "enthusiast", "advanced", "professional"]
+    if tier not in valid_tiers:
+        raise HTTPException(status_code=400, detail=f"Invalid tier. Must be one of: {valid_tiers}")
+    
+    result = await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"subscription_tier": tier}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {"message": f"User {user_id} updated to {tier} tier"}
+
 # Include router and setup middleware
 app.include_router(api_router)
 
