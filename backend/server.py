@@ -122,6 +122,40 @@ class DailyGuidance(BaseModel):
     action_items: List[str]
     transit_highlights: List[dict]
 
+# ============== Compatibility Models ==============
+
+class CompatibilityRequest(BaseModel):
+    partner_name: str
+    partner_birth_date: str  # YYYY-MM-DD
+    partner_birth_time: Optional[str] = None
+    partner_birth_place: str
+
+class SynastryAspect(BaseModel):
+    person1_planet: str
+    person2_planet: str
+    aspect_type: str
+    orb: float
+    strength: float
+    interpretation: str
+    category: str  # romantic, communication, emotional, karmic, growth
+
+class CompatibilityReport(BaseModel):
+    id: str
+    user_id: str
+    partner_name: str
+    partner_birth_date: str
+    partner_sun_sign: str
+    overall_score: float
+    category_scores: Dict[str, float]
+    synastry_aspects: List[Dict[str, Any]]
+    composite_chart: Dict[str, Any]
+    strengths: List[str]
+    challenges: List[str]
+    karmic_themes: List[str]
+    growth_opportunities: List[str]
+    ai_analysis: str
+    created_at: str
+
 # ============== Auth Helpers ==============
 
 def hash_password(password: str) -> str:
