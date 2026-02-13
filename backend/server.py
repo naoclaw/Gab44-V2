@@ -32,8 +32,8 @@ JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
 # LLM Configuration
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 
-# Admin emails (can be set via environment variable)
-ADMIN_EMAILS = os.environ.get('ADMIN_EMAILS', 'admin@gab44.com').split(',')
+# Admin emails (set via environment variable)
+ADMIN_EMAILS = [e.strip().lower() for e in os.environ.get('ADMIN_EMAILS', '').split(',') if e.strip()]
 
 app = FastAPI(title="Gab44 - Astrology AI Coaching Platform")
 api_router = APIRouter(prefix="/api")
