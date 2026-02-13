@@ -294,6 +294,7 @@ export default function AdminPage() {
                   <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Sun Sign</th>
                   <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Birth Date</th>
                   <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Tier</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Admin</th>
                   <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Joined</th>
                 </tr>
               </thead>
@@ -305,8 +306,13 @@ export default function AdminPage() {
                     <tr key={user.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center font-serif text-primary">
+                          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center font-serif text-primary relative">
                             {user.name?.[0] || "?"}
+                            {user.is_admin && (
+                              <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center">
+                                <ShieldCheck className="w-2.5 h-2.5 text-white" />
+                              </div>
+                            )}
                           </div>
                           <div>
                             <p className="font-medium text-foreground">{user.name}</p>
@@ -338,6 +344,32 @@ export default function AdminPage() {
                             <SelectItem value="professional">Professional</SelectItem>
                           </SelectContent>
                         </Select>
+                      </td>
+                      <td className="py-3 px-4">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleAdminRole(user.id, user.is_admin)}
+                          disabled={updating === user.id}
+                          className={`h-8 px-3 rounded-lg ${
+                            user.is_admin 
+                              ? "bg-amber-500/10 text-amber-500 hover:bg-amber-500/20" 
+                              : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                          }`}
+                          data-testid={`admin-toggle-${user.id}`}
+                        >
+                          {user.is_admin ? (
+                            <>
+                              <ShieldCheck className="w-3.5 h-3.5 mr-1.5" />
+                              Admin
+                            </>
+                          ) : (
+                            <>
+                              <ShieldOff className="w-3.5 h-3.5 mr-1.5" />
+                              User
+                            </>
+                          )}
+                        </Button>
                       </td>
                       <td className="py-3 px-4 text-sm text-muted-foreground">
                         {user.created_at ? new Date(user.created_at).toLocaleDateString() : "N/A"}
