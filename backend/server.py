@@ -1112,6 +1112,47 @@ async def update_user_tier(user_id: str, tier: str, admin: dict = Depends(requir
     
     return {"message": f"User {user_id} updated to {tier} tier"}
 
+@api_router.put("/admin/users/{user_id}/role")
+async def update_user_role(user_id: str, role: str, admin: dict = Depends(require_admin)):
+    """Grant or revoke admin role for a user"""
+    valid_roles = ["user", "admin"]
+    if role not in valid_roles:
+        raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {valid_roles}")
+    
+    # Prevent self-demotion
+    if user_id == admin["id"] and role != "admin":
+        raise HTTPException(status_code=400, detail="Cannot remove your own admin role")
+    
+    result = await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"role": role}}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    action = "granted" if role == "admin" else "revoked"
+    return {"message": f"Admin role {action} for user {user_id}"}
+
+@api_router.get("/admin/admins")
+async def get_admin_users(admin: dict = Depends(require_admin)):
+    """Get list of all admin users"""
+    # Users with admin role in DB
+    db_admins = await db.users.find(
+        {"role": "admin"},
+        {"_id": 0, "password": 0}
+    ).to_list(100)
+    
+    # Users in ADMIN_EMAILS env var (bootstrap admins)
+    env_admins = await db.users.find(
+        {"email": {"$in": ADMIN_EMAILS}},
+        {"_id": 0, "password": 0}
+    ).to_list(100)
+    
+    # Merge and dedupe
+    all_admins = {u["id"]: u for u in db_admins + env_admins}
+    return list(all_admins.values())
+
 # Include router and setup middleware
 app.include_router(api_router)
 
