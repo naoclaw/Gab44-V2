@@ -1023,10 +1023,10 @@ async def root():
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
 
-# ============== Admin: Upgrade All Users ==============
+# ============== Admin Routes (Protected) ==============
 
 @api_router.post("/admin/upgrade-all-users")
-async def upgrade_all_users_to_advanced():
+async def upgrade_all_users_to_advanced(admin: dict = Depends(require_admin)):
     """Upgrade all existing users to advanced tier (temporary until payment setup)"""
     result = await db.users.update_many(
         {"subscription_tier": {"$ne": "advanced"}},
@@ -1038,7 +1038,7 @@ async def upgrade_all_users_to_advanced():
     }
 
 @api_router.get("/admin/stats")
-async def get_admin_stats():
+async def get_admin_stats(admin: dict = Depends(require_admin)):
     """Get platform statistics for admin dashboard"""
     total_users = await db.users.count_documents({})
     
@@ -1057,8 +1057,10 @@ async def get_admin_stats():
     total_chats = await db.chat_messages.count_documents({})
     total_sessions = len(await db.chat_messages.distinct("session_id"))
     
+    # Total compatibility reports
+    total_compatibility = await db.compatibility_reports.count_documents({})
+    
     # Recent signups (last 7 days)
-    from datetime import timedelta
     week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
     recent_signups = await db.users.count_documents({"created_at": {"$gte": week_ago}})
     
@@ -1068,11 +1070,12 @@ async def get_admin_stats():
         "subscription_breakdown": {s["_id"]: s["count"] for s in subscription_stats},
         "sun_sign_distribution": {s["_id"]: s["count"] for s in sign_stats if s["_id"]},
         "total_chat_messages": total_chats,
-        "total_chat_sessions": total_sessions
+        "total_chat_sessions": total_sessions,
+        "total_compatibility_reports": total_compatibility
     }
 
 @api_router.get("/admin/users")
-async def get_all_users(skip: int = 0, limit: int = 50):
+async def get_all_users(skip: int = 0, limit: int = 50, admin: dict = Depends(require_admin)):
     """Get all users for admin dashboard"""
     users = await db.users.find(
         {},
@@ -1089,7 +1092,7 @@ async def get_all_users(skip: int = 0, limit: int = 50):
     }
 
 @api_router.put("/admin/users/{user_id}/tier")
-async def update_user_tier(user_id: str, tier: str):
+async def update_user_tier(user_id: str, tier: str, admin: dict = Depends(require_admin)):
     """Update a user's subscription tier"""
     valid_tiers = ["seeker", "enthusiast", "advanced", "professional"]
     if tier not in valid_tiers:
