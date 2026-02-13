@@ -193,6 +193,14 @@ function App() {
                 } 
               />
               <Route 
+                path="/compatibility" 
+                element={
+                  <ProtectedRoute>
+                    <CompatibilityPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
                 path="/admin" 
                 element={
                   <AdminRoute>
