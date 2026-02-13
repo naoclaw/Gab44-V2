@@ -83,7 +83,7 @@ export default function AdminPage() {
   const updateUserTier = async (userId, newTier) => {
     setUpdating(userId);
     try {
-      await axios.put(`${API}/admin/users/${userId}/tier?tier=${newTier}`);
+      await axios.put(`${API}/admin/users/${userId}/tier?tier=${newTier}`, {}, authHeaders);
       setUsers(users.map(u => u.id === userId ? { ...u, subscription_tier: newTier } : u));
       toast.success(`User updated to ${newTier} tier`);
     } catch (error) {
@@ -97,7 +97,7 @@ export default function AdminPage() {
     setUpdating(userId);
     try {
       const newRole = currentIsAdmin ? "user" : "admin";
-      await axios.put(`${API}/admin/users/${userId}/role?role=${newRole}`);
+      await axios.put(`${API}/admin/users/${userId}/role?role=${newRole}`, {}, authHeaders);
       setUsers(users.map(u => u.id === userId ? { ...u, is_admin: !currentIsAdmin, role: newRole } : u));
       toast.success(currentIsAdmin ? "Admin role revoked" : "Admin role granted");
     } catch (error) {
@@ -109,7 +109,7 @@ export default function AdminPage() {
 
   const upgradeAllUsers = async () => {
     try {
-      const res = await axios.post(`${API}/admin/upgrade-all-users`);
+      const res = await axios.post(`${API}/admin/upgrade-all-users`, {}, authHeaders);
       toast.success(`Upgraded ${res.data.modified_count} users to Advanced tier`);
       fetchData();
     } catch (error) {
