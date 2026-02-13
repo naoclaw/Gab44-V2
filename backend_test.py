@@ -331,6 +331,9 @@ class Gab44APITester:
         # Basic health checks
         self.test_health_check()
         
+        # Test user tier defaults
+        self.test_user_defaults_to_advanced()
+        
         # Authentication flow
         auth_success = self.test_auth_flow()
         
@@ -340,6 +343,7 @@ class Gab44APITester:
             self.test_chart_functionality()
             self.test_transits_functionality()
             self.test_guidance_functionality()
+            self.test_admin_functionality()
         
         # Test public endpoints
         self.test_pricing_info()
