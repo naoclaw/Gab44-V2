@@ -215,6 +215,56 @@ class Gab44APITester:
             200
         )
 
+    def test_admin_functionality(self):
+        """Test admin functionality"""
+        print("\n=== ADMIN FUNCTIONALITY TESTS ===")
+        
+        if not self.token:
+            print("❌ No auth token, skipping admin tests")
+            return
+        
+        # Test getting admin stats
+        self.run_test(
+            "Get Admin Stats",
+            "GET",
+            "admin/stats",
+            200
+        )
+        
+        # Test getting all users
+        self.run_test(
+            "Get All Users",
+            "GET",
+            "admin/users?limit=10",
+            200
+        )
+        
+        # Test upgrade all users endpoint
+        self.run_test(
+            "Upgrade All Users to Advanced",
+            "POST",
+            "admin/upgrade-all-users",
+            200
+        )
+        
+        # Test updating user tier (if we have a user_id)
+        if self.user_id:
+            # First try to update to enthusiast
+            success, response = self.run_test(
+                "Update User Tier to Enthusiast",
+                "PUT",
+                f"admin/users/{self.user_id}/tier?tier=enthusiast",
+                200
+            )
+            
+            # Then back to advanced
+            self.run_test(
+                "Update User Tier to Advanced",
+                "PUT",
+                f"admin/users/{self.user_id}/tier?tier=advanced",
+                200
+            )
+
     def test_pricing_info(self):
         """Test pricing information"""
         print("\n=== PRICING TESTS ===")
@@ -226,6 +276,52 @@ class Gab44APITester:
             "pricing",
             200
         )
+
+    def test_user_defaults_to_advanced(self):
+        """Test that new users default to advanced subscription tier"""
+        print("\n=== USER TIER DEFAULT TESTS ===")
+        
+        # Create a new user and verify they get advanced tier
+        timestamp = datetime.now().strftime("%H%M%S")
+        test_user_data = {
+            "email": f"tier_test_user_{timestamp}@gab44test.com",
+            "password": "TestPass123!",
+            "name": "Tier Test User",
+            "birth_date": "1995-03-21",
+            "birth_time": "10:00",
+            "birth_place": "Los Angeles, CA, USA",
+            "birth_latitude": 34.0522,
+            "birth_longitude": -118.2437
+        }
+        
+        success, response = self.run_test(
+            "New User Registration (Check Advanced Tier)",
+            "POST",
+            "auth/register",
+            200,
+            data=test_user_data
+        )
+        
+        if success and 'user' in response:
+            user_tier = response['user'].get('subscription_tier')
+            if user_tier == 'advanced':
+                print(f"✅ New user correctly defaults to 'advanced' tier")
+                self.tests_passed += 1
+            else:
+                print(f"❌ New user has '{user_tier}' tier instead of 'advanced'")
+                self.failed_tests.append({
+                    "test": "New User Default Tier",
+                    "expected": "advanced",
+                    "actual": user_tier
+                })
+            self.tests_run += 1
+        else:
+            print("❌ Failed to create test user for tier verification")
+            self.failed_tests.append({
+                "test": "New User Default Tier",
+                "error": "Failed to create user"
+            })
+            self.tests_run += 1
 
     def run_all_tests(self):
         """Run all API tests"""
