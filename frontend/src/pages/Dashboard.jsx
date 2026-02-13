@@ -21,7 +21,8 @@ import {
   Share2,
   Menu,
   X,
-  Shield
+  Shield,
+  Heart
 } from "lucide-react";
 
 const Sidebar = ({ activeTab, setActiveTab, mobileOpen, setMobileOpen }) => {
