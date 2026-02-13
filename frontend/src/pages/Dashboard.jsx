@@ -29,15 +29,19 @@ const Sidebar = ({ activeTab, setActiveTab, mobileOpen, setMobileOpen }) => {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
-  const navItems = [
+  const baseNavItems = [
     { id: "overview", icon: BarChart3, label: "Overview" },
     { id: "chat", icon: MessageCircle, label: "AI Coach", href: "/chat" },
     { id: "chart", icon: Sun, label: "Birth Chart", href: "/chart" },
     { id: "transits", icon: Calendar, label: "Transits", href: "/transits" },
     { id: "share", icon: Share2, label: "Share Chart", href: "/share" },
     { id: "settings", icon: Settings, label: "Settings", href: "/settings" },
-    { id: "admin", icon: Shield, label: "Admin", href: "/admin" },
   ];
+  
+  // Only show admin link if user is admin
+  const navItems = user?.is_admin 
+    ? [...baseNavItems, { id: "admin", icon: Shield, label: "Admin", href: "/admin" }]
+    : baseNavItems;
 
   const handleNavClick = (item) => {
     if (item.href) {
