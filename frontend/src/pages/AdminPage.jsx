@@ -89,6 +89,20 @@ export default function AdminPage() {
     }
   };
 
+  const toggleAdminRole = async (userId, currentIsAdmin) => {
+    setUpdating(userId);
+    try {
+      const newRole = currentIsAdmin ? "user" : "admin";
+      await axios.put(`${API}/admin/users/${userId}/role?role=${newRole}`);
+      setUsers(users.map(u => u.id === userId ? { ...u, is_admin: !currentIsAdmin, role: newRole } : u));
+      toast.success(currentIsAdmin ? "Admin role revoked" : "Admin role granted");
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to update role");
+    } finally {
+      setUpdating(null);
+    }
+  };
+
   const upgradeAllUsers = async () => {
     try {
       const res = await axios.post(`${API}/admin/upgrade-all-users`);
