@@ -6,7 +6,8 @@ Build a world-class redesign for Gab44.com - an Astrology AI Coaching Platform w
 - Light/Dark theme support
 - Modern transparent header with glassmorphism
 - Improved readability and eye comfort
-- Admin dashboard for user management
+- Admin dashboard for user management with Role-Based Access Control (RBAC)
+- Relationship compatibility/synastry features
 - All users on Advanced tier by default (until payment integration)
 
 ## Architecture & Tech Stack
@@ -15,8 +16,9 @@ Build a world-class redesign for Gab44.com - an Astrology AI Coaching Platform w
 - **Database**: MongoDB
 - **AI Integration**: OpenAI GPT-4o via emergentintegrations library
 - **Authentication**: JWT-based with bcrypt password hashing
+- **Authorization**: Role-Based Access Control (RBAC)
 
-## What's Been Implemented (January 2026)
+## What's Been Implemented (February 2026)
 
 ### Core Features
 - [x] User registration with birth details (defaults to Advanced tier)
@@ -24,6 +26,15 @@ Build a world-class redesign for Gab44.com - an Astrology AI Coaching Platform w
 - [x] Birth chart calculation and display
 - [x] Transit forecast tracking
 - [x] Daily personalized guidance
+- [x] Relationship compatibility/synastry analysis
+
+### Admin RBAC System (NEW)
+- [x] Admin role management via ADMIN_EMAILS environment variable
+- [x] Database role field for granting/revoking admin access
+- [x] require_admin dependency protecting admin routes
+- [x] Admin can grant/revoke admin role to other users
+- [x] Frontend AdminRoute component redirects non-admins
+- [x] Admin link only visible in sidebar for admin users
 
 ### Design System V2
 - [x] Light/Dark theme with system preference detection
@@ -34,13 +45,24 @@ Build a world-class redesign for Gab44.com - an Astrology AI Coaching Platform w
 - [x] Mobile-responsive sidebar
 
 ### Admin Dashboard (/admin)
-- [x] Platform statistics (users, chats, sessions)
+- [x] Platform statistics (users, chats, sessions, compatibility reports)
 - [x] Subscription tier breakdown with visual progress bars
 - [x] Sun sign distribution analytics
 - [x] User management table with search
 - [x] Tier management dropdown per user
+- [x] Admin role toggle button per user
 - [x] Bulk upgrade all users to Advanced
 - [x] Weekly signup tracking
+- [x] Admin badge on user avatars
+
+### Compatibility Features (NEW)
+- [x] POST /api/compatibility/analyze - Generate synastry report
+- [x] GET /api/compatibility/reports - List user's reports
+- [x] GET /api/compatibility/reports/{id} - Get specific report
+- [x] AI-powered relationship analysis using GPT-4o
+- [x] Element and modality compatibility scoring
+- [x] Synastry aspects calculation
+- [x] Composite chart generation
 
 ### Settings Page (/settings)
 - [x] Theme toggle (Light/Dark)
@@ -68,14 +90,14 @@ Build a world-class redesign for Gab44.com - an Astrology AI Coaching Platform w
 - [x] Pricing Page - Plan comparison
 - [x] Settings Page - User preferences
 - [x] Share Page - Social sharing
-- [x] Admin Page - Platform management
+- [x] Admin Page - Platform management (admin only)
 
 ## API Endpoints
 
 ### Auth
 - POST /api/auth/register - New user (defaults to advanced tier)
 - POST /api/auth/login
-- GET /api/auth/me
+- GET /api/auth/me - Returns user with is_admin flag
 
 ### Core
 - POST /api/chat
@@ -86,45 +108,58 @@ Build a world-class redesign for Gab44.com - an Astrology AI Coaching Platform w
 - GET /api/guidance/daily
 - GET /api/pricing
 
-### Admin
+### Compatibility (NEW)
+- POST /api/compatibility/analyze - Generate synastry report
+- GET /api/compatibility/reports - List user's reports
+- GET /api/compatibility/reports/{report_id} - Get specific report
+
+### Admin (Protected)
 - GET /api/admin/stats
 - GET /api/admin/users
 - PUT /api/admin/users/{user_id}/tier
+- PUT /api/admin/users/{user_id}/role - Grant/revoke admin
+- GET /api/admin/admins - List all admin users
 - POST /api/admin/upgrade-all-users
 
 ### Health
 - GET /api/health
 
-## Test Results (Latest - Iteration 3)
-- Backend: 100% (19/19 tests passed)
-- Frontend: 98% (25/26 features working)
-- All users defaulting to Advanced tier ✓
-- Admin dashboard fully functional ✓
+## Test Results (Latest - Iteration 4)
+- Backend: 100% (16/16 tests passed)
+- Frontend: 100% (All RBAC UI flows working correctly)
+- All admin RBAC features verified working
+- Compatibility analysis verified working
 
 ## Prioritized Backlog
 
-### P0 (Critical)
+### P0 (Critical) - COMPLETED
+- [x] Admin RBAC implementation
+- [x] Synastry/Compatibility backend
+
+### P1 (High) - IN PROGRESS
+- [ ] Frontend for Relationship Compatibility - UI for synastry reports
 - [ ] Stripe payment integration
 - [ ] Swiss Ephemeris for real chart calculations
 - [ ] Email verification
 
-### P1 (High)
-- [ ] Admin authentication/roles
-- [ ] Compatibility/synastry charts
+### P2 (Medium)
+- [ ] Reading Mode implementation for chat
 - [ ] PDF report exports
 - [ ] Push notifications
 
-### P2 (Medium)
+### P3 (Low)
 - [ ] Life outcomes tracking
 - [ ] Educational library
-- [ ] Analytics dashboard enhancements
-
-### P3 (Low)
 - [ ] White-label reports
 - [ ] API access for developers
 - [ ] Mobile app (React Native)
 
+## Admin Credentials
+- **Email**: nchobah@gmail.com
+- **Password**: admin123
+- **ADMIN_EMAILS env var**: nchobah@gmail.com
+
 ## Current User Stats
-- Total Users: 21+
+- Total Users: 31+
 - All on Advanced Tier
-- Sun Sign Distribution: Gemini, Taurus, Leo, Aries, Virgo, Scorpio, Capricorn, Aquarius
+- Sun Sign Distribution: Gemini (11), Taurus (3), Aries (3), Leo (2), Virgo (1), Scorpio (1), Capricorn (1), Aquarius (1)
