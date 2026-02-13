@@ -50,18 +50,21 @@ const TIER_ICONS = {
 
 export default function AdminPage() {
   const { theme, toggleTheme } = useTheme();
+  const { token } = useAuth();
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [updating, setUpdating] = useState(null);
 
+  const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
+
   const fetchData = async () => {
     setLoading(true);
     try {
       const [statsRes, usersRes] = await Promise.all([
-        axios.get(`${API}/admin/stats`),
-        axios.get(`${API}/admin/users?limit=100`)
+        axios.get(`${API}/admin/stats`, authHeaders),
+        axios.get(`${API}/admin/users?limit=100`, authHeaders)
       ]);
       setStats(statsRes.data);
       setUsers(usersRes.data.users);
