@@ -573,9 +573,11 @@ async def login(credentials: UserLogin):
     
     return TokenResponse(access_token=token, user=UserProfile(**user_profile))
 
-@api_router.get("/auth/me", response_model=UserProfile)
+@api_router.get("/auth/me")
 async def get_me(user: dict = Depends(get_current_user)):
-    return UserProfile(**user)
+    # Include is_admin in response
+    response = {**user}
+    return response
 
 # ============== Chat Routes ==============
 
