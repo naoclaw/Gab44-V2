@@ -22,7 +22,8 @@ import {
 
 const PLANET_SYMBOLS = {
   sun: "☉", moon: "☽", mercury: "☿", venus: "♀", mars: "♂",
-  jupiter: "♃", saturn: "♄", uranus: "♅", neptune: "♆", pluto: "♇"
+  jupiter: "♃", saturn: "♄", uranus: "♅", neptune: "♆", pluto: "♇",
+  north_node: "☊", south_node: "☋", chiron: "⚷"
 };
 
 const SIGN_SYMBOLS = {
