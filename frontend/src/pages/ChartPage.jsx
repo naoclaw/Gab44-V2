@@ -190,13 +190,19 @@ export default function ChartPage() {
               <h2 className="font-serif text-xl text-foreground mb-6">House Cusps</h2>
               
               <div className="grid grid-cols-3 gap-3">
-                {chart?.houses && Object.entries(chart.houses).map(([house, sign]) => (
-                  <div key={house} className="p-3 rounded-xl bg-muted/30 text-center">
-                    <p className="text-xs text-muted-foreground mb-1">House {house}</p>
-                    <p className="text-lg">{SIGN_SYMBOLS[sign]}</p>
-                    <p className="text-xs text-foreground">{sign}</p>
-                  </div>
-                ))}
+                {chart?.houses && Object.entries(chart.houses).map(([house, data]) => {
+                  // Handle both old (string) and new (object) format
+                  const sign = typeof data === 'string' ? data : data?.sign;
+                  const degree = typeof data === 'object' ? data?.sign_degree : null;
+                  return (
+                    <div key={house} className="p-3 rounded-xl bg-muted/30 text-center">
+                      <p className="text-xs text-muted-foreground mb-1">House {house}</p>
+                      <p className="text-lg">{SIGN_SYMBOLS[sign]}</p>
+                      <p className="text-xs text-foreground">{sign}</p>
+                      {degree != null && <p className="text-xs text-muted-foreground">{degree.toFixed(0)}°</p>}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
