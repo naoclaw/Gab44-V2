@@ -8,6 +8,8 @@ Build a world-class redesign for Gab44.com - an Astrology AI Coaching Platform w
 - Improved readability and eye comfort
 - Admin dashboard for user management with Role-Based Access Control (RBAC)
 - Relationship compatibility/synastry features
+- Swiss Ephemeris for accurate chart calculations
+- Reading Mode for enhanced readability
 - All users on Advanced tier by default (until payment integration)
 
 ## Architecture & Tech Stack
@@ -15,6 +17,7 @@ Build a world-class redesign for Gab44.com - an Astrology AI Coaching Platform w
 - **Backend**: FastAPI + Python 3.11
 - **Database**: MongoDB
 - **AI Integration**: OpenAI GPT-4o via emergentintegrations library
+- **Astrology Calculations**: Swiss Ephemeris (pyswisseph)
 - **Authentication**: JWT-based with bcrypt password hashing
 - **Authorization**: Role-Based Access Control (RBAC)
 
@@ -23,12 +26,29 @@ Build a world-class redesign for Gab44.com - an Astrology AI Coaching Platform w
 ### Core Features
 - [x] User registration with birth details (defaults to Advanced tier)
 - [x] AI-powered astrology coaching chat (GPT-4o)
-- [x] Birth chart calculation and display
-- [x] Transit forecast tracking
+- [x] Birth chart calculation with Swiss Ephemeris
+- [x] Transit forecast tracking with real calculations
 - [x] Daily personalized guidance
 - [x] Relationship compatibility/synastry analysis
 
-### Admin RBAC System (NEW)
+### Swiss Ephemeris Integration (NEW)
+- [x] Accurate planetary positions (Sun through Pluto)
+- [x] Lunar Nodes (North & South Node) calculation
+- [x] House cusps calculation (Placidus system)
+- [x] Rising Sign (Ascendant) and Midheaven
+- [x] Aspect calculations between planets
+- [x] Chart pattern detection (Grand Trine, T-Square, Stellium)
+- [x] Real transits from current planetary positions
+- [x] 90+ city coordinates for birth place lookup
+
+### Reading Mode (NEW)
+- [x] Toggle for enhanced readability
+- [x] Adjustable font size (12-24px)
+- [x] Increased line height and letter spacing
+- [x] Persistent settings via localStorage
+- [x] Integration with Chat page
+
+### Admin RBAC System
 - [x] Admin role management via ADMIN_EMAILS environment variable
 - [x] Database role field for granting/revoking admin access
 - [x] require_admin dependency protecting admin routes
@@ -44,58 +64,28 @@ Build a world-class redesign for Gab44.com - an Astrology AI Coaching Platform w
 - [x] Font size customization
 - [x] Mobile-responsive sidebar
 
-### Admin Dashboard (/admin)
-- [x] Platform statistics (users, chats, sessions, compatibility reports)
-- [x] Subscription tier breakdown with visual progress bars
-- [x] Sun sign distribution analytics
-- [x] User management table with search
-- [x] Tier management dropdown per user
-- [x] Admin role toggle button per user
-- [x] Bulk upgrade all users to Advanced
-- [x] Weekly signup tracking
-- [x] Admin badge on user avatars
-
-### Compatibility Features (NEW - COMPLETE)
+### Compatibility Features
 - [x] POST /api/compatibility/analyze - Generate synastry report
 - [x] GET /api/compatibility/reports - List user's reports
 - [x] GET /api/compatibility/reports/{id} - Get specific report
 - [x] AI-powered relationship analysis using GPT-4o
+- [x] Swiss Ephemeris for both partners' charts
 - [x] Element and modality compatibility scoring
 - [x] Synastry aspects calculation
-- [x] Composite chart generation
 - [x] Frontend Compatibility Page with form modal
-- [x] Report cards list showing partner name, sun sign, score, date
-- [x] Detailed report view with score ring, category breakdown
-- [x] Strengths and Growth Areas sections
-- [x] AI Analysis section with comprehensive text
-- [x] Karmic & Spiritual themes display
-- [x] Mobile responsive layout
-
-### Settings Page (/settings)
-- [x] Theme toggle (Light/Dark)
-- [x] Reading mode toggle
-- [x] Font size slider (12-24px)
-- [x] Notification preferences
-- [x] Account information display
-- [x] Subscription management link
-
-### Share Chart Feature (/share)
-- [x] Beautiful cosmic blueprint preview card
-- [x] Native share API integration
-- [x] Twitter sharing with pre-filled text
-- [x] Facebook sharing
-- [x] Copy link functionality
-- [x] Referral invitation section
+- [x] Report cards showing partner name, sun sign, score
+- [x] Detailed view with score ring, category breakdown
 
 ### Pages
 - [x] Landing Page - Hero, Features, Testimonials, Pricing, FAQ
 - [x] Auth Page - Login/Register with birth details
 - [x] Dashboard - Bento grid, daily guidance, transits
-- [x] Chat Page - AI coaching conversations
-- [x] Chart Page - Planetary positions, aspects, houses
-- [x] Transits Page - 90-day forecasts with filters
+- [x] Chat Page - AI coaching with Reading Mode
+- [x] Chart Page - Real planetary positions, aspects, houses
+- [x] Compatibility Page - Synastry reports
+- [x] Transits Page - Real outer planet transits
 - [x] Pricing Page - Plan comparison
-- [x] Settings Page - User preferences
+- [x] Settings Page - User preferences, Reading Mode
 - [x] Share Page - Social sharing
 - [x] Admin Page - Platform management (admin only)
 
@@ -110,44 +100,41 @@ Build a world-class redesign for Gab44.com - an Astrology AI Coaching Platform w
 - POST /api/chat
 - GET /api/chat/history/{session_id}
 - GET /api/chat/sessions
-- GET /api/chart/me
-- GET /api/transits/upcoming
+- GET /api/chart/me?recalculate=bool - Swiss Ephemeris calculation
+- GET /api/transits/upcoming - Real transit calculations
 - GET /api/guidance/daily
 - GET /api/pricing
 
-### Compatibility (NEW)
-- POST /api/compatibility/analyze - Generate synastry report
-- GET /api/compatibility/reports - List user's reports
-- GET /api/compatibility/reports/{report_id} - Get specific report
+### Compatibility
+- POST /api/compatibility/analyze - Swiss Ephemeris synastry
+- GET /api/compatibility/reports
+- GET /api/compatibility/reports/{report_id}
 
 ### Admin (Protected)
 - GET /api/admin/stats
 - GET /api/admin/users
 - PUT /api/admin/users/{user_id}/tier
-- PUT /api/admin/users/{user_id}/role - Grant/revoke admin
-- GET /api/admin/admins - List all admin users
+- PUT /api/admin/users/{user_id}/role
+- GET /api/admin/admins
 - POST /api/admin/upgrade-all-users
 
-### Health
-- GET /api/health
-
-## Test Results (Latest - Iteration 5)
-- Backend: 100% (20/20 tests passed)
-- Frontend: 100% (All Compatibility UI flows working correctly)
-- All RBAC features verified working
-- Compatibility analysis with AI verified working
+## Test Results (Latest - Iteration 6)
+- Backend: 100% (28/28 tests passed)
+- Frontend: 100% (All UI elements working correctly)
+- Swiss Ephemeris: Verified accurate Sun, Moon, Rising calculations
+- Reading Mode: Verified working with font size controls
 
 ## Prioritized Backlog
 
-### P1 (High) - IN PROGRESS
+### P1 (High) - NEXT
 - [ ] Stripe payment integration
-- [ ] Swiss Ephemeris for real chart calculations
 - [ ] Email verification
+- [ ] Geocoding API for unknown cities
 
 ### P2 (Medium)
-- [ ] Reading Mode implementation for chat
 - [ ] PDF report exports
 - [ ] Push notifications
+- [ ] Swiss Ephemeris files for Chiron
 
 ### P3 (Low)
 - [ ] Life outcomes tracking
@@ -161,7 +148,13 @@ Build a world-class redesign for Gab44.com - an Astrology AI Coaching Platform w
 - **Password**: admin123
 - **ADMIN_EMAILS env var**: nchobah@gmail.com
 
+## Swiss Ephemeris Notes
+- Uses built-in Moshier ephemeris (no external files needed)
+- Chiron calculation requires seas_18.se1 file (currently omitted)
+- 90+ cities have coordinates for Rising Sign calculation
+- Unknown cities return (0.0, 0.0) resulting in Unknown rising sign
+
 ## Current User Stats
 - Total Users: 31+
 - All on Advanced Tier
-- Sun Sign Distribution: Gemini (11), Taurus (3), Aries (3), Leo (2), Virgo (1), Scorpio (1), Capricorn (1), Aquarius (1)
+- Sample Chart (nchobah@gmail.com): Sun Taurus, Moon Virgo, Rising Taurus
