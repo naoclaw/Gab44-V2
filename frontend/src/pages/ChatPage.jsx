@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth, API } from "@/App";
 import { useTheme } from "@/context/ThemeContext";
+import { useReadingMode } from "@/context/ReadingModeContext";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,19 +16,25 @@ import {
   Clock,
   User,
   Sun,
-  Moon
+  Moon,
+  BookOpen,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw
 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function ChatPage() {
   const { user, token } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { readingMode, toggleReadingMode, fontSize, increaseFontSize, decreaseFontSize, resetFontSize } = useReadingMode();
   const navigate = useNavigate();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [sessions, setSessions] = useState([]);
+  const [showReadingControls, setShowReadingControls] = useState(false);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
