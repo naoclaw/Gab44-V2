@@ -218,18 +218,25 @@ export default function ChartPage() {
               <h2 className="font-serif text-xl text-foreground mb-6">Major Aspects</h2>
               
               <div className="space-y-3">
-                {chart?.aspects?.map((aspect, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-muted/30">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">{PLANET_SYMBOLS[aspect.planet1]}</span>
-                      <span className="text-xs text-primary font-medium">{aspect.aspect}</span>
-                      <span className="text-lg">{PLANET_SYMBOLS[aspect.planet2]}</span>
+                {chart?.aspects?.map((aspect, i) => {
+                  const orb = aspect.orb ?? 0;
+                  const planet1 = aspect.planet1 || aspect.planet1_name;
+                  const planet2 = aspect.planet2 || aspect.planet2_name;
+                  const aspectType = aspect.aspect || aspect.aspect_type;
+                  
+                  return (
+                    <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-muted/30">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{PLANET_SYMBOLS[planet1] || planet1}</span>
+                        <span className="text-xs text-primary font-medium">{aspectType}</span>
+                        <span className="text-lg">{PLANET_SYMBOLS[planet2] || planet2}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground font-mono">
+                        Orb: {typeof orb === 'number' ? orb.toFixed(1) : orb}°
+                      </span>
                     </div>
-                    <span className="text-xs text-muted-foreground font-mono">
-                      Orb: {aspect.orb.toFixed(1)}°
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
