@@ -868,51 +868,35 @@ async def get_daily_guidance(user: dict = Depends(get_current_user)):
 
 @api_router.post("/compatibility/analyze")
 async def analyze_compatibility(request: CompatibilityRequest, user: dict = Depends(get_current_user)):
-    """Generate a comprehensive compatibility/synastry analysis"""
+    """Generate a comprehensive compatibility/synastry analysis using Swiss Ephemeris"""
     
-    # Get user's chart
+    # Get or calculate user's chart
     user_chart = await db.birth_charts.find_one({"user_id": user["id"]}, {"_id": 0})
-    if not user_chart:
-        # Generate basic chart if not exists
-        user_chart = {
-            "sun_sign": user.get("sun_sign", calculate_sun_sign(user.get("birth_date", "1990-01-01"))),
-            "moon_sign": "Scorpio",
-            "rising_sign": "Leo",
-            "planets": {
-                "sun": {"sign": user.get("sun_sign", "Aries"), "degree": 15.5, "house": 10},
-                "moon": {"sign": "Scorpio", "degree": 22.3, "house": 4},
-                "mercury": {"sign": "Taurus", "degree": 8.7, "house": 10},
-                "venus": {"sign": "Gemini", "degree": 3.2, "house": 11},
-                "mars": {"sign": "Aries", "degree": 28.9, "house": 9},
-                "jupiter": {"sign": "Scorpio", "degree": 5.1, "house": 4},
-                "saturn": {"sign": "Pisces", "degree": 12.8, "house": 8}
-            }
-        }
+    if not user_chart or user_chart.get("calculation_method") != "Swiss Ephemeris":
+        # Generate real chart using Swiss Ephemeris
+        birth_date = user.get("birth_date", "1990-01-01")
+        birth_time = user.get("birth_time")
+        birth_place = user.get("birth_place", "")
+        latitude, longitude = get_coordinates(birth_place) if birth_place else (0.0, 0.0)
+        
+        user_chart = calculate_natal_chart(birth_date, birth_time, latitude, longitude)
     
-    # Calculate partner's sun sign
-    partner_sun = calculate_sun_sign(request.partner_birth_date)
+    # Calculate partner's chart using Swiss Ephemeris
+    partner_latitude, partner_longitude = get_coordinates(request.partner_birth_place)
+    partner_chart = calculate_natal_chart(
+        birth_date=request.partner_birth_date,
+        birth_time=request.partner_birth_time,
+        latitude=partner_latitude,
+        longitude=partner_longitude
+    )
     
-    # Generate partner chart (simulated - in production use Swiss Ephemeris)
-    partner_chart = {
-        "sun_sign": partner_sun,
-        "moon_sign": "Taurus",
-        "rising_sign": "Virgo",
-        "planets": {
-            "sun": {"sign": partner_sun, "degree": 12.3, "house": 7},
-            "moon": {"sign": "Taurus", "degree": 18.5, "house": 2},
-            "mercury": {"sign": partner_sun, "degree": 20.1, "house": 7},
-            "venus": {"sign": "Libra", "degree": 5.8, "house": 6},
-            "mars": {"sign": "Cancer", "degree": 15.2, "house": 4},
-            "jupiter": {"sign": "Gemini", "degree": 22.7, "house": 3},
-            "saturn": {"sign": "Aquarius", "degree": 8.4, "house": 11}
-        }
-    }
+    partner_sun = partner_chart["sun_sign"]
     
     # Calculate compatibility scores
     element_compat = calculate_element_compatibility(user_chart["sun_sign"], partner_sun)
     modality_compat = calculate_modality_compatibility(user_chart["sun_sign"], partner_sun)
     
-    # Calculate synastry aspects
+    # Calculate synastry aspects using real planetary positions
     synastry_aspects = calculate_synastry_aspects(user_chart, partner_chart)
     
     # Generate composite chart
