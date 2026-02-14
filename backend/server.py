@@ -646,51 +646,66 @@ async def get_chat_sessions(user: dict = Depends(get_current_user)):
 # ============== Birth Chart Routes ==============
 
 @api_router.get("/chart/me")
-async def get_my_chart(user: dict = Depends(get_current_user)):
-    """Get or generate the user's birth chart"""
-    chart = await db.birth_charts.find_one({"user_id": user["id"]}, {"_id": 0})
+async def get_my_chart(user: dict = Depends(get_current_user), recalculate: bool = False):
+    """Get or generate the user's birth chart using Swiss Ephemeris"""
     
-    if not chart:
-        # Generate a basic chart (in production, use Swiss Ephemeris)
-        sun_sign = user.get("sun_sign", calculate_sun_sign(user.get("birth_date", "1990-01-01")))
-        
-        # Simulated chart data - in production, calculate with Swiss Ephemeris
-        chart_doc = {
-            "id": str(uuid.uuid4()),
-            "user_id": user["id"],
-            "sun_sign": sun_sign,
-            "moon_sign": "Scorpio",  # Would be calculated
-            "rising_sign": "Leo",     # Would be calculated
-            "planets": {
-                "sun": {"sign": sun_sign, "degree": 15.5, "house": 10},
-                "moon": {"sign": "Scorpio", "degree": 22.3, "house": 4},
-                "mercury": {"sign": "Taurus", "degree": 8.7, "house": 10},
-                "venus": {"sign": "Gemini", "degree": 3.2, "house": 11},
-                "mars": {"sign": "Aries", "degree": 28.9, "house": 9},
-                "jupiter": {"sign": "Scorpio", "degree": 5.1, "house": 4},
-                "saturn": {"sign": "Pisces", "degree": 12.8, "house": 8},
-                "uranus": {"sign": "Capricorn", "degree": 25.4, "house": 6},
-                "neptune": {"sign": "Capricorn", "degree": 22.1, "house": 6},
-                "pluto": {"sign": "Scorpio", "degree": 27.6, "house": 4}
-            },
-            "houses": {
-                "1": "Leo", "2": "Virgo", "3": "Libra", "4": "Scorpio",
-                "5": "Sagittarius", "6": "Capricorn", "7": "Aquarius", "8": "Pisces",
-                "9": "Aries", "10": "Taurus", "11": "Gemini", "12": "Cancer"
-            },
-            "aspects": [
-                {"planet1": "sun", "planet2": "moon", "aspect": "opposition", "orb": 2.3},
-                {"planet1": "venus", "planet2": "mars", "aspect": "sextile", "orb": 1.5},
-                {"planet1": "jupiter", "planet2": "pluto", "aspect": "conjunction", "orb": 0.5}
-            ],
-            "patterns": ["T-Square", "Grand Trine (Water)"],
-            "created_at": datetime.now(timezone.utc).isoformat()
-        }
-        await db.birth_charts.insert_one(chart_doc)
-        # Return the chart without _id (which MongoDB adds during insert)
-        chart = {k: v for k, v in chart_doc.items() if k != "_id"}
+    # Check for existing chart unless recalculate is requested
+    if not recalculate:
+        chart = await db.birth_charts.find_one({"user_id": user["id"]}, {"_id": 0})
+        if chart and chart.get("calculation_method") == "Swiss Ephemeris":
+            return chart
     
-    return chart
+    # Get user's birth data
+    birth_date = user.get("birth_date", "1990-01-01")
+    birth_time = user.get("birth_time")
+    birth_place = user.get("birth_place", "")
+    
+    # Get coordinates from place name or user's stored coordinates
+    latitude = user.get("birth_latitude", 0.0)
+    longitude = user.get("birth_longitude", 0.0)
+    
+    if (latitude == 0.0 and longitude == 0.0) and birth_place:
+        latitude, longitude = get_coordinates(birth_place)
+    
+    # Calculate chart using Swiss Ephemeris
+    chart_data = calculate_natal_chart(
+        birth_date=birth_date,
+        birth_time=birth_time,
+        latitude=latitude,
+        longitude=longitude
+    )
+    
+    # Build chart document
+    chart_doc = {
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "sun_sign": chart_data["sun_sign"],
+        "moon_sign": chart_data["moon_sign"],
+        "rising_sign": chart_data["rising_sign"],
+        "planets": chart_data["planets"],
+        "houses": chart_data["houses"],
+        "ascendant": chart_data.get("ascendant", {}),
+        "midheaven": chart_data.get("midheaven", {}),
+        "aspects": chart_data["aspects"],
+        "patterns": chart_data["patterns"],
+        "calculation_method": "Swiss Ephemeris",
+        "julian_day": chart_data.get("julian_day"),
+        "birth_coordinates": {"latitude": latitude, "longitude": longitude},
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    # Update or insert chart
+    await db.birth_charts.delete_many({"user_id": user["id"]})
+    await db.birth_charts.insert_one(chart_doc)
+    
+    # Update user's sun sign if it changed
+    if chart_data["sun_sign"] != user.get("sun_sign"):
+        await db.users.update_one(
+            {"id": user["id"]},
+            {"$set": {"sun_sign": chart_data["sun_sign"], "moon_sign": chart_data["moon_sign"]}}
+        )
+    
+    return {k: v for k, v in chart_doc.items() if k != "_id"}
 
 # ============== Transit Routes ==============
 
