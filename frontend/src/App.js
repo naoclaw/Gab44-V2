@@ -137,6 +137,7 @@ const AdminRoute = ({ children }) => {
 function App() {
   return (
     <ThemeProvider>
+    <ReadingModeProvider>
       <AuthProvider>
         <div className="App min-h-screen bg-background theme-transition">
           <div className="noise-overlay" />
