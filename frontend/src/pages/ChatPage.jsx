@@ -174,16 +174,102 @@ export default function ChatPage() {
       <main className="flex-1 flex flex-col h-screen">
         {/* Header */}
         <header className="p-4 border-b border-border bg-card/30 backdrop-blur-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
-              <Sparkles className="w-5 h-5 text-primary" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                <Sparkles className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h1 className="font-medium text-foreground">Gab44 AI Coach</h1>
+                <p className="text-xs text-green-500 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-green-500" />
+                  Online - Ready to guide you
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="font-medium text-foreground">Gab44 AI Coach</h1>
-              <p className="text-xs text-green-500 flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-green-500" />
-                Online - Ready to guide you
-              </p>
+            
+            {/* Reading Mode Controls */}
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowReadingControls(!showReadingControls)}
+                  className={`h-9 px-3 rounded-xl transition-colors ${
+                    readingMode 
+                      ? 'bg-primary/10 text-primary border border-primary/20' 
+                      : 'hover:bg-muted'
+                  }`}
+                  data-testid="reading-mode-btn"
+                >
+                  <BookOpen className="w-4 h-4 mr-2" />
+                  Reading Mode
+                </Button>
+                
+                {showReadingControls && (
+                  <div className="absolute right-0 top-full mt-2 z-50 glass-card rounded-xl p-4 shadow-lg w-64">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-foreground">Reading Mode</span>
+                        <button
+                          onClick={toggleReadingMode}
+                          className={`w-12 h-6 rounded-full transition-colors ${
+                            readingMode ? 'bg-primary' : 'bg-muted'
+                          }`}
+                          data-testid="reading-mode-toggle"
+                        >
+                          <span className={`block w-5 h-5 rounded-full bg-white shadow transform transition-transform ${
+                            readingMode ? 'translate-x-6' : 'translate-x-0.5'
+                          }`} />
+                        </button>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <span className="text-sm text-foreground">Font Size: {fontSize}px</span>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={decreaseFontSize}
+                            className="h-8 w-8 p-0 rounded-lg"
+                            data-testid="decrease-font-btn"
+                          >
+                            <ZoomOut className="w-4 h-4" />
+                          </Button>
+                          <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-primary rounded-full transition-all"
+                              style={{ width: `${((fontSize - 12) / 12) * 100}%` }}
+                            />
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={increaseFontSize}
+                            className="h-8 w-8 p-0 rounded-lg"
+                            data-testid="increase-font-btn"
+                          >
+                            <ZoomIn className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={resetFontSize}
+                            className="h-8 w-8 p-0 rounded-lg"
+                            data-testid="reset-font-btn"
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      <p className="text-xs text-muted-foreground">
+                        Reading mode increases line height and letter spacing for better readability.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </header>
