@@ -151,35 +151,42 @@ export default function ChartPage() {
             
             <div className="space-y-3">
               <TooltipProvider>
-                {chart?.planets && Object.entries(chart.planets).map(([planet, data]) => (
-                  <div 
-                    key={planet}
-                    className="flex items-center justify-between p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl w-8 text-center">{PLANET_SYMBOLS[planet]}</span>
-                      <div>
-                        <p className="font-medium text-foreground capitalize">{planet}</p>
-                        <p className="text-xs text-muted-foreground">House {data.house}</p>
+                {chart?.planets && Object.entries(chart.planets).map(([planet, data]) => {
+                  // Handle different data formats
+                  const sign = data?.sign || 'Unknown';
+                  const degree = data?.sign_degree ?? data?.degree ?? 0;
+                  const house = data?.house || '?';
+                  
+                  return (
+                    <div 
+                      key={planet}
+                      className="flex items-center justify-between p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl w-8 text-center">{PLANET_SYMBOLS[planet]}</span>
+                        <div>
+                          <p className="font-medium text-foreground capitalize">{planet.replace('_', ' ')}</p>
+                          <p className="text-xs text-muted-foreground">House {house}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <div className="text-right">
+                              <p className="text-sm text-foreground">{sign}</p>
+                              <p className="text-xs text-muted-foreground font-mono">{typeof degree === 'number' ? degree.toFixed(1) : degree}°</p>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{planet.charAt(0).toUpperCase() + planet.slice(1).replace('_', ' ')} at {typeof degree === 'number' ? degree.toFixed(1) : degree}° {sign}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        <span className="text-xl">{SIGN_SYMBOLS[sign]}</span>
                       </div>
                     </div>
-                    
-                    <div className="flex items-center gap-3">
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <div className="text-right">
-                            <p className="text-sm text-foreground">{data.sign}</p>
-                            <p className="text-xs text-muted-foreground font-mono">{data.degree.toFixed(1)}°</p>
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>{planet.charAt(0).toUpperCase() + planet.slice(1)} at {data.degree.toFixed(1)}° {data.sign}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                      <span className="text-xl">{SIGN_SYMBOLS[data.sign]}</span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </TooltipProvider>
             </div>
           </div>
