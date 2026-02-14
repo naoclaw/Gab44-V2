@@ -661,8 +661,8 @@ async def get_my_chart(user: dict = Depends(get_current_user), recalculate: bool
     birth_place = user.get("birth_place", "")
     
     # Get coordinates from place name or user's stored coordinates
-    latitude = user.get("birth_latitude", 0.0)
-    longitude = user.get("birth_longitude", 0.0)
+    latitude = user.get("birth_latitude") or 0.0
+    longitude = user.get("birth_longitude") or 0.0
     
     if (latitude == 0.0 and longitude == 0.0) and birth_place:
         latitude, longitude = get_coordinates(birth_place)
