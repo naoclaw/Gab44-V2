@@ -329,7 +329,14 @@ export default function ChatPage() {
                   }`}
                   data-testid={`message-${index}`}
                 >
-                  <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+                  <p 
+                    className={`text-foreground whitespace-pre-wrap ${
+                      readingMode 
+                        ? 'leading-loose tracking-wide' 
+                        : 'leading-relaxed'
+                    }`}
+                    style={{ fontSize: `${fontSize}px` }}
+                  >
                     {message.content}
                   </p>
                 </div>
