@@ -711,63 +711,106 @@ async def get_my_chart(user: dict = Depends(get_current_user), recalculate: bool
 
 @api_router.get("/transits/upcoming")
 async def get_upcoming_transits(user: dict = Depends(get_current_user)):
-    """Get upcoming transit activations for the user"""
-    # In production, these would be calculated based on current planetary positions
-    today = datetime.now(timezone.utc)
+    """Get upcoming transit activations for the user using Swiss Ephemeris"""
     
-    transits = [
-        {
+    # Get user's natal chart
+    chart = await db.birth_charts.find_one({"user_id": user["id"]}, {"_id": 0})
+    
+    if not chart or "planets" not in chart:
+        # Generate chart first if doesn't exist
+        birth_date = user.get("birth_date", "1990-01-01")
+        birth_time = user.get("birth_time")
+        birth_place = user.get("birth_place", "")
+        latitude, longitude = get_coordinates(birth_place) if birth_place else (0.0, 0.0)
+        
+        chart_data = calculate_natal_chart(birth_date, birth_time, latitude, longitude)
+        natal_positions = chart_data.get("planets", {})
+    else:
+        natal_positions = chart.get("planets", {})
+    
+    # Calculate current transits to natal chart
+    current_transits = calculate_current_transits(natal_positions)
+    
+    today = datetime.now(timezone.utc)
+    transits = []
+    
+    # Transit interpretations
+    transit_meanings = {
+        ("jupiter", "sun", "trine"): {
+            "interpretation": "A period of expansion, luck, and opportunity. Your confidence is boosted and doors open easily.",
+            "action_items": ["Take bold action on goals", "Expand your horizons", "Share your vision with others"]
+        },
+        ("jupiter", "sun", "conjunction"): {
+            "interpretation": "Major growth and abundance. This is your personal Jupiter return moment - dream big!",
+            "action_items": ["Start new ventures", "Travel or learn something new", "Celebrate your achievements"]
+        },
+        ("saturn", "sun", "square"): {
+            "interpretation": "A testing period requiring discipline and patience. Build solid foundations.",
+            "action_items": ["Review commitments", "Set realistic goals", "Practice patience"]
+        },
+        ("saturn", "sun", "opposition"): {
+            "interpretation": "Time to evaluate your path and responsibilities. Maturity is required.",
+            "action_items": ["Assess long-term goals", "Take responsibility", "Make necessary adjustments"]
+        },
+        ("uranus", "sun", "conjunction"): {
+            "interpretation": "Unexpected changes and breakthroughs. Embrace your authentic self.",
+            "action_items": ["Welcome change", "Express individuality", "Try something new"]
+        },
+        ("neptune", "sun", "trine"): {
+            "interpretation": "Enhanced intuition and creativity. Spiritual insights flow easily.",
+            "action_items": ["Trust your intuition", "Engage in creative pursuits", "Practice meditation"]
+        },
+        ("pluto", "sun", "square"): {
+            "interpretation": "Powerful transformation. Old patterns are breaking down for renewal.",
+            "action_items": ["Release what no longer serves", "Embrace personal power", "Dig deep"]
+        },
+    }
+    
+    for transit in current_transits[:6]:  # Top 6 transits
+        key = (transit["transit_planet"], transit["natal_planet"], transit["aspect"])
+        meaning = transit_meanings.get(key, {
+            "interpretation": f"{transit['transit_planet'].title()} {transit['aspect']} your natal {transit['natal_planet'].title()} - a significant cosmic activation.",
+            "action_items": ["Pay attention to this area of life", "Journal your experiences", "Stay open to insights"]
+        })
+        
+        # Estimate transit duration based on planet speed
+        duration_days = {
+            "jupiter": 14, "saturn": 21, "uranus": 30, 
+            "neptune": 45, "pluto": 60
+        }.get(transit["transit_planet"], 7)
+        
+        transits.append({
             "id": str(uuid.uuid4()),
-            "transit_type": "Jupiter trine Sun",
-            "planet": "Jupiter",
-            "aspect": "trine",
-            "natal_planet": "Sun",
+            "transit_type": f"{transit['transit_planet'].title()} {transit['aspect']} {transit['natal_planet'].title()}",
+            "planet": transit["transit_planet"].title(),
+            "aspect": transit["aspect"],
+            "natal_planet": transit["natal_planet"].title(),
+            "transit_sign": transit["transit_sign"],
+            "orb": transit["orb"],
+            "start_date": (today - timedelta(days=duration_days//3)).isoformat(),
+            "peak_date": today.isoformat(),
+            "end_date": (today + timedelta(days=duration_days*2//3)).isoformat(),
+            "strength": round(1 - (transit["orb"] / 8), 2),
+            "harmony": transit["harmony"],
+            "interpretation": meaning["interpretation"],
+            "action_items": meaning["action_items"]
+        })
+    
+    # If no significant transits, return some current planetary positions
+    if not transits:
+        transits = [{
+            "id": str(uuid.uuid4()),
+            "transit_type": "Current cosmic weather",
+            "planet": "General",
+            "aspect": "influence",
+            "natal_planet": "Chart",
             "start_date": today.isoformat(),
-            "peak_date": (today + timedelta(days=3)).isoformat(),
+            "peak_date": today.isoformat(),
             "end_date": (today + timedelta(days=7)).isoformat(),
-            "strength": 0.85,
-            "interpretation": "A period of expansion and opportunity. Your natural talents are highlighted and recognition may come your way.",
-            "action_items": [
-                "Take initiative on projects you've been postponing",
-                "Network and make new professional connections",
-                "Set intentions for long-term growth"
-            ]
-        },
-        {
-            "id": str(uuid.uuid4()),
-            "transit_type": "Mercury conjunct Venus",
-            "planet": "Mercury",
-            "aspect": "conjunction",
-            "natal_planet": "Venus",
-            "start_date": (today + timedelta(days=5)).isoformat(),
-            "peak_date": (today + timedelta(days=7)).isoformat(),
-            "end_date": (today + timedelta(days=10)).isoformat(),
-            "strength": 0.72,
-            "interpretation": "Excellent for communication in relationships. Express your feelings and have meaningful conversations.",
-            "action_items": [
-                "Have important conversations with loved ones",
-                "Write heartfelt messages or letters",
-                "Negotiate or discuss financial matters"
-            ]
-        },
-        {
-            "id": str(uuid.uuid4()),
-            "transit_type": "Saturn square Mars",
-            "planet": "Saturn",
-            "aspect": "square",
-            "natal_planet": "Mars",
-            "start_date": (today + timedelta(days=14)).isoformat(),
-            "peak_date": (today + timedelta(days=21)).isoformat(),
-            "end_date": (today + timedelta(days=28)).isoformat(),
-            "strength": 0.65,
-            "interpretation": "A testing period for your ambitions. Patience and strategic planning are key. Avoid forcing outcomes.",
-            "action_items": [
-                "Review and refine your action plans",
-                "Practice patience with delays",
-                "Focus on sustainable progress over quick wins"
-            ]
-        }
-    ]
+            "strength": 0.5,
+            "interpretation": "A relatively quiet transit period. Good time for reflection and integration.",
+            "action_items": ["Review recent experiences", "Plan for upcoming opportunities", "Rest and recharge"]
+        }]
     
     return transits
 
