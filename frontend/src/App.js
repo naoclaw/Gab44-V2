@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import axios from "axios";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { ReadingModeProvider } from "@/context/ReadingModeContext";
 
 // Pages
 import LandingPage from "@/pages/LandingPage";
