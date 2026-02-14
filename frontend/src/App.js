@@ -214,6 +214,7 @@ function App() {
           <Toaster position="top-right" />
         </div>
       </AuthProvider>
+    </ReadingModeProvider>
     </ThemeProvider>
   );
 }
