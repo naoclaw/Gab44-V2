@@ -13,6 +13,13 @@ from datetime import datetime, timezone, timedelta
 import jwt
 import bcrypt
 from emergentintegrations.llm.chat import LlmChat, UserMessage
+from astro_calculator import (
+    calculate_natal_chart, 
+    calculate_current_transits, 
+    get_coordinates,
+    get_element,
+    get_modality
+)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
