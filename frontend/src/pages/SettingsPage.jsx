@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
+import axios from "axios";
 import { 
   ArrowLeft, 
   User, 
@@ -25,7 +26,7 @@ import {
 } from "lucide-react";
 
 export default function SettingsPage() {
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   
@@ -45,6 +46,14 @@ export default function SettingsPage() {
     marketing: false
   });
 
+  const [profileEdit, setProfileEdit] = useState({
+    name: user?.name || "",
+    birth_date: user?.birth_date || "",
+    birth_time: user?.birth_time || "",
+    birth_place: user?.birth_place || ""
+  });
+  const [savingProfile, setSavingProfile] = useState(false);
+
   const handleFontSizeChange = (value) => {
     setFontSize(value[0]);
     localStorage.setItem("gab44_font_size", value[0].toString());
@@ -63,6 +72,48 @@ export default function SettingsPage() {
       root.style.setProperty("--reading-letter-spacing", "0.01em");
     }
     toast.success(checked ? "Reading mode enabled" : "Reading mode disabled");
+  };
+
+  const handleProfileChange = (e) => {
+    setProfileEdit({ ...profileEdit, [e.target.name]: e.target.value });
+  };
+
+  const handleProfileSave = async (e) => {
+    e.preventDefault();
+    setSavingProfile(true);
+    try {
+      const updates = {};
+      if (profileEdit.name && profileEdit.name !== user?.name) updates.name = profileEdit.name;
+      if (profileEdit.birth_date && profileEdit.birth_date !== user?.birth_date) updates.birth_date = profileEdit.birth_date;
+      if (profileEdit.birth_time !== (user?.birth_time || "")) updates.birth_time = profileEdit.birth_time || null;
+      if (profileEdit.birth_place && profileEdit.birth_place !== user?.birth_place) updates.birth_place = profileEdit.birth_place;
+
+      if (Object.keys(updates).length === 0) {
+        toast.info("No changes to save");
+        return;
+      }
+
+      await axios.put(`${API}/auth/me`, updates, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success("Profile updated successfully");
+    } catch (error) {
+      const status = error.response?.status;
+      const detail = error.response?.data?.detail;
+      let message;
+      if (detail) {
+        message = detail;
+      } else if (status === 401) {
+        message = "Unauthorized. Please log in again.";
+      } else if (status === 404) {
+        message = "Profile not found.";
+      } else {
+        message = "Failed to update profile";
+      }
+      toast.error(message);
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
   const settingsSections = [
@@ -160,7 +211,7 @@ export default function SettingsPage() {
       title: "Account",
       icon: User,
       content: (
-        <div className="space-y-4">
+        <form onSubmit={handleProfileSave} className="space-y-4">
           <div className="glass-card rounded-xl p-4">
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center font-serif text-2xl text-primary">
@@ -178,21 +229,63 @@ export default function SettingsPage() {
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="name" className="text-foreground">Name</Label>
+            <Input
+              id="name"
+              name="name"
+              value={profileEdit.name}
+              onChange={handleProfileChange}
+              className="bg-muted/30 rounded-xl"
+              data-testid="profile-name-input"
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label className="text-foreground">Birth Place</Label>
-            <Input value={user?.birth_place || ""} disabled className="bg-muted/30 rounded-xl" />
+            <Input
+              name="birth_place"
+              value={profileEdit.birth_place}
+              onChange={handleProfileChange}
+              className="bg-muted/30 rounded-xl"
+              data-testid="profile-birth-place-input"
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-foreground">Birth Date</Label>
-              <Input value={user?.birth_date || ""} disabled className="bg-muted/30 rounded-xl" />
+              <Input
+                name="birth_date"
+                type="date"
+                value={profileEdit.birth_date}
+                onChange={handleProfileChange}
+                className="bg-muted/30 rounded-xl"
+                data-testid="profile-birth-date-input"
+              />
             </div>
             <div className="space-y-2">
               <Label className="text-foreground">Birth Time</Label>
-              <Input value={user?.birth_time || "Not provided"} disabled className="bg-muted/30 rounded-xl" />
+              <Input
+                name="birth_time"
+                type="time"
+                value={profileEdit.birth_time}
+                onChange={handleProfileChange}
+                className="bg-muted/30 rounded-xl"
+                data-testid="profile-birth-time-input"
+              />
             </div>
           </div>
-        </div>
+
+          <Button
+            type="submit"
+            disabled={savingProfile}
+            className="w-full rounded-xl"
+            data-testid="save-profile-btn"
+          >
+            <Save className="w-4 h-4 mr-2" />
+            {savingProfile ? "Saving..." : "Save Profile"}
+          </Button>
+        </form>
       )
     },
     {

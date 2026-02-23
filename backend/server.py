@@ -6,7 +6,8 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict, EmailStr
+from pydantic import BaseModel, Field, ConfigDict, EmailStr, field_validator
+import json
 from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone, timedelta
@@ -58,6 +59,27 @@ class UserCreate(BaseModel):
     birth_latitude: Optional[float] = None
     birth_longitude: Optional[float] = None
 
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        import re
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if not re.search(r"[A-Za-z]", v):
+            raise ValueError("Password must contain at least one letter")
+        if not re.search(r"[0-9!@#$%^&*(),.?\":{}|<>]", v):
+            raise ValueError("Password must contain at least one digit or special character")
+        return v
+
+
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    birth_date: Optional[str] = None
+    birth_time: Optional[str] = None
+    birth_place: Optional[str] = None
+    birth_latitude: Optional[float] = None
+    birth_longitude: Optional[float] = None
+
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
@@ -74,6 +96,7 @@ class UserProfile(BaseModel):
     birth_longitude: Optional[float] = None
     sun_sign: Optional[str] = None
     subscription_tier: str = "seeker"
+    is_admin: bool = False
     created_at: str
 
 class TokenResponse(BaseModel):
@@ -566,6 +589,8 @@ async def register(user_data: UserCreate):
     
     token = create_token(user_id)
     user_profile = {k: v for k, v in user_doc.items() if k != "password" and k != "_id"}
+    user_email = user_data.email.lower()
+    user_profile["is_admin"] = user_email in ADMIN_EMAILS
     
     return TokenResponse(access_token=token, user=UserProfile(**user_profile))
 
@@ -577,6 +602,10 @@ async def login(credentials: UserLogin):
     
     token = create_token(user["id"])
     user_profile = {k: v for k, v in user.items() if k != "password" and k != "_id"}
+    user_email = user.get("email", "").lower()
+    is_admin_by_role = user.get("role") == "admin"
+    is_admin_by_env = user_email in ADMIN_EMAILS
+    user_profile["is_admin"] = is_admin_by_role or is_admin_by_env
     
     return TokenResponse(access_token=token, user=UserProfile(**user_profile))
 
@@ -585,6 +614,31 @@ async def get_me(user: dict = Depends(get_current_user)):
     # Include is_admin in response
     response = {**user}
     return response
+
+@api_router.put("/auth/me", response_model=UserProfile)
+async def update_me(update_data: UserUpdate, user: dict = Depends(get_current_user)):
+    """Update the current user's profile information"""
+    updates = update_data.model_dump(exclude_unset=True)
+    
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    
+    # Recalculate sun sign if birth_date changes
+    if "birth_date" in updates and updates["birth_date"]:
+        updates["sun_sign"] = calculate_sun_sign(updates["birth_date"])
+    
+    await db.users.update_one({"id": user["id"]}, {"$set": updates})
+    
+    updated_user = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password": 0})
+    if not updated_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user_email = updated_user.get("email", "").lower()
+    is_admin_by_role = updated_user.get("role") == "admin"
+    is_admin_by_env = user_email in ADMIN_EMAILS
+    updated_user["is_admin"] = is_admin_by_role or is_admin_by_env
+    
+    return UserProfile(**updated_user)
 
 # ============== Chat Routes ==============
 
@@ -822,7 +876,7 @@ async def get_daily_guidance(user: dict = Depends(get_current_user)):
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     sun_sign = user.get("sun_sign", "Unknown")
     
-    # Check cache
+    # Check cache (24-hour window)
     cached = await db.daily_guidance.find_one(
         {"user_id": user["id"], "date": today},
         {"_id": 0}
@@ -830,33 +884,107 @@ async def get_daily_guidance(user: dict = Depends(get_current_user)):
     if cached:
         return DailyGuidance(**cached)
     
-    # Generate new guidance (in production, use AI with current transits)
-    guidance = {
-        "date": today,
-        "overall_energy": f"The cosmic energies today support {sun_sign}'s natural strengths. Focus on clarity and intentional action.",
-        "focus_areas": [
-            "Personal growth and self-reflection",
-            "Communication with close relationships",
-            "Financial planning and resource management"
-        ],
-        "action_items": [
-            "Set one clear intention for the day",
-            "Reach out to someone you've been meaning to connect with",
-            "Review your weekly goals and adjust priorities"
-        ],
-        "transit_highlights": [
-            {
-                "transit": "Moon in Taurus",
-                "influence": "Emotional stability and grounding",
-                "advice": "Take time to appreciate simple pleasures"
-            },
-            {
-                "transit": "Mercury trine Jupiter",
-                "influence": "Expanded thinking and optimism",
-                "advice": "Great day for learning and big-picture planning"
-            }
-        ]
-    }
+    # Get current transits for personalization
+    transits_summary = ""
+    try:
+        chart = await db.birth_charts.find_one({"user_id": user["id"]}, {"_id": 0})
+        natal_positions = chart.get("planets", {}) if chart else {}
+        if natal_positions:
+            current_transits = calculate_current_transits(natal_positions)
+            transits_summary = "\n".join([
+                f"- {t['transit_planet'].title()} {t['aspect']} natal {t['natal_planet'].title()} (orb {t['orb']:.1f}°)"
+                for t in current_transits[:5]
+            ])
+    except Exception as e:
+        logging.warning(f"Could not fetch transits for daily guidance: {e}")
+
+    # Sanitize user fields used in the prompt to prevent prompt injection
+    safe_name = str(user.get('name', 'Seeker'))[:50].replace('\n', ' ').replace('\r', ' ')
+    safe_sun_sign = str(sun_sign)[:20].replace('\n', ' ').replace('\r', ' ')
+    safe_birth_date = str(user.get('birth_date', 'Unknown'))[:12].replace('\n', ' ')
+
+    # Generate LLM-powered guidance
+    prompt = f"""Generate personalized daily astrology guidance for today ({today}).
+
+USER PROFILE:
+- Name: {safe_name}
+- Sun Sign: {safe_sun_sign}
+- Birth Date: {safe_birth_date}
+
+CURRENT ACTIVE TRANSITS:
+{transits_summary or "No significant transits calculated"}
+
+Provide a JSON-structured daily guidance with:
+1. overall_energy: A 1-2 sentence summary of today's cosmic energy for this person
+2. focus_areas: A list of exactly 3 specific life areas to focus on today (strings)
+3. action_items: A list of exactly 3 concrete, actionable tasks for today (strings)
+4. transit_highlights: A list of exactly 2 objects, each with keys "transit", "influence", and "advice"
+
+Respond ONLY with valid JSON matching this exact structure:
+{{
+  "overall_energy": "...",
+  "focus_areas": ["...", "...", "..."],
+  "action_items": ["...", "...", "..."],
+  "transit_highlights": [
+    {{"transit": "...", "influence": "...", "advice": "..."}},
+    {{"transit": "...", "influence": "...", "advice": "..."}}
+  ]
+}}"""
+
+    guidance = None
+    try:
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"guidance-{user['id']}-{today}",
+            system_message="You are Gab44, an expert astrology AI. Return only valid JSON as instructed."
+        ).with_model("openai", "gpt-4o")
+        
+        import re as _re
+        raw = await chat.send_message(UserMessage(text=prompt))
+        # Strip markdown code fences if present
+        raw = raw.strip()
+        match = _re.search(r"```(?:json)?\s*([\s\S]+?)```", raw)
+        if match:
+            raw = match.group(1).strip()
+        parsed = json.loads(raw)
+        guidance = {
+            "date": today,
+            "overall_energy": parsed["overall_energy"],
+            "focus_areas": parsed["focus_areas"],
+            "action_items": parsed["action_items"],
+            "transit_highlights": parsed["transit_highlights"]
+        }
+    except Exception as e:
+        logging.error(f"LLM daily guidance error: {e}")
+
+    # Fallback to static guidance if LLM unavailable
+    if guidance is None:
+        guidance = {
+            "date": today,
+            "overall_energy": f"The cosmic energies today support {sun_sign}'s natural strengths. Focus on clarity and intentional action.",
+            "focus_areas": [
+                "Personal growth and self-reflection",
+                "Communication with close relationships",
+                "Financial planning and resource management"
+            ],
+            "action_items": [
+                "Set one clear intention for the day",
+                "Reach out to someone you've been meaning to connect with",
+                "Review your weekly goals and adjust priorities"
+            ],
+            "transit_highlights": [
+                {
+                    "transit": "Moon influence",
+                    "influence": "Emotional grounding and stability",
+                    "advice": "Take time to appreciate simple pleasures"
+                },
+                {
+                    "transit": "Current planetary weather",
+                    "influence": "Expanded thinking and optimism",
+                    "advice": "Great day for learning and big-picture planning"
+                }
+            ]
+        }
     
     # Cache for the day
     guidance_doc = {"user_id": user["id"], **guidance}
@@ -1227,6 +1355,25 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+@app.on_event("startup")
+async def create_indexes():
+    """Create MongoDB indexes for performance"""
+    # Users collection
+    await db.users.create_index("email", unique=True)
+    await db.users.create_index("id", unique=True)
+    # Chat messages
+    await db.chat_messages.create_index("user_id")
+    await db.chat_messages.create_index("session_id")
+    await db.chat_messages.create_index([("user_id", 1), ("session_id", 1)])
+    # Birth charts
+    await db.birth_charts.create_index("user_id", unique=True)
+    # Compatibility reports
+    await db.compatibility_reports.create_index("user_id")
+    await db.compatibility_reports.create_index("id", unique=True)
+    # Daily guidance cache
+    await db.daily_guidance.create_index([("user_id", 1), ("date", 1)], unique=True)
+    logger.info("MongoDB indexes created")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

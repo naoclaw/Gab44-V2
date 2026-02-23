@@ -214,6 +214,11 @@ export default function AuthPage() {
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
+            {isRegister && (
+              <p className="text-xs text-muted-foreground">
+                Min. 8 characters, must include a letter and a digit or special character.
+              </p>
+            )}
           </div>
 
           <Button 
