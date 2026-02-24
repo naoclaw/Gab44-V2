@@ -390,6 +390,114 @@ def assign_houses_to_planets(positions: Dict[str, Dict], houses: Dict) -> Dict[s
     return positions
 
 
+# ---------------------------------------------------------------------------
+# Pythagorean Numerology Engine
+# ---------------------------------------------------------------------------
+
+# Pythagorean letter-to-digit mapping
+_PYTH_MAP: Dict[str, int] = {
+    'a': 1, 'b': 2, 'c': 3, 'd': 4, 'e': 5, 'f': 6, 'g': 7, 'h': 8, 'i': 9,
+    'j': 1, 'k': 2, 'l': 3, 'm': 4, 'n': 5, 'o': 6, 'p': 7, 'q': 8, 'r': 9,
+    's': 1, 't': 2, 'u': 3, 'v': 4, 'w': 5, 'x': 6, 'y': 7, 'z': 8,
+}
+_VOWELS = set('aeiou')
+
+# Master numbers are never reduced further
+_MASTER_NUMBERS = {11, 22, 33}
+
+_NUMBER_MEANINGS: Dict[int, Dict[str, str]] = {
+    1:  {"keyword": "Leadership",    "theme": "Independence, pioneering drive, original thinking"},
+    2:  {"keyword": "Partnership",   "theme": "Diplomacy, intuition, cooperation, sensitivity"},
+    3:  {"keyword": "Expression",    "theme": "Creativity, joy, communication, social magnetism"},
+    4:  {"keyword": "Foundation",    "theme": "Hard work, discipline, stability, practical mastery"},
+    5:  {"keyword": "Freedom",       "theme": "Adventure, adaptability, change, sensory experience"},
+    6:  {"keyword": "Harmony",       "theme": "Nurturing, responsibility, beauty, domestic love"},
+    7:  {"keyword": "Wisdom",        "theme": "Introspection, analysis, spiritual seeking, truth"},
+    8:  {"keyword": "Abundance",     "theme": "Ambition, authority, material mastery, karma"},
+    9:  {"keyword": "Completion",    "theme": "Compassion, universal love, humanitarian service"},
+    11: {"keyword": "Illumination",  "theme": "Spiritual messenger, visionary insight, nervous intensity"},
+    22: {"keyword": "Master Builder","theme": "Manifesting grand visions, disciplined idealism"},
+    33: {"keyword": "Master Teacher","theme": "Selfless service, Christ-like compassion, healing"},
+}
+
+
+def _reduce(n: int, preserve_masters: bool = True) -> int:
+    """Reduce n to a single digit, preserving master numbers when requested."""
+    while n > 9 and (not preserve_masters or n not in _MASTER_NUMBERS):
+        n = sum(int(d) for d in str(n))
+    return n
+
+
+def _name_to_digits(name: str) -> List[int]:
+    """Convert alphabetic characters in a name to Pythagorean digits."""
+    return [_PYTH_MAP[c] for c in name.lower() if c in _PYTH_MAP]
+
+
+def _number_info(n: int) -> Dict[str, str]:
+    return _NUMBER_MEANINGS.get(n, {"keyword": "Unknown", "theme": ""})
+
+
+def calculate_numerology(name: str, birth_date: str) -> Dict:
+    """
+    Calculate a complete Pythagorean numerology profile.
+
+    Args:
+        name:       Full birth name (as on birth certificate for accuracy)
+        birth_date: YYYY-MM-DD
+
+    Returns:
+        Dict with life_path, expression, soul_urge, personality, birthday,
+        personal_year, first_name_number, last_name_number, and meanings.
+    """
+    # --- Life Path Number (from birth date) ---
+    try:
+        dt = datetime.strptime(birth_date, "%Y-%m-%d")
+        # Reduce each component separately before summing (standard method)
+        month_r = _reduce(dt.month)
+        day_r = _reduce(dt.day)
+        year_r = _reduce(sum(int(d) for d in str(dt.year)))
+        life_path = _reduce(month_r + day_r + year_r)
+        birthday_num = _reduce(dt.day)
+    except ValueError:
+        life_path = 0
+        birthday_num = 0
+        dt = None
+
+    # --- Personal Year Number (changes each birthday) ---
+    if dt:
+        today = datetime.now()
+        py_raw = _reduce(dt.month) + _reduce(dt.day) + _reduce(sum(int(d) for d in str(today.year)))
+        personal_year = _reduce(py_raw)
+    else:
+        personal_year = 0
+
+    # --- Name-based numbers ---
+    name_clean = name.strip()
+    all_digits  = _name_to_digits(name_clean)
+    vowel_digits = [_PYTH_MAP[c] for c in name_clean.lower() if c in _VOWELS and c in _PYTH_MAP]
+    cons_digits  = [_PYTH_MAP[c] for c in name_clean.lower() if c.isalpha() and c not in _VOWELS and c in _PYTH_MAP]
+
+    expression   = _reduce(sum(all_digits))    if all_digits   else 0
+    soul_urge    = _reduce(sum(vowel_digits))  if vowel_digits else 0
+    personality  = _reduce(sum(cons_digits))   if cons_digits  else 0
+
+    # First / Last name numbers (split on whitespace)
+    parts = name_clean.split()
+    first_name_num = _reduce(sum(_name_to_digits(parts[0])))  if parts       else 0
+    last_name_num  = _reduce(sum(_name_to_digits(parts[-1]))) if len(parts) > 1 else first_name_num
+
+    return {
+        "life_path":        {"number": life_path,      **_number_info(life_path)},
+        "expression":       {"number": expression,     **_number_info(expression)},
+        "soul_urge":        {"number": soul_urge,      **_number_info(soul_urge)},
+        "personality":      {"number": personality,    **_number_info(personality)},
+        "birthday":         {"number": birthday_num,   **_number_info(birthday_num)},
+        "personal_year":    {"number": personal_year,  **_number_info(personal_year)},
+        "first_name":       {"number": first_name_num, **_number_info(first_name_num)},
+        "last_name":        {"number": last_name_num,  **_number_info(last_name_num)},
+    }
+
+
 def calculate_natal_chart(
     birth_date: str,
     birth_time: Optional[str] = None,

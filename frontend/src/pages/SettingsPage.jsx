@@ -74,6 +74,7 @@ export default function SettingsPage() {
 
   const [profileEdit, setProfileEdit] = useState({
     name: user?.name || "",
+    birth_name: user?.birth_name || "",
     birth_date: user?.birth_date || "",
     birth_time: user?.birth_time || "",
     birth_place: user?.birth_place || ""
@@ -146,6 +147,7 @@ export default function SettingsPage() {
     try {
       const updates = {};
       if (profileEdit.name && profileEdit.name !== user?.name) updates.name = profileEdit.name;
+      if (profileEdit.birth_name !== (user?.birth_name || "")) updates.birth_name = profileEdit.birth_name || null;
       if (profileEdit.birth_date && profileEdit.birth_date !== user?.birth_date) updates.birth_date = profileEdit.birth_date;
       if (profileEdit.birth_time !== (user?.birth_time || "")) updates.birth_time = profileEdit.birth_time || null;
       if (profileEdit.birth_place && profileEdit.birth_place !== user?.birth_place) updates.birth_place = profileEdit.birth_place;
@@ -348,6 +350,20 @@ export default function SettingsPage() {
               onChange={handleProfileChange}
               className="bg-muted/30 rounded-xl"
               data-testid="profile-birth-place-input"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-foreground flex items-center gap-2">
+              Legal Birth Name <span className="text-xs text-muted-foreground font-normal">(for numerology — leave blank to use display name)</span>
+            </Label>
+            <Input
+              name="birth_name"
+              value={profileEdit.birth_name}
+              onChange={handleProfileChange}
+              placeholder={profileEdit.name}
+              className="bg-muted/30 rounded-xl"
+              data-testid="profile-birth-name-input"
             />
           </div>
 

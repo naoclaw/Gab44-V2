@@ -20,8 +20,9 @@ from openai import AsyncOpenAI
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 from astro_calculator import (
-    calculate_natal_chart, 
-    calculate_current_transits, 
+    calculate_natal_chart,
+    calculate_current_transits,
+    calculate_numerology,
     get_coordinates,
     get_element,
     get_modality
@@ -99,6 +100,7 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     name: str
+    birth_name: Optional[str] = None  # Legal birth name for numerology (if different from display name)
     birth_date: str  # YYYY-MM-DD
     birth_time: Optional[str] = None  # HH:MM
     birth_place: str
@@ -119,6 +121,7 @@ class UserCreate(BaseModel):
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
+    birth_name: Optional[str] = None
     birth_date: Optional[str] = None
     birth_time: Optional[str] = None
     birth_place: Optional[str] = None
@@ -152,6 +155,7 @@ class UserProfile(BaseModel):
     id: str
     email: str
     name: str
+    birth_name: Optional[str] = None
     birth_date: str
     birth_time: Optional[str] = None
     birth_place: str
@@ -702,44 +706,87 @@ Keep the analysis warm, insightful, and actionable. Focus on growth potential.""
 
 async def get_ai_coach_response(user: dict, message: str, session_id: str) -> str:
     """Generate AI coaching response"""
-    
+
     # Get user's chat history
     history = await db.chat_messages.find(
         {"user_id": user["id"], "session_id": session_id},
         {"_id": 0}
     ).sort("timestamp", 1).limit(20).to_list(20)
-    
+
     # Build context
     sun_sign = user.get("sun_sign", "Unknown")
-    element = get_sign_element(sun_sign)
+    element  = get_sign_element(sun_sign)
     modality = get_sign_modality(sun_sign)
-    
+
+    # Fetch full natal chart (cached in DB)
+    chart_doc = await db.birth_charts.find_one({"user_id": user["id"]}, {"_id": 0})
+
+    # Build planet summary
+    planet_lines = []
+    if chart_doc and chart_doc.get("planets"):
+        for pname, pdata in chart_doc["planets"].items():
+            if pdata:
+                h = f" H{pdata['house']}" if pdata.get("house") else ""
+                r = " ℞" if pdata.get("retrograde") else ""
+                planet_lines.append(f"  {pname.replace('_',' ').title()}: {pdata.get('sign','?')} {pdata.get('sign_degree',0):.1f}°{h}{r}")
+    planets_block = "\n".join(planet_lines) if planet_lines else "  (chart not yet generated)"
+
+    # Build numerology summary
+    num_lines = []
+    if chart_doc and chart_doc.get("numerology"):
+        num = chart_doc["numerology"]
+        for key in ("life_path", "expression", "soul_urge", "personality", "personal_year"):
+            entry = num.get(key, {})
+            if entry:
+                num_lines.append(f"  {key.replace('_',' ').title()}: {entry['number']} ({entry.get('keyword','')})")
+    numerology_block = "\n".join(num_lines) if num_lines else "  (not calculated)"
+
+    # Top aspects
+    aspect_lines = []
+    if chart_doc and chart_doc.get("aspects"):
+        for a in chart_doc["aspects"][:5]:
+            aspect_lines.append(f"  {a['planet1'].title()} {a['aspect']} {a['planet2'].title()} (orb {a['orb']}°)")
+    aspects_block = "\n".join(aspect_lines) if aspect_lines else "  (none)"
+
+    rising = chart_doc.get("rising_sign", "Unknown") if chart_doc else "Unknown"
+    moon   = chart_doc.get("moon_sign",   "Unknown") if chart_doc else "Unknown"
+
     system_message = f"""You are Gab44, an advanced astrology AI coach. Your mission is to help people live measurably better lives through truthful astrological guidance.
 
 USER PROFILE:
 - Name: {user.get('name', 'Seeker')}
 - Sun Sign: {sun_sign} ({element}, {modality})
+- Moon Sign: {moon}
+- Rising Sign: {rising}
 - Birth Date: {user.get('birth_date', 'Unknown')}
 - Birth Place: {user.get('birth_place', 'Unknown')}
 
+NATAL PLANETS:
+{planets_block}
+
+TOP ASPECTS:
+{aspects_block}
+
+NUMEROLOGY:
+{numerology_block}
+
 YOUR PRINCIPLES:
 1. Every response must help the user make better decisions
-2. Be truthful, even when uncomfortable - truth serves growth
+2. Be truthful, even when uncomfortable — truth serves growth
 3. Provide actionable guidance, not just information
-4. Adapt your tone to be warm but wise
-5. Connect astrological insights to practical life outcomes
+4. Weave together astrology AND numerology when they reinforce each other
+5. Connect insights to practical life outcomes
 6. Ask follow-up questions to understand if guidance was helpful
 
 RESPONSE FORMAT:
 - Keep responses conversational but substantive
 - Include specific action items when relevant
-- Reference the user's chart when applicable
+- Reference planets, houses, and numerology numbers when applicable
 - End with a thoughtful question or call to action"""
 
     try:
         if not openai_client:
             raise RuntimeError("OpenAI not configured")
-        # Build messages list with history
         messages = [{"role": "system", "content": system_message}]
         for msg in history[-10:]:
             messages.append({"role": msg["role"], "content": msg["content"]})
@@ -750,7 +797,7 @@ RESPONSE FORMAT:
             messages=messages,
         )
         return completion.choices[0].message.content
-        
+
     except Exception as e:
         logging.error(f"AI Coach error: {e}")
         return f"I sense a disturbance in the cosmic connection. Let me try again... As a {sun_sign}, your {element} energy suggests taking a moment to ground yourself. What specific area of life would you like guidance on?"
@@ -1057,7 +1104,11 @@ async def get_my_chart(user: dict = Depends(get_current_user), recalculate: bool
         latitude=latitude,
         longitude=longitude
     )
-    
+
+    # Calculate numerology from name and birth date
+    numerology_name = user.get("birth_name") or user.get("name", "")
+    numerology = calculate_numerology(numerology_name, birth_date) if numerology_name else {}
+
     # Build chart document
     chart_doc = {
         "id": str(uuid.uuid4()),
@@ -1071,6 +1122,7 @@ async def get_my_chart(user: dict = Depends(get_current_user), recalculate: bool
         "midheaven": chart_data.get("midheaven", {}),
         "aspects": chart_data["aspects"],
         "patterns": chart_data["patterns"],
+        "numerology": numerology,
         "calculation_method": "Swiss Ephemeris",
         "julian_day": chart_data.get("julian_day"),
         "birth_coordinates": {"latitude": latitude, "longitude": longitude},
@@ -1255,6 +1307,7 @@ async def get_daily_guidance(user: dict = Depends(get_current_user)):
     
     # Get current transits for personalization
     transits_summary = ""
+    numerology_block = ""
     try:
         chart = await db.birth_charts.find_one({"user_id": user["id"]}, {"_id": 0})
         natal_positions = chart.get("planets", {}) if chart else {}
@@ -1264,6 +1317,16 @@ async def get_daily_guidance(user: dict = Depends(get_current_user)):
                 f"- {t['transit_planet'].title()} {t['aspect']} natal {t['natal_planet'].title()} (orb {t['orb']:.1f}°)"
                 for t in current_transits[:5]
             ])
+        # Numerology for daily tone
+        if chart and chart.get("numerology"):
+            num = chart["numerology"]
+            py = num.get("personal_year", {})
+            lp = num.get("life_path", {})
+            if py or lp:
+                numerology_block = (
+                    f"- Life Path {lp.get('number','?')} ({lp.get('keyword','')})\n"
+                    f"- Personal Year {py.get('number','?')} ({py.get('keyword','')}) — {py.get('theme','')}"
+                )
     except Exception as e:
         logging.warning(f"Could not fetch transits for daily guidance: {e}")
 
@@ -1283,8 +1346,11 @@ USER PROFILE:
 CURRENT ACTIVE TRANSITS:
 {transits_summary or "No significant transits calculated"}
 
+NUMEROLOGY:
+{numerology_block or "Not available"}
+
 Provide a JSON-structured daily guidance with:
-1. overall_energy: A 1-2 sentence summary of today's cosmic energy for this person
+1. overall_energy: A 1-2 sentence summary of today's cosmic energy for this person (weave in numerology if relevant)
 2. focus_areas: A list of exactly 3 specific life areas to focus on today (strings)
 3. action_items: A list of exactly 3 concrete, actionable tasks for today (strings)
 4. transit_highlights: A list of exactly 2 objects, each with keys "transit", "influence", and "advice"

@@ -250,6 +250,54 @@ export default function ChartPage() {
                 </div>
               </div>
             )}
+
+            {/* Numerology Section */}
+            {chart?.numerology && Object.keys(chart.numerology).length > 0 && (
+              <div className="glass-card rounded-xl p-6" data-testid="numerology-card">
+                <h2 className="font-serif text-xl text-foreground mb-1 flex items-center gap-2">
+                  <span>🔢</span> Numerology Profile
+                </h2>
+                <p className="text-sm text-muted-foreground mb-4">Pythagorean — derived from your name and birth date</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {[
+                    { key: "life_path",     label: "Life Path",     icon: "🌟" },
+                    { key: "expression",    label: "Expression",    icon: "📢" },
+                    { key: "soul_urge",     label: "Soul Urge",     icon: "💜" },
+                    { key: "personality",   label: "Personality",   icon: "🎭" },
+                    { key: "birthday",      label: "Birthday",      icon: "🎂" },
+                    { key: "personal_year", label: "Personal Year", icon: "📅" },
+                    { key: "first_name",    label: "First Name",    icon: "✨" },
+                    { key: "last_name",     label: "Family Name",   icon: "🌳" },
+                  ].map(({ key, label, icon }) => {
+                    const entry = chart.numerology[key];
+                    if (!entry || !entry.number) return null;
+                    const isMaster = [11, 22, 33].includes(entry.number);
+                    return (
+                      <TooltipProvider key={key}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="p-4 rounded-xl bg-muted/30 text-center cursor-default hover:bg-muted/50 transition-colors">
+                              <div className="text-lg mb-1">{icon}</div>
+                              <div className={`text-2xl font-bold mb-1 ${isMaster ? "text-yellow-400" : "text-primary"}`}>
+                                {entry.number}
+                                {isMaster && <span className="text-xs ml-0.5">✦</span>}
+                              </div>
+                              <div className="text-xs text-muted-foreground">{label}</div>
+                              <div className="text-xs font-medium text-foreground mt-0.5">{entry.keyword}</div>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-xs text-center">
+                            <p className="font-semibold">{label} {entry.number} — {entry.keyword}</p>
+                            <p className="text-xs mt-1">{entry.theme}</p>
+                            {isMaster && <p className="text-xs text-yellow-400 mt-1">✦ Master Number — not reduced further</p>}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
