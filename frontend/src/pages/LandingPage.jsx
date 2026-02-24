@@ -37,8 +37,11 @@ const CHALDEAN = {
   a:1,b:2,c:3,d:4,e:5,f:8,g:3,h:5,i:1,j:1,k:2,l:3,m:4,
   n:5,o:7,p:8,q:1,r:2,s:3,t:4,u:6,v:6,w:6,x:5,y:1,z:7
 };
+// Master numbers (11, 22, 33) are never reduced in Chaldean gematria
 function chaldeanReduce(n) {
-  while (n > 9) { n = String(n).split("").reduce((s, d) => s + Number(d), 0); }
+  while (n > 9 && ![11, 22, 33].includes(n)) {
+    n = String(n).split("").reduce((s, d) => s + Number(d), 0);
+  }
   return n;
 }
 function computeLandingGematria(text) {
@@ -164,6 +167,7 @@ const Navigation = () => {
           <div className="md:hidden mt-4 pb-4 border-t border-border pt-4 space-y-4">
             <a href="#features" className="block text-muted-foreground hover:text-foreground py-2">Features</a>
             <a href="#testimonials" className="block text-muted-foreground hover:text-foreground py-2">Testimonials</a>
+            <a href="#gematria" className="block text-muted-foreground hover:text-foreground py-2">Gematria</a>
             <a href="#pricing" className="block text-muted-foreground hover:text-foreground py-2">Pricing</a>
             <a href="#faq" className="block text-muted-foreground hover:text-foreground py-2">FAQ</a>
             <a href="#contact" className="block text-muted-foreground hover:text-foreground py-2">Contact</a>
@@ -976,6 +980,7 @@ export default function LandingPage() {
       <HeroSection />
       <FeaturesSection />
       <ChatPreview />
+      <GematriaSection />
       <TestimonialsSection />
       <PricingSection />
       <FAQSection />

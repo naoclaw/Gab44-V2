@@ -229,6 +229,7 @@ class CompatibilityRequest(BaseModel):
     partner_birth_time: Optional[str] = None
     partner_birth_place: str
     partner_birth_name: Optional[str] = None  # legal birth name for numerology
+    relationship_type: str = "romantic"  # romantic | friendship | family | business | colleague
 
 class SynastryAspect(BaseModel):
     person1_planet: str
@@ -653,8 +654,40 @@ def generate_composite_chart(chart1: dict, chart2: dict) -> dict:
     
     return composite
 
+# Per-type AI framing config
+_REL_TYPE_CONFIG = {
+    "romantic": {
+        "system": "You are Gab44, an expert relationship astrologer specialising in romantic compatibility. Provide insightful, compassionate analysis that illuminates the love potential, passion, and long-term romantic growth of this pairing.",
+        "context": "ROMANTIC PARTNERSHIP",
+        "question_5": "Practical advice for deepening intimacy and building a lasting romantic bond",
+    },
+    "friendship": {
+        "system": "You are Gab44, an expert astrologer specialising in friendship and platonic compatibility. Provide warm, insightful analysis of how these two people can build and sustain a meaningful, supportive friendship.",
+        "context": "FRIENDSHIP",
+        "question_5": "Practical advice for deepening trust and creating a lasting, joyful friendship",
+    },
+    "family": {
+        "system": "You are Gab44, an expert astrologer specialising in family and ancestral dynamics. Provide compassionate, grounded analysis of how these two people can understand their family bond, heal patterns, and support each other.",
+        "context": "FAMILY RELATIONSHIP",
+        "question_5": "Practical advice for honouring the family bond and healing any ancestral patterns",
+    },
+    "business": {
+        "system": "You are Gab44, an expert astrologer specialising in business partnerships and professional compatibility. Provide strategic, insightful analysis of how these two people can build a successful, aligned business partnership.",
+        "context": "BUSINESS PARTNERSHIP",
+        "question_5": "Practical advice for building a successful, long-term business collaboration",
+    },
+    "colleague": {
+        "system": "You are Gab44, an expert astrologer specialising in professional and collegial dynamics. Provide practical, insightful analysis of how these two people can work effectively together and leverage each other's strengths.",
+        "context": "PROFESSIONAL / COLLEAGUE RELATIONSHIP",
+        "question_5": "Practical advice for a productive, harmonious working relationship",
+    },
+}
+
 async def generate_compatibility_analysis(user: dict, partner_data: dict, synastry: list, scores: dict) -> str:
-    """Generate AI-powered compatibility analysis"""
+    """Generate AI-powered compatibility analysis (any relationship type)"""
+
+    relationship_type = partner_data.get("relationship_type", "romantic")
+    cfg = _REL_TYPE_CONFIG.get(relationship_type, _REL_TYPE_CONFIG["romantic"])
     
     user_sun = user.get("sun_sign", "Unknown")
     partner_sun = partner_data.get("sun_sign", "Unknown")
@@ -678,33 +711,37 @@ async def generate_compatibility_analysis(user: dict, partner_data: dict, synast
         p_ex = partner_num.get("expression", {}).get("number", "?")
         num_block = f"""
 NUMEROLOGY COMPARISON:
-- Life Path: {user.get('name', 'Person 1')} = {u_lp}  |  {partner_data.get('name', 'Person 2')} = {p_lp}{"  (MATCH!)" if u_lp == p_lp else ""}
-- Soul Urge: {u_su}  |  {p_su}{"  (MATCH!)" if u_su == p_su else ""}
-- Expression: {u_ex}  |  {p_ex}{"  (MATCH!)" if u_ex == p_ex else ""}"""
-    
-    prompt = f"""Provide a comprehensive relationship compatibility analysis:
+- Life Path: {user.get('name', 'Person 1')} = {u_lp}  |  {partner_data.get('name', 'Person 2')} = {p_lp}{"  (MATCH!)" if str(u_lp) == str(p_lp) else ""}
+- Soul Urge: {u_su}  |  {p_su}{"  (MATCH!)" if str(u_su) == str(p_su) else ""}
+- Expression: {u_ex}  |  {p_ex}{"  (MATCH!)" if str(u_ex) == str(p_ex) else ""}"""
+
+    connection_label = "Romance" if relationship_type == "romantic" else "Connection"
+
+    prompt = f"""Provide a comprehensive {cfg['context']} compatibility analysis:
 
 PERSON 1: {user.get('name')} - {user_sun} Sun
 PERSON 2: {partner_data.get('name')} - {partner_sun} Sun
+RELATIONSHIP TYPE: {cfg['context']}
 
 COMPATIBILITY SCORES:
 - Overall: {scores.get('overall', 0)}%
 - Emotional: {scores.get('emotional', 0)}%
 - Communication: {scores.get('communication', 0)}%
-- Romance: {scores.get('romantic', 0)}%
-- Long-term: {scores.get('stability', 0)}%
+- {connection_label}: {scores.get('romantic', 0)}%
+- Long-term Stability: {scores.get('stability', 0)}%
+- Karmic Bond: {scores.get('karmic', 0)}%
 
 KEY SYNASTRY ASPECTS:
 {aspect_summary}
 {num_block}
 Provide:
-1. Overall relationship dynamic and natural chemistry
+1. Overall dynamic and natural chemistry for this {cfg['context'].lower()}
 2. Key strengths of this pairing
 3. Potential challenges and how to navigate them
 4. Karmic or spiritual themes in this connection (include numerology Life Path resonance if provided)
-5. Practical advice for building a strong relationship
+5. {cfg['question_5']}
 
-Keep the analysis warm, insightful, and actionable. Focus on growth potential."""
+Keep the analysis warm, insightful, and actionable. Frame everything specifically for a {cfg['context'].lower()} — avoid defaulting to romantic language unless this is a romantic relationship."""
 
     try:
         if not openai_client:
@@ -712,14 +749,14 @@ Keep the analysis warm, insightful, and actionable. Focus on growth potential.""
         completion = await openai_client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "You are Gab44, an expert relationship astrologer. Provide insightful, compassionate compatibility analysis that helps people understand their relationship dynamics and growth opportunities."},
+                {"role": "system", "content": cfg["system"]},
                 {"role": "user", "content": prompt},
             ],
         )
         return completion.choices[0].message.content
     except Exception as e:
         logging.error(f"Compatibility analysis error: {e}")
-        return f"Based on the {user_sun}-{partner_sun} pairing, this relationship shows {scores.get('overall', 70)}% compatibility. Key themes include balancing {get_sign_element(user_sun)} and {get_sign_element(partner_sun)} energies."
+        return f"Based on the {user_sun}-{partner_sun} pairing, this {relationship_type} connection shows {scores.get('overall', 70)}% compatibility. Key themes include balancing {get_sign_element(user_sun)} and {get_sign_element(partner_sun)} energies."
 
 # ============== AI Coach ==============
 
@@ -1687,7 +1724,7 @@ async def analyze_compatibility(request: CompatibilityRequest, user: dict = Depe
     emotional_aspects = [a for a in synastry_aspects if a["category"] == "emotional"]
     comm_aspects = [a for a in synastry_aspects if a["category"] == "communication"]
     karmic_aspects = [a for a in synastry_aspects if a["category"] == "karmic"]
-    
+
     category_scores = {
         "romantic": min(95, 60 + len(romantic_aspects) * 8 + sum(a["harmony"] * 10 for a in romantic_aspects)),
         "emotional": min(95, 55 + len(emotional_aspects) * 10 + sum(a["harmony"] * 12 for a in emotional_aspects)),
@@ -1695,16 +1732,34 @@ async def analyze_compatibility(request: CompatibilityRequest, user: dict = Depe
         "stability": (element_compat["score"] + modality_compat["score"]) / 2,
         "karmic": min(95, 40 + len(karmic_aspects) * 15)
     }
-    
-    # Overall score
+
+    # Overall score weights depend on relationship type
+    # Bonus applied when both people share the same Life Path number (strong karmic resonance)
+    KARMIC_LP_MATCH_BONUS = 10
+    OVERALL_LP_MATCH_BONUS = 2
+
+    rel_type = request.relationship_type
+    score_weights = {
+        # All weight dicts must sum to 1.0
+        "romantic":   dict(element=0.25, modality=0.15, romantic=0.25, emotional=0.20, communication=0.15),
+        "friendship": dict(element=0.20, modality=0.10, romantic=0.10, emotional=0.30, communication=0.30),
+        "family":     dict(element=0.15, modality=0.10, romantic=0.05, emotional=0.35, communication=0.20),  # karmic carries via category_scores
+        "business":   dict(element=0.15, modality=0.20, romantic=0.05, emotional=0.20, communication=0.40),
+        "colleague":  dict(element=0.10, modality=0.20, romantic=0.05, emotional=0.15, communication=0.50),
+    }.get(rel_type, dict(element=0.25, modality=0.15, romantic=0.25, emotional=0.20, communication=0.15))
+
+    # Normalise weights to guarantee sum == 1.0 regardless of rounding
+    weight_total = sum(score_weights.values())
+    score_weights = {k: v / weight_total for k, v in score_weights.items()}
+
     overall_score = (
-        element_compat["score"] * 0.25 +
-        modality_compat["score"] * 0.15 +
-        category_scores["romantic"] * 0.25 +
-        category_scores["emotional"] * 0.20 +
-        category_scores["communication"] * 0.15
+        element_compat["score"] * score_weights["element"] +
+        modality_compat["score"] * score_weights["modality"] +
+        category_scores["romantic"] * score_weights["romantic"] +
+        category_scores["emotional"] * score_weights["emotional"] +
+        category_scores["communication"] * score_weights["communication"]
     )
-    
+
     # Generate AI analysis
     scores_for_ai = {
         "overall": round(overall_score),
@@ -1720,14 +1775,20 @@ async def analyze_compatibility(request: CompatibilityRequest, user: dict = Depe
     partner_numerology = calculate_numerology(partner_num_name, request.partner_birth_date)
 
     # Numerology compatibility score bump (shared Life Path = strong karmic bond)
-    lp_match = user_numerology.get("life_path", {}).get("number") == partner_numerology.get("life_path", {}).get("number")
+    # Use str() comparison to avoid int vs string type mismatch from different code paths
+    lp_match = (
+        str(user_numerology.get("life_path", {}).get("number", "")) ==
+        str(partner_numerology.get("life_path", {}).get("number", ""))
+        and user_numerology.get("life_path", {}).get("number") is not None
+    )
     if lp_match:
-        category_scores["karmic"] = min(99, category_scores["karmic"] + 10)
-        overall_score = min(99, overall_score + 2)
+        category_scores["karmic"] = min(99, category_scores["karmic"] + KARMIC_LP_MATCH_BONUS)
+        overall_score = min(99, overall_score + OVERALL_LP_MATCH_BONUS)
 
     partner_data = {
         "name": request.partner_name,
         "sun_sign": partner_sun,
+        "relationship_type": rel_type,
         "user_numerology": user_numerology,
         "partner_numerology": partner_numerology,
     }
@@ -1750,6 +1811,7 @@ async def analyze_compatibility(request: CompatibilityRequest, user: dict = Depe
         "partner_name": request.partner_name,
         "partner_birth_date": request.partner_birth_date,
         "partner_sun_sign": partner_sun,
+        "relationship_type": rel_type,
         "overall_score": round(overall_score, 1),
         "category_scores": {k: round(v, 1) for k, v in category_scores.items()},
         "synastry_aspects": synastry_aspects,
