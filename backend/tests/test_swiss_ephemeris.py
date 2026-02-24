@@ -96,17 +96,19 @@ class TestSwissEphemerisChart:
             # Validate ranges
             assert 0 <= data["degree"] <= 360, f"{planet_name} degree out of range"
             assert 0 <= data["sign_degree"] <= 30, f"{planet_name} sign_degree out of range"
-            assert 1 <= data["house"] <= 12, f"{planet_name} house out of range"
+            # house can be None for extra points (Lilith, Part of Fortune, Nodes) without coords
+            if data["house"] is not None:
+                assert 1 <= data["house"] <= 12, f"{planet_name} house out of range"
         print(f"✓ All planets have required fields with valid ranges")
     
     def test_additional_points_present(self, user_chart):
-        """Verify North Node and South Node are calculated (Chiron requires full ephemeris files)"""
+        """Verify North Node, South Node, Lilith, and Part of Fortune are calculated"""
         planets = user_chart.get("planets", {})
         assert "north_node" in planets, "Missing North Node"
         assert "south_node" in planets, "Missing South Node"
-        # Note: Chiron requires seas_18.se1 file which is not included in built-in Moshier ephemeris
-        # Skipping chiron check - it's a known limitation without full ephemeris files
-        print(f"✓ Additional points (north_node, south_node) present")
+        assert "lilith" in planets, "Missing Black Moon Lilith"
+        assert "part_of_fortune" in planets, "Missing Part of Fortune"
+        print(f"✓ Additional points (north_node, south_node, lilith, part_of_fortune) present")
         if "chiron" in planets:
             print(f"  (Chiron also available: {planets['chiron']['sign']})")
     

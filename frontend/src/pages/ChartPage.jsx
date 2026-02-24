@@ -4,6 +4,7 @@ import { useAuth, API } from "@/App";
 import { useTheme } from "@/context/ThemeContext";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { 
   Sparkles, 
   ArrowLeft,
@@ -12,7 +13,8 @@ import {
   Star,
   ChevronRight,
   Share2,
-  Printer
+  Printer,
+  Search
 } from "lucide-react";
 import {
   Tooltip,
@@ -24,7 +26,8 @@ import {
 const PLANET_SYMBOLS = {
   sun: "☉", moon: "☽", mercury: "☿", venus: "♀", mars: "♂",
   jupiter: "♃", saturn: "♄", uranus: "♅", neptune: "♆", pluto: "♇",
-  north_node: "☊", south_node: "☋", chiron: "⚷"
+  north_node: "☊", south_node: "☋", chiron: "⚷",
+  lilith: "⚸", part_of_fortune: "⊕"
 };
 
 const SIGN_SYMBOLS = {
@@ -46,12 +49,45 @@ const ELEMENT_COLORS = {
   Fire: "text-orange-500", Earth: "text-green-500", Air: "text-cyan-500", Water: "text-blue-500"
 };
 
+// Chaldean gematria cipher (ancient Babylonian, 1–8; 9 is sacred)
+const CHALDEAN = {
+  A:1,I:1,J:1,Q:1,Y:1, B:2,K:2,R:2, C:3,G:3,L:3,S:3,
+  D:4,M:4,T:4, E:5,H:5,N:5,X:5, U:6,V:6,W:6, O:7,Z:7, F:8,P:8
+};
+const NUMBER_KEYWORDS = {
+  1:"Leadership",2:"Partnership",3:"Expression",4:"Foundation",5:"Freedom",
+  6:"Harmony",7:"Wisdom",8:"Abundance",9:"Completion",
+  11:"Illumination",22:"Master Builder",33:"Master Teacher"
+};
+
+// reduceNum mirrors the Python _reduce() in astro_calculator.py.
+// Duplication is intentional: client-side computation avoids a network
+// roundtrip for the interactive gematria input, keeping the UI instant.
+function reduceNum(n) {
+  while (n > 9 && ![11,22,33].includes(n)) n = String(n).split('').reduce((a,d)=>a+Number(d),0);
+  return n;
+}
+
+function computeGematria(text) {
+  const letters = text.toUpperCase().replace(/[^A-Z]/g,'').split('');
+  if (!letters.length) return null;
+  const ordTotal = letters.reduce((a,c)=>a+(c.charCodeAt(0)-64),0);
+  const chTotal  = letters.reduce((a,c)=>a+(CHALDEAN[c]||0),0);
+  return {
+    ordinal: { total: ordTotal, reduced: reduceNum(ordTotal) },
+    chaldean: { total: chTotal, reduced: reduceNum(chTotal) },
+    letters: letters.slice(0,24).map(c=>({ letter:c, ordinal:c.charCodeAt(0)-64, chaldean:CHALDEAN[c]||0 }))
+  };
+}
+
 export default function ChartPage() {
   const { user, token } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [chart, setChart] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [gematriaInput, setGematriaInput] = useState("");
+  const [gematriaResult, setGematriaResult] = useState(null);
 
   useEffect(() => {
     const fetchChart = async () => {
@@ -60,6 +96,12 @@ export default function ChartPage() {
           headers: { Authorization: `Bearer ${token}` }
         });
         setChart(response.data);
+        // Pre-populate gematria with user's name
+        const name = user?.birth_name || user?.name || "";
+        if (name) {
+          setGematriaInput(name);
+          setGematriaResult(computeGematria(name));
+        }
       } catch (error) {
         console.error("Error fetching chart:", error);
       } finally {
@@ -313,6 +355,70 @@ export default function ChartPage() {
                 </div>
               </div>
             )}
+
+            {/* Gematria Card */}
+            <div className="glass-card rounded-xl p-6" data-testid="gematria-card">
+              <h2 className="font-serif text-xl text-foreground mb-1 flex items-center gap-2">
+                <span>🔮</span> Gematria Analysis
+              </h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Chaldean (Babylonian, 1–8) · English Ordinal (A=1…Z=26) — analyse any name or word
+              </p>
+
+              {/* Input */}
+              <div className="flex gap-2 mb-5">
+                <Input
+                  value={gematriaInput}
+                  onChange={e => setGematriaInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && setGematriaResult(computeGematria(gematriaInput))}
+                  placeholder="Enter any name or word…"
+                  className="bg-muted/30 border-border rounded-xl"
+                />
+                <Button
+                  onClick={() => setGematriaResult(computeGematria(gematriaInput))}
+                  variant="outline"
+                  className="rounded-xl shrink-0"
+                  aria-label="Analyse"
+                >
+                  <Search className="w-4 h-4" />
+                </Button>
+              </div>
+
+              {gematriaResult && (
+                <>
+                  {/* Two cipher results */}
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    {[
+                      { label: "Chaldean", sys: gematriaResult.chaldean, color: "text-yellow-400", note: "ancient Babylonian" },
+                      { label: "English Ordinal", sys: gematriaResult.ordinal, color: "text-primary", note: "A=1 … Z=26" },
+                    ].map(({ label, sys, color, note }) => (
+                      <div key={label} className="p-4 rounded-xl bg-muted/30 text-center">
+                        <div className="text-xs text-muted-foreground mb-1">{label}</div>
+                        <div className="text-xs text-muted-foreground/70 mb-2 italic">{note}</div>
+                        <div className={`text-3xl font-bold ${color}`}>{sys.reduced}</div>
+                        <div className="text-xs font-medium text-foreground mt-1">
+                          {NUMBER_KEYWORDS[sys.reduced] || ""}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">total: {sys.total}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Letter breakdown */}
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2">Chaldean letter values</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {gematriaResult.letters.map((l, i) => (
+                        <div key={i} className="flex flex-col items-center p-1.5 rounded-lg bg-muted/20 min-w-[2rem]">
+                          <span className="text-xs font-mono text-foreground">{l.letter}</span>
+                          <span className="text-xs text-yellow-400 font-bold">{l.chaldean}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>

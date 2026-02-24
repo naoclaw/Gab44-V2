@@ -23,6 +23,7 @@ from astro_calculator import (
     calculate_natal_chart,
     calculate_current_transits,
     calculate_numerology,
+    calculate_gematria,
     get_coordinates,
     get_element,
     get_modality
@@ -1108,6 +1109,7 @@ async def get_my_chart(user: dict = Depends(get_current_user), recalculate: bool
     # Calculate numerology from name and birth date
     numerology_name = (user.get("birth_name") or user.get("name") or "").strip()
     numerology = calculate_numerology(numerology_name, birth_date) if numerology_name else {}
+    gematria = calculate_gematria(numerology_name) if numerology_name else {}
 
     # Build chart document
     chart_doc = {
@@ -1123,6 +1125,7 @@ async def get_my_chart(user: dict = Depends(get_current_user), recalculate: bool
         "aspects": chart_data["aspects"],
         "patterns": chart_data["patterns"],
         "numerology": numerology,
+        "gematria": gematria,
         "calculation_method": "Swiss Ephemeris",
         "julian_day": chart_data.get("julian_day"),
         "birth_coordinates": {"latitude": latitude, "longitude": longitude},

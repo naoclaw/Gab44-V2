@@ -49,6 +49,7 @@ PLANETS = {
 # Additional points — True Node is standard for natal charts
 NORTH_NODE = swe.TRUE_NODE
 CHIRON = swe.CHIRON
+LILITH = swe.MEAN_APOG  # Mean Black Moon Lilith (mean apogee of the Moon)
 
 # Aspect definitions (degree, name, orb, harmony)
 ASPECTS = [
@@ -166,7 +167,23 @@ def calculate_planetary_positions(jd: float) -> Dict[str, Dict]:
         }
     except Exception as e:
         print(f"Error calculating Chiron: {e}")
-    
+
+    # Calculate Black Moon Lilith (Mean Apogee)
+    try:
+        result, flag = swe.calc_ut(jd, LILITH)
+        longitude = result[0]
+        sign, sign_degree, _ = degree_to_sign(longitude)
+        positions["lilith"] = {
+            "degree": round(longitude, 2),
+            "sign": sign,
+            "sign_degree": round(sign_degree, 2),
+            "house": None,
+            "retrograde": False,  # Mean Lilith moves uniformly — no retrograde
+            "speed": round(result[3], 4),
+        }
+    except Exception as e:
+        print(f"Error calculating Lilith: {e}")
+
     return positions
 
 
@@ -502,6 +519,110 @@ def calculate_numerology(name: str, birth_date: str) -> Dict:
     return result
 
 
+# ---------------------------------------------------------------------------
+# Gematria Engine (Chaldean + English Ordinal)
+# ---------------------------------------------------------------------------
+
+# Chaldean cipher — ancient Babylonian system, the same civilisation that
+# gave us astrology.  Letters map to cosmic values 1–8; 9 is considered
+# sacred and never assigned to a letter.
+_CHALDEAN_MAP: Dict[str, int] = {
+    'A': 1, 'I': 1, 'J': 1, 'Q': 1, 'Y': 1,
+    'B': 2, 'K': 2, 'R': 2,
+    'C': 3, 'G': 3, 'L': 3, 'S': 3,
+    'D': 4, 'M': 4, 'T': 4,
+    'E': 5, 'H': 5, 'N': 5, 'X': 5,
+    'U': 6, 'V': 6, 'W': 6,
+    'O': 7, 'Z': 7,
+    'F': 8, 'P': 8,
+}
+
+
+def calculate_gematria(text: str) -> Dict:
+    """Calculate gematria using two cipher systems.
+
+    English Ordinal — A=1 … Z=26 (modern, widely used).
+    Chaldean — ancient Babylonian values 1–8 (cosmically connected to
+    astrology's Mesopotamian roots; 9 is sacred and unassigned).
+
+    Returns both totals, their reductions, number meanings, and a per-letter
+    breakdown for the Chaldean system (useful for UI display).
+    """
+    cleaned = ''.join(c.upper() for c in text if c.isalpha())
+    if not cleaned:
+        return {}
+
+    # English Ordinal: A=1, B=2 … Z=26
+    ordinal_total = sum(ord(c) - 64 for c in cleaned)
+    ordinal_reduced = _reduce(ordinal_total)
+
+    # Chaldean
+    chaldean_total = sum(_CHALDEAN_MAP.get(c, 0) for c in cleaned)
+    chaldean_reduced = _reduce(chaldean_total)
+
+    # Letter breakdown — cap at 24 chars (covers most names; keeps API payload lean
+    # and fits comfortably in the UI letter-tile row without wrapping)
+    letters = [
+        {"letter": c, "ordinal": ord(c) - 64, "chaldean": _CHALDEAN_MAP.get(c, 0)}
+        for c in cleaned[:24]
+    ]
+
+    return {
+        "text": text,
+        "ordinal": {
+            "total": ordinal_total,
+            "reduced": ordinal_reduced,
+            **_number_info(ordinal_reduced),
+        },
+        "chaldean": {
+            "total": chaldean_total,
+            "reduced": chaldean_reduced,
+            **_number_info(chaldean_reduced),
+        },
+        "letters": letters,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Part of Fortune (classical Lot / Arabic Part)
+# ---------------------------------------------------------------------------
+
+def _calculate_part_of_fortune(positions: Dict, ascendant_degree: float) -> Dict:
+    """Calculate the Lot of Fortune.
+
+    Must be called **after** ``assign_houses_to_planets`` so that
+    ``positions["sun"]["house"]`` is populated for correct day/night determination.
+
+    Day chart  (Sun in houses 7-12, above horizon): ASC + Moon − Sun
+    Night chart (Sun in houses 1-6, below horizon): ASC + Sun  − Moon
+
+    The returned dict has ``house: None``; the caller is responsible for
+    running the result through ``assign_houses_to_planets`` to set a real house.
+    """
+    sun_deg  = positions.get("sun",  {}).get("degree", 0)
+    moon_deg = positions.get("moon", {}).get("degree", 0)
+
+    # Sun in houses 7-12 = above horizon = day chart
+    sun_house = positions.get("sun", {}).get("house")
+    is_day = sun_house is not None and sun_house >= 7
+
+    if is_day:
+        pof_degree = (ascendant_degree + moon_deg - sun_deg) % 360
+    else:
+        pof_degree = (ascendant_degree + sun_deg - moon_deg) % 360
+
+    sign, sign_degree, _ = degree_to_sign(pof_degree)
+    return {
+        "degree": round(pof_degree, 2),
+        "sign": sign,
+        "sign_degree": round(sign_degree, 2),
+        "house": None,
+        "retrograde": False,
+        "speed": 0,
+        "chart_type": "day" if is_day else "night",
+    }
+
+
 def calculate_natal_chart(
     birth_date: str,
     birth_time: Optional[str] = None,
@@ -533,7 +654,15 @@ def calculate_natal_chart(
     houses = {}
     if latitude != 0.0 or longitude != 0.0:
         houses = calculate_houses(jd, latitude, longitude)
+        # Assign houses to all planets first (Sun needs its house for day/night detection)
         positions = assign_houses_to_planets(positions, houses)
+        # Now calculate Part of Fortune (requires Sun's house to be set for day/night formula)
+        asc_degree = houses.get("ascendant", {}).get("degree")
+        if asc_degree is not None:
+            pof = _calculate_part_of_fortune(positions, asc_degree)
+            # Assign PoF's own house number
+            pof_assigned = assign_houses_to_planets({"part_of_fortune": pof}, houses)
+            positions["part_of_fortune"] = pof_assigned["part_of_fortune"]
     
     # Calculate aspects
     aspects = calculate_aspects(positions)
