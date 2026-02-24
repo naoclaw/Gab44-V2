@@ -77,8 +77,9 @@ EMAIL_VERIFY    = os.environ.get('EMAIL_VERIFY',    'verify@gab44.com')     # si
 EMAIL_SUPPORT   = os.environ.get('EMAIL_SUPPORT',   'support@gab44.com')    # support replies
 EMAIL_MARKETING = os.environ.get('EMAIL_MARKETING', 'hello@gab44.com')      # promotions & newsletters
 
-# Verification token validity window (informational – shown in email copy)
+# Token validity windows
 EMAIL_VERIFY_EXPIRY_HOURS = 48
+PASSWORD_RESET_EXPIRY_HOURS = 1
 
 app = FastAPI(title="Gab44 - Astrology AI Coaching Platform")
 api_router = APIRouter(prefix="/api")
@@ -119,6 +120,24 @@ class UserUpdate(BaseModel):
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if not re.search(r"[A-Za-z]", v):
+            raise ValueError("Password must contain at least one letter")
+        if not re.search(r"[0-9!@#$%^&*(),.?\":{}|<>]", v):
+            raise ValueError("Password must contain at least one digit or special character")
+        return v
 
 class UserProfile(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -393,6 +412,28 @@ def build_support_reply_email(name: str, ticket_subject: str, reply_body: str) -
         and we'll get back to you.</p>
     """
     return _email_wrap(body)
+
+
+def build_password_reset_email(name: str, reset_url: str) -> str:
+    """Password-reset email — sent from EMAIL_NOREPLY."""
+    body = f"""
+      <h1 style="font-family:Georgia,serif;font-size:26px;margin-bottom:4px;color:#c9a84c;">
+        🔑 Reset your password</h1>
+      <p style="color:#9090b0;margin-top:0;">A reset was requested for your Gab44 account.</p>
+      <p style="margin-top:24px;">Hi {name},</p>
+      <p>Click the button below to choose a new password. This link expires in
+         <strong>{PASSWORD_RESET_EXPIRY_HOURS}&nbsp;hour</strong>.</p>
+      <a href="{reset_url}"
+         style="display:inline-block;margin:24px 0;padding:14px 32px;background:#c9a84c;
+                color:#0a0a0f;font-weight:700;border-radius:12px;text-decoration:none;font-size:16px;">
+        Reset My Password
+      </a>
+      <p style="color:#9090b0;font-size:13px;">
+        If you didn't request a password reset, you can safely ignore this email —
+        your password will not change.</p>
+    """
+    return _email_wrap(body)
+
 
 # ============== Astrology Helpers ==============
 
@@ -823,6 +864,58 @@ async def resend_verification(user: dict = Depends(get_current_user)):
     )
     return {"sent": sent}
 
+@api_router.post("/auth/forgot-password")
+async def forgot_password(req: ForgotPasswordRequest):
+    """Send a password-reset link to the given email address.
+
+    Always returns 200 to prevent user enumeration.
+    """
+    user = await db.users.find_one({"email": req.email})
+    if user:
+        reset_token = str(uuid.uuid4())
+        expiry = datetime.now(timezone.utc) + timedelta(hours=PASSWORD_RESET_EXPIRY_HOURS)
+        await db.users.update_one(
+            {"id": user["id"]},
+            {"$set": {
+                "password_reset_token": reset_token,
+                "password_reset_expiry": expiry.isoformat(),
+            }},
+        )
+        frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+        reset_url = f"{frontend_url}/reset-password?token={reset_token}"
+        send_email(
+            to_email=user["email"],
+            subject="🔑 Reset your Gab44 password",
+            html_content=build_password_reset_email(user.get("name", "Seeker"), reset_url),
+            from_email=EMAIL_NOREPLY,
+        )
+    return {"message": "If that email is registered, a reset link has been sent."}
+
+@api_router.post("/auth/reset-password")
+async def reset_password(req: ResetPasswordRequest):
+    """Validate a reset token and set a new password."""
+    user = await db.users.find_one({"password_reset_token": req.token})
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+    # Check expiry — ensure timezone-aware comparison
+    expiry_str = user.get("password_reset_expiry", "")
+    if expiry_str:
+        expiry = datetime.fromisoformat(expiry_str)
+        if expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) > expiry:
+            raise HTTPException(status_code=400, detail="Reset link has expired. Please request a new one.")
+
+    await db.users.update_one(
+        {"id": user["id"]},
+        {
+            "$set": {"password": hash_password(req.new_password)},
+            "$unset": {"password_reset_token": "", "password_reset_expiry": ""},
+        },
+    )
+    return {"message": "Password updated successfully. You can now log in."}
+
 @api_router.get("/auth/me")
 async def get_me(user: dict = Depends(get_current_user)):
     # Exclude internal token from response
@@ -976,6 +1069,46 @@ async def get_my_chart(user: dict = Depends(get_current_user), recalculate: bool
         )
     
     return {k: v for k, v in chart_doc.items() if k != "_id"}
+
+@api_router.post("/chart/share")
+async def generate_share_token(user: dict = Depends(get_current_user)):
+    """Generate (or return existing) a public share token for the user's chart."""
+    chart = await db.birth_charts.find_one({"user_id": user["id"]}, {"_id": 0})
+    if not chart:
+        raise HTTPException(status_code=404, detail="No chart found. Generate your chart first.")
+
+    # Reuse existing token if present — avoids invalidating links already emailed
+    if chart.get("share_token"):
+        return {"share_token": chart["share_token"]}
+
+    share_token = str(uuid.uuid4())
+    await db.birth_charts.update_one(
+        {"user_id": user["id"]},
+        {"$set": {"share_token": share_token}},
+    )
+    return {"share_token": share_token}
+
+@api_router.delete("/chart/share")
+async def revoke_share_token(user: dict = Depends(get_current_user)):
+    """Revoke the public share token (makes the chart private again)."""
+    await db.birth_charts.update_one(
+        {"user_id": user["id"]},
+        {"$unset": {"share_token": ""}},
+    )
+    return {"revoked": True}
+
+@api_router.get("/chart/public/{share_token}")
+async def get_public_chart(share_token: str):
+    """Public endpoint — returns a sanitized chart by share token (no auth required)."""
+    chart = await db.birth_charts.find_one({"share_token": share_token}, {"_id": 0})
+    if not chart:
+        raise HTTPException(status_code=404, detail="Chart not found or sharing has been disabled.")
+    # Strip internal fields before returning
+    public_fields = {
+        k: v for k, v in chart.items()
+        if k not in ("user_id", "share_token")
+    }
+    return public_fields
 
 # ============== Transit Routes ==============
 
@@ -1776,6 +1909,7 @@ async def create_indexes():
     await db.chat_messages.create_index([("user_id", 1), ("session_id", 1)])
     # Birth charts
     await db.birth_charts.create_index("user_id", unique=True)
+    await db.birth_charts.create_index("share_token", sparse=True)
     # Compatibility reports
     await db.compatibility_reports.create_index("user_id")
     await db.compatibility_reports.create_index("id", unique=True)

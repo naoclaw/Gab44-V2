@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useAuth } from "@/App";
+import axios from "axios";
+import { useAuth, API } from "@/App";
 import { useTheme } from "@/context/ThemeContext";
+import { parseApiError } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,9 +17,11 @@ export default function AuthPage() {
   const { theme, toggleTheme } = useTheme();
   
   const [isRegister, setIsRegister] = useState(searchParams.get("mode") === "register");
+  const [isForgot, setIsForgot] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState(null);
+  const [forgotEmail, setForgotEmail] = useState("");
   
   const [formData, setFormData] = useState({
     email: "",
@@ -36,6 +40,20 @@ export default function AuthPage() {
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleForgotSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await axios.post(`${API}/auth/forgot-password`, { email: forgotEmail });
+      toast.success("If that email is registered, a reset link has been sent.");
+      setIsForgot(false);
+    } catch {
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -59,15 +77,7 @@ export default function AuthPage() {
         navigate("/dashboard");
       }
     } catch (error) {
-      const detail = error.response?.data?.detail;
-      let message;
-      if (Array.isArray(detail)) {
-        // Pydantic validation error - extract readable messages
-        message = detail.map(e => e.msg?.replace(/^Value error,\s*/i, "") || "Validation error").join("; ");
-      } else {
-        message = detail || "Something went wrong";
-      }
-      toast.error(message);
+      toast.error(parseApiError(error));
     } finally {
       setLoading(false);
     }
@@ -79,7 +89,7 @@ export default function AuthPage() {
       <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 md:px-16 lg:px-24 py-12">
         <div className="flex items-center justify-between mb-12">
           <button 
-            onClick={() => navigate("/")}
+            onClick={() => { setIsForgot(false); navigate("/"); }}
             className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
             data-testid="back-to-home"
           >
@@ -104,6 +114,38 @@ export default function AuthPage() {
           <span className="font-serif text-xl text-foreground">Gab44</span>
         </div>
 
+        {/* ── Forgot Password Panel ── */}
+        {isForgot && (
+          <div className="max-w-sm">
+            <h1 className="font-serif text-3xl text-foreground mb-2">Reset Password</h1>
+            <p className="text-muted-foreground mb-8">Enter your email and we'll send you a reset link.</p>
+            <form onSubmit={handleForgotSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="forgot-email" className="text-foreground">Email</Label>
+                <Input
+                  id="forgot-email"
+                  type="email"
+                  placeholder="your@email.com"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  className="bg-muted/30 border-border h-12 rounded-xl focus-glow"
+                  required
+                />
+              </div>
+              <Button type="submit" disabled={loading} className="w-full glow-button bg-primary text-primary-foreground h-12 text-base rounded-xl">
+                {loading ? <span className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />Sending...</span> : "Send Reset Link"}
+              </Button>
+            </form>
+            <p className="text-sm text-muted-foreground mt-6 text-center">
+              <button onClick={() => setIsForgot(false)} className="text-primary hover:underline font-medium">
+                Back to Sign In
+              </button>
+            </p>
+          </div>
+        )}
+
+        {!isForgot && (
+        <>
         <h1 className="font-serif text-3xl md:text-4xl text-foreground mb-2">
           {isRegister ? "Create Your Account" : "Welcome Back"}
         </h1>
@@ -248,7 +290,18 @@ export default function AuthPage() {
           </Button>
         </form>
 
-        <p className="text-sm text-muted-foreground mt-6 text-center">
+        {!isRegister && (
+          <p className="text-sm text-muted-foreground mt-3 text-center">
+            <button
+              onClick={() => { setIsForgot(true); setForgotEmail(formData.email); }}
+              className="text-primary hover:underline font-medium"
+            >
+              Forgot your password?
+            </button>
+          </p>
+        )}
+
+        <p className="text-sm text-muted-foreground mt-4 text-center">
           {isRegister ? "Already have an account?" : "Don't have an account?"}{" "}
           <button
             onClick={() => setIsRegister(!isRegister)}
@@ -258,6 +311,8 @@ export default function AuthPage() {
             {isRegister ? "Sign In" : "Create One"}
           </button>
         </p>
+        </>
+        )}
       </div>
 
       {/* Right Side - Image */}

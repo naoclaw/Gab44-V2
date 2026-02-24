@@ -150,6 +150,8 @@ export default function ShareChartPage() {
   const [chart, setChart] = useState(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [shareToken, setShareToken] = useState(null);
+  const [generatingLink, setGeneratingLink] = useState(false);
   const cardRef = useRef(null);
 
   useEffect(() => {
@@ -159,6 +161,10 @@ export default function ShareChartPage() {
           headers: { Authorization: `Bearer ${token}` }
         });
         setChart(response.data);
+        // If chart already has a share token stored, use it
+        if (response.data.share_token) {
+          setShareToken(response.data.share_token);
+        }
       } catch (error) {
         console.error("Error fetching chart:", error);
       } finally {
@@ -168,35 +174,82 @@ export default function ShareChartPage() {
     if (token) fetchChart();
   }, [token]);
 
-  const shareUrl = `${window.location.origin}/chart`;
+  const generateShareLink = async () => {
+    if (shareToken) return; // already generated
+    setGeneratingLink(true);
+    try {
+      const res = await axios.post(`${API}/chart/share`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setShareToken(res.data.share_token);
+    } catch {
+      toast.error("Could not generate share link. Please try again.");
+    } finally {
+      setGeneratingLink(false);
+    }
+  };
+
+  const shareUrl = (token) =>
+    token
+      ? `${window.location.origin}/chart/public/${token}`
+      : `${window.location.origin}/auth?mode=register`;
 
   const copyLink = async () => {
+    let tok = shareToken;
+    if (!tok) {
+      // Generate first, then copy using the freshly returned token
+      setGeneratingLink(true);
+      try {
+        const res = await axios.post(`${API}/chart/share`, {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        tok = res.data.share_token;
+        setShareToken(tok);
+      } catch {
+        toast.error("Could not generate share link. Please try again.");
+        setGeneratingLink(false);
+        return;
+      }
+      setGeneratingLink(false);
+    }
     try {
-      await navigator.clipboard.writeText(shareUrl);
+      await navigator.clipboard.writeText(shareUrl(tok));
       setCopied(true);
       toast.success("Link copied to clipboard!");
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
+    } catch {
       toast.error("Failed to copy link");
     }
   };
 
-  const shareToTwitter = () => {
+  const shareToTwitter = async () => {
+    if (!shareToken) {
+      await generateShareLink();
+      return; // shareToken state not yet updated; user can click again
+    }
     const text = `✨ I'm a ${chart?.sun_sign} Sun, ${chart?.moon_sign} Moon, ${chart?.rising_sign} Rising! Discover your cosmic blueprint at Gab44`;
-    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`, '_blank');
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl(shareToken))}`, '_blank');
   };
 
-  const shareToFacebook = () => {
-    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank');
+  const shareToFacebook = async () => {
+    if (!shareToken) {
+      await generateShareLink();
+      return;
+    }
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl(shareToken))}`, '_blank');
   };
 
   const shareNative = async () => {
+    if (!shareToken) {
+      await generateShareLink();
+      return;
+    }
     if (navigator.share) {
       try {
         await navigator.share({
           title: `${user?.name}'s Cosmic Blueprint - Gab44`,
           text: `I'm a ${chart?.sun_sign} Sun, ${chart?.moon_sign} Moon, ${chart?.rising_sign} Rising!`,
-          url: shareUrl
+          url: shareUrl(shareToken)
         });
       } catch (err) {
         if (err.name !== 'AbortError') {
@@ -320,23 +373,33 @@ export default function ShareChartPage() {
               </div>
             </div>
 
-            {/* Invite Friends */}
+            {/* Share Link */}
             <div className="glass-card rounded-xl p-6 bg-primary/5 border-primary/20">
-              <h2 className="font-medium text-foreground mb-2">Invite Friends</h2>
+              <h2 className="font-medium text-foreground mb-2">Public Chart Link</h2>
               <p className="text-sm text-muted-foreground mb-4">
-                When friends sign up using your link, you both get extended trial access to premium features!
+                Anyone with this link can view your chart — no account required.
               </p>
-              <div className="flex gap-2">
-                <input 
-                  type="text" 
-                  value={shareUrl}
-                  readOnly
-                  className="flex-1 bg-background/50 border border-border rounded-xl px-3 py-2 text-sm text-foreground"
-                />
-                <Button onClick={copyLink} className="bg-primary text-primary-foreground rounded-xl">
-                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              {!shareToken ? (
+                <Button
+                  onClick={generateShareLink}
+                  disabled={generatingLink}
+                  className="w-full rounded-xl bg-primary text-primary-foreground"
+                >
+                  {generatingLink ? "Generating…" : "Generate Shareable Link"}
                 </Button>
-              </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={shareUrl(shareToken)}
+                    readOnly
+                    className="flex-1 bg-background/50 border border-border rounded-xl px-3 py-2 text-sm text-foreground"
+                  />
+                  <Button onClick={copyLink} className="bg-primary text-primary-foreground rounded-xl">
+                    {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -19,6 +19,8 @@ import ShareChartPage from "@/pages/ShareChartPage";
 import AdminPage from "@/pages/AdminPage";
 import CompatibilityPage from "@/pages/CompatibilityPage";
 import VerifyEmailPage from "@/pages/VerifyEmailPage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
+import PublicChartPage from "@/pages/PublicChartPage";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
@@ -152,6 +154,8 @@ function App() {
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/pricing" element={<PricingPage />} />
               <Route path="/verify-email" element={<VerifyEmailPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
+              <Route path="/chart/public/:token" element={<PublicChartPage />} />
               <Route 
                 path="/dashboard" 
                 element={
