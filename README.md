@@ -8,7 +8,7 @@ A full-stack astrology and numerology web app. Users get their natal chart, dail
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React 18, Tailwind CSS, shadcn/ui, Axios |
+| Frontend | React 19, Tailwind CSS, shadcn/ui, Axios |
 | Backend | FastAPI (Python), Motor (async MongoDB) |
 | Database | MongoDB |
 | Ephemeris | pyswisseph (Swiss Ephemeris) |

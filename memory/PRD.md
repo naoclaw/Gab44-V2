@@ -335,14 +335,14 @@ Extended palette: `cosmic-void` (#050505), `cosmic-starlight` (#F8FAFC), `cosmic
 - [x] House cusps display
 - [x] Major aspects listing
 - [x] Chart patterns identification
-- [ ] **Swiss Ephemeris integration** (currently simulated — priority upgrade)
+- [ ] Swiss Ephemeris integration (currently simulated — priority upgrade)
 
 ### Transits
 - [x] 90-day forecast display
 - [x] Aspect type filtering
 - [x] Action items per transit
 - [x] Strength indicators
-- [ ] **Real transit calculations** (currently simulated)
+- [ ] Real transit calculations (currently simulated)
 
 ---
 
