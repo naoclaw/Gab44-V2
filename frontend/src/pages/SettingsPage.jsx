@@ -404,7 +404,7 @@ export default function SettingsPage() {
                 className="text-xs text-amber-400 underline underline-offset-2 hover:text-amber-300 flex-shrink-0"
                 onClick={async () => {
                   try {
-                    await axios.post(`${API}/auth/resend-verification`, {}, { headers: { Authorization: `****** } });
+                    await axios.post(`${API}/auth/resend-verification`, {}, { headers: { Authorization: `Bearer ${token}` } });
                     toast.success("Verification email sent!");
                   } catch {
                     toast.error("Could not send email. Please try again.");

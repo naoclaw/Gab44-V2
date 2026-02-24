@@ -35,6 +35,15 @@
 - [x] AI-powered daily guidance (OpenAI, 24h server-side cache, fallback text)
 - [x] Daily guidance enriched with Personal Year + Life Path numerology
 
+### AI Friend (Saoul)
+- [x] Separate AI friend persona — warm, casual, present (not a coach, not a therapist)
+- [x] Own system prompt: matches user energy, no unsolicited advice, genuine human warmth
+- [x] Separate `friend_messages` MongoDB collection (isolated from coach messages)
+- [x] Session management (create, list, load history, delete)
+- [x] Same tier-based daily message limits as AI Coach
+- [x] Dedicated FriendPage UI with rose/warm accent color palette
+- [x] Dashboard sidebar navigation ("AI Friend" with Coffee icon)
+
 ### Astrology Engine (Swiss Ephemeris)
 - [x] Accurate planetary positions (Sun through Pluto)
 - [x] Black Moon Lilith (Mean Apogee, ⚸)
@@ -116,6 +125,7 @@
 - [x] AuthPage — Login/Register (birth_name field, password hint)
 - [x] Dashboard — Bento grid, daily guidance, transits, numerology tiles
 - [x] ChatPage — AI coaching, session management, tier limit toast
+- [x] FriendPage — AI friend (Saoul), warm rose accent, separate sessions
 - [x] ChartPage — Planets (with Lilith, PoF, ℞ badge), Houses, Aspects, Patterns, Numerology, Gematria
 - [x] CompatibilityPage — Synastry reports
 - [x] TransitsPage — Real outer planet transits with real progress bars
@@ -151,6 +161,10 @@
 - GET  /api/chat/history/{session_id}
 - GET  /api/chat/sessions
 - DELETE /api/chat/session/{session_id}
+- POST /api/friend/chat
+- GET  /api/friend/history/{session_id}
+- GET  /api/friend/sessions
+- DELETE /api/friend/session/{session_id}
 - GET  /api/chart/me?recalculate=bool
 - POST /api/chart/share
 - DELETE /api/chart/share
