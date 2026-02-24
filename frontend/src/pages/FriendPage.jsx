@@ -132,7 +132,7 @@ export default function FriendPage() {
     }
   };
 
-  const firstName = user?.name?.split(" ")[0] || "friend";
+  const firstName = user?.name?.trim().split(" ")[0] || "friend";
 
   return (
     <div className="min-h-screen bg-background flex">

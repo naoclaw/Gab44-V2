@@ -477,7 +477,7 @@ const ChatPreview = () => {
           </div>
 
           {/* AI Friend Preview */}
-          <div className="glass-card rounded-2xl p-6 md:p-8" style={{ borderColor: 'hsl(350 60% 50% / 0.15)' }}>
+          <div className="glass-card rounded-2xl p-6 md:p-8 friend-preview-card">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 rounded-full bg-rose-500/15 flex items-center justify-center">
                 <Heart className="w-5 h-5 text-rose-400" />

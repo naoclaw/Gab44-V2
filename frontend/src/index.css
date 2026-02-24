@@ -299,6 +299,15 @@
   background: hsl(350 60% 60% / 0.08);
 }
 
+/* Friend preview card on landing page */
+.friend-preview-card {
+  border-color: hsl(350 60% 50% / 0.15);
+}
+
+.dark .friend-preview-card {
+  border-color: hsl(350 60% 60% / 0.15);
+}
+
 /* Transit card */
 .transit-card {
   transition: transform 0.3s ease, box-shadow 0.3s ease;
