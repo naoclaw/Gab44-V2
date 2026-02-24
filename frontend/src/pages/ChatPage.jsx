@@ -20,7 +20,8 @@ import {
   BookOpen,
   ZoomIn,
   ZoomOut,
-  RotateCcw
+  RotateCcw,
+  Trash2
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -74,6 +75,20 @@ export default function ChatPage() {
     setSessionId(null);
   };
 
+  const deleteSession = async (e, sid) => {
+    e.stopPropagation(); // don't trigger loadSession
+    try {
+      await axios.delete(`${API}/chat/session/${sid}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSessions(prev => prev.filter(s => s.session_id !== sid));
+      if (sessionId === sid) startNewSession();
+      toast.success("Conversation deleted");
+    } catch {
+      toast.error("Failed to delete conversation");
+    }
+  };
+
   const sendMessage = async (e) => {
     e.preventDefault();
     if (!input.trim() || loading) return;
@@ -102,7 +117,15 @@ export default function ChatPage() {
       }
     } catch (error) {
       console.error("Error sending message:", error);
-      toast.error("Failed to get response. Please try again.");
+      const status = error.response?.status;
+      const detail = error.response?.data?.detail;
+      if (status === 429) {
+        toast.error(detail || "Daily message limit reached. Upgrade your plan to continue.", {
+          action: { label: "Upgrade", onClick: () => window.location.href = "/pricing" }
+        });
+      } else {
+        toast.error("Failed to get response. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -140,24 +163,32 @@ export default function ChatPage() {
         <ScrollArea className="flex-1 p-4">
           <div className="space-y-2">
             {sessions.map((session) => (
-              <button
-                key={session.session_id}
-                onClick={() => loadSession(session.session_id)}
-                className={`w-full text-left p-3 rounded-xl transition-all ${
-                  sessionId === session.session_id 
-                    ? 'bg-primary/10 border border-primary/20' 
-                    : 'hover:bg-muted'
-                }`}
-                data-testid={`session-${session.session_id}`}
-              >
-                <p className="text-sm text-foreground truncate mb-1">
-                  {session.preview}...
-                </p>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Clock className="w-3 h-3" />
-                  {new Date(session.timestamp).toLocaleDateString()}
-                </div>
-              </button>
+              <div key={session.session_id} className="relative group">
+                <button
+                  onClick={() => loadSession(session.session_id)}
+                  className={`w-full text-left p-3 rounded-xl transition-all ${
+                    sessionId === session.session_id 
+                      ? 'bg-primary/10 border border-primary/20' 
+                      : 'hover:bg-muted'
+                  }`}
+                  data-testid={`session-${session.session_id}`}
+                >
+                  <p className="text-sm text-foreground truncate mb-1 pr-6">
+                    {session.preview}...
+                  </p>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Clock className="w-3 h-3" />
+                    {new Date(session.timestamp).toLocaleDateString()}
+                  </div>
+                </button>
+                <button
+                  onClick={(e) => deleteSession(e, session.session_id)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                  title="Delete conversation"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             ))}
             
             {sessions.length === 0 && (

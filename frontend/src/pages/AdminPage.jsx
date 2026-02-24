@@ -6,6 +6,7 @@ import { API } from "@/App";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -56,6 +57,8 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [updating, setUpdating] = useState(null);
+  const [blast, setBlast] = useState({ subject: "", body_html: "", tier_filter: "all" });
+  const [blastSending, setBlastSending] = useState(false);
 
   const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
 
@@ -401,6 +404,72 @@ export default function AdminPage() {
               <p className="text-muted-foreground">No users found</p>
             </div>
           )}
+        </div>
+
+        {/* Email Blast Panel */}
+        <div className="glass-card rounded-2xl p-6">
+          <h2 className="font-serif text-xl text-foreground mb-1">Send Email Blast</h2>
+          <p className="text-sm text-muted-foreground mb-5">
+            Send a marketing email to a subset of verified users.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="md:col-span-2 space-y-1">
+              <label className="text-sm font-medium text-foreground">Subject</label>
+              <Input
+                placeholder="Weekly Cosmic Insights ✨"
+                value={blast.subject}
+                onChange={(e) => setBlast({ ...blast, subject: e.target.value })}
+                className="bg-muted/30 border-border rounded-xl"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-foreground">Recipients</label>
+              <Select
+                value={blast.tier_filter}
+                onValueChange={(v) => setBlast({ ...blast, tier_filter: v })}
+              >
+                <SelectTrigger className="bg-muted/30 border-border rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All verified users</SelectItem>
+                  <SelectItem value="seeker">Seeker only</SelectItem>
+                  <SelectItem value="enthusiast">Enthusiast only</SelectItem>
+                  <SelectItem value="advanced">Advanced only</SelectItem>
+                  <SelectItem value="professional">Professional only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-1 mb-4">
+            <label className="text-sm font-medium text-foreground">Body HTML</label>
+            <Textarea
+              placeholder="<p>Hello Seeker...</p>"
+              value={blast.body_html}
+              onChange={(e) => setBlast({ ...blast, body_html: e.target.value })}
+              className="bg-muted/30 border-border rounded-xl min-h-[120px] font-mono text-sm"
+            />
+          </div>
+          <Button
+            disabled={blastSending || !blast.subject || !blast.body_html}
+            className="bg-primary text-primary-foreground rounded-xl"
+            onClick={async () => {
+              setBlastSending(true);
+              try {
+                const res = await axios.post(`${API}/admin/send-email-blast`, blast, authHeaders);
+                toast.success(res.data.message || `Email blast queued for ${res.data.queued} recipients`);
+                setBlast({ subject: "", body_html: "", tier_filter: "all" });
+              } catch {
+                toast.error("Failed to send email blast");
+              } finally {
+                setBlastSending(false);
+              }
+            }}
+          >
+            {blastSending
+              ? <span className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />Sending...</span>
+              : "Send Email Blast"}
+          </Button>
         </div>
       </div>
     </div>

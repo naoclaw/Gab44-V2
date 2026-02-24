@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "@/App";
+import axios from "axios";
+import { useAuth, API } from "@/App";
 import { useTheme } from "@/context/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +19,9 @@ import {
   Zap,
   Users,
   Menu,
-  X
+  X,
+  Mail,
+  Send
 } from "lucide-react";
 import {
   Accordion,
@@ -26,6 +29,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
 
 const Navigation = () => {
   const { user, logout } = useAuth();
@@ -686,6 +691,142 @@ const CTASection = () => {
   );
 };
 
+const NewsletterSection = () => {
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await axios.post(`${API}/subscribe`, { email, name });
+      setDone(true);
+    } catch {
+      // Even on duplicate, show success to avoid enumeration
+      setDone(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <section id="newsletter" className="py-20 px-6 bg-primary/5 border-t border-border">
+      <div className="max-w-2xl mx-auto text-center">
+        <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 mx-auto mb-6">
+          <Mail className="w-6 h-6 text-primary" />
+        </div>
+        <h2 className="font-serif text-3xl text-foreground mb-3">Stay Aligned</h2>
+        <p className="text-muted-foreground mb-8">
+          Weekly astrological insights, feature announcements, and cosmic guidance — straight to your inbox.
+        </p>
+        {done ? (
+          <div className="flex items-center justify-center gap-3 text-green-500">
+            <Check className="w-5 h-5" />
+            <span className="font-medium">You're on the list! ✨</span>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+            <Input
+              type="text"
+              placeholder="Your name (optional)"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="bg-background border-border rounded-xl h-12"
+            />
+            <Input
+              type="email"
+              placeholder="your@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="bg-background border-border rounded-xl h-12 flex-1"
+              required
+            />
+            <Button type="submit" disabled={loading} className="glow-button bg-primary text-primary-foreground h-12 rounded-xl shrink-0">
+              {loading ? <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" /> : <><Send className="w-4 h-4 mr-2" />Subscribe</>}
+            </Button>
+          </form>
+        )}
+      </div>
+    </section>
+  );
+};
+
+const ContactSection = () => {
+  const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await axios.post(`${API}/contact`, form);
+      setDone(true);
+    } catch (err) {
+      const msg = err.response?.data?.detail || "Failed to send message. Please try again.";
+      toast.error(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <section id="contact" className="py-24 px-6">
+      <div className="max-w-2xl mx-auto">
+        <div className="text-center mb-12">
+          <p className="text-primary font-semibold mb-3 tracking-widest text-sm uppercase">Contact</p>
+          <h2 className="font-serif text-foreground">Get in Touch</h2>
+          <p className="text-muted-foreground mt-3">Questions, partnerships, or feedback — we'd love to hear from you.</p>
+        </div>
+
+        {done ? (
+          <div className="glass-card rounded-2xl p-10 text-center space-y-4">
+            <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center mx-auto">
+              <Check className="w-8 h-8 text-green-500" />
+            </div>
+            <h3 className="font-serif text-2xl text-foreground">Message Received ✨</h3>
+            <p className="text-muted-foreground">We'll get back to you within 1–2 business days. Check your inbox for a confirmation.</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="glass-card rounded-2xl p-8 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-foreground">Name</label>
+                <Input name="name" placeholder="Your name" value={form.name} onChange={handleChange}
+                  className="bg-muted/30 border-border rounded-xl" required />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-foreground">Email</label>
+                <Input name="email" type="email" placeholder="your@email.com" value={form.email} onChange={handleChange}
+                  className="bg-muted/30 border-border rounded-xl" required />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-foreground">Subject</label>
+              <Input name="subject" placeholder="What's on your mind?" value={form.subject} onChange={handleChange}
+                className="bg-muted/30 border-border rounded-xl" required />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-foreground">Message</label>
+              <Textarea name="message" placeholder="Tell us more..." value={form.message} onChange={handleChange}
+                className="bg-muted/30 border-border rounded-xl min-h-[140px]" required />
+            </div>
+            <Button type="submit" disabled={loading} className="w-full glow-button bg-primary text-primary-foreground h-12 rounded-xl">
+              {loading
+                ? <span className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />Sending...</span>
+                : <><Send className="w-4 h-4 mr-2" />Send Message</>}
+            </Button>
+          </form>
+        )}
+      </div>
+    </section>
+  );
+};
+
 const Footer = () => {
   return (
     <footer className="border-t border-border py-12 px-6">
@@ -705,7 +846,7 @@ const Footer = () => {
           <div className="flex gap-6">
             <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Privacy</a>
             <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Terms</a>
-            <a href="mailto:contact@gab44.com" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Contact</a>
+            <a href="#contact" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Contact</a>
           </div>
         </div>
       </div>
@@ -724,6 +865,8 @@ export default function LandingPage() {
       <PricingSection />
       <FAQSection />
       <CTASection />
+      <NewsletterSection />
+      <ContactSection />
       <Footer />
     </div>
   );

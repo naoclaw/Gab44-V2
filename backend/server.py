@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Request
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Request, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -80,6 +80,14 @@ EMAIL_MARKETING = os.environ.get('EMAIL_MARKETING', 'hello@gab44.com')      # pr
 # Token validity windows
 EMAIL_VERIFY_EXPIRY_HOURS = 48
 PASSWORD_RESET_EXPIRY_HOURS = 1
+
+# Chat message limits per subscription tier (per calendar day, UTC)
+CHAT_DAILY_LIMITS: dict[str, int] = {
+    "seeker":       10,
+    "enthusiast":   100,
+    "advanced":     -1,   # unlimited
+    "professional": -1,   # unlimited
+}
 
 app = FastAPI(title="Gab44 - Astrology AI Coaching Platform")
 api_router = APIRouter(prefix="/api")
@@ -249,6 +257,21 @@ class CheckoutRequest(BaseModel):
 
 class DeviceRegistration(BaseModel):
     player_id: str  # OneSignal player/subscription ID
+
+class NewsletterSubscription(BaseModel):
+    email: EmailStr
+    name: str = ""
+
+class ContactMessage(BaseModel):
+    name: str
+    email: EmailStr
+    subject: str
+    message: str
+
+class EmailBlastRequest(BaseModel):
+    subject: str
+    body_html: str
+    tier_filter: str = "all"  # "all" | "seeker" | "enthusiast" | "advanced" | "professional"
 
 # ============== Auth Helpers ==============
 
@@ -953,6 +976,22 @@ async def update_me(update_data: UserUpdate, user: dict = Depends(get_current_us
 
 @api_router.post("/chat", response_model=ChatResponse)
 async def send_chat_message(request: ChatRequest, user: dict = Depends(get_current_user)):
+    tier = user.get("subscription_tier", "seeker")
+    daily_limit = CHAT_DAILY_LIMITS.get(tier, 10)
+
+    if daily_limit > 0:
+        # Count messages sent today (user messages only, UTC calendar day)
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        today_count = await db.chat_messages.count_documents({
+            "user_id": user["id"],
+            "role": "user",
+            "timestamp": {"$gte": today_start},
+        })
+        if today_count >= daily_limit:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Daily message limit reached ({daily_limit} messages for {tier.title()} plan). Upgrade to continue chatting."
+            )
     session_id = request.session_id or str(uuid.uuid4())
     
     # Save user message
@@ -1005,6 +1044,14 @@ async def get_chat_sessions(user: dict = Depends(get_current_user)):
     ]
     sessions = await db.chat_messages.aggregate(pipeline).to_list(20)
     return [{"session_id": s["_id"], "preview": s["last_message"][:50], "timestamp": s["timestamp"], "count": s["message_count"]} for s in sessions]
+
+@api_router.delete("/chat/session/{session_id}")
+async def delete_chat_session(session_id: str, user: dict = Depends(get_current_user)):
+    """Delete all messages in a chat session belonging to the current user."""
+    result = await db.chat_messages.delete_many({"user_id": user["id"], "session_id": session_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"deleted": result.deleted_count}
 
 # ============== Birth Chart Routes ==============
 
@@ -1736,6 +1783,93 @@ async def send_daily_notifications(admin: dict = Depends(require_admin)):
     )
     return {"sent": sent, "devices": len(all_player_ids)}
 
+# ============== Newsletter / Contact Routes (Public) ==============
+
+@api_router.post("/subscribe")
+async def subscribe_newsletter(sub: NewsletterSubscription):
+    """Capture email for newsletter / marketing list."""
+    existing = await db.newsletter_subscribers.find_one({"email": sub.email})
+    if existing:
+        return {"subscribed": True, "already_subscribed": True}
+
+    await db.newsletter_subscribers.insert_one({
+        "id": str(uuid.uuid4()),
+        "email": sub.email,
+        "name": sub.name,
+        "subscribed_at": datetime.now(timezone.utc).isoformat(),
+        "active": True,
+    })
+
+    # Send confirmation email (non-blocking fire-and-forget)
+    greeting = f"Hi {sub.name}!" if sub.name else "Hi there!"
+    confirm_html = build_promotional_email(
+        name=sub.name or "Seeker",
+        headline="You're In! 🌟",
+        body_html=f"""
+          <p>{greeting} Thanks for subscribing to Gab44 Cosmic Updates.</p>
+          <p>You'll receive weekly astrological guidance, feature announcements, and exclusive offers directly in your inbox.</p>
+          <p>In the meantime, why not discover your full cosmic blueprint?</p>
+        """,
+        cta_text="Create My Free Chart",
+        cta_url=f"{os.environ.get('FRONTEND_URL','https://gab44.com')}/auth?mode=register",
+    )
+    send_email(
+        to_email=sub.email,
+        subject="Welcome to Gab44 Cosmic Updates ✨",
+        html_content=confirm_html,
+        from_email=EMAIL_MARKETING,
+    )
+    return {"subscribed": True, "already_subscribed": False}
+
+@api_router.post("/contact")
+async def submit_contact_form(msg: ContactMessage):
+    """Store a contact/support ticket and forward to support email."""
+    ticket_id = str(uuid.uuid4())
+    await db.contact_messages.insert_one({
+        "id": ticket_id,
+        "name": msg.name,
+        "email": msg.email,
+        "subject": msg.subject,
+        "message": msg.message,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "status": "open",
+    })
+
+    # Forward to support inbox
+    support_html = f"""
+    <div style="font-family:sans-serif;font-size:14px;color:#333;">
+      <h2 style="color:#c9a84c;">New Support Ticket #{ticket_id[:8]}</h2>
+      <p><strong>From:</strong> {msg.name} &lt;{msg.email}&gt;</p>
+      <p><strong>Subject:</strong> {msg.subject}</p>
+      <hr style="border:1px solid #eee;margin:16px 0;"/>
+      <p style="white-space:pre-wrap;">{msg.message}</p>
+    </div>
+    """
+    send_email(
+        to_email=EMAIL_SUPPORT,
+        subject=f"[Gab44 Support] {msg.subject}",
+        html_content=support_html,
+        from_email=EMAIL_NOREPLY,
+    )
+
+    # Auto-reply to sender
+    auto_reply = build_support_reply_email(
+        name=msg.name,
+        ticket_subject=msg.subject,
+        reply_body=f"""
+          <p>Thanks for reaching out. We've received your message and will get back to you
+          within 1–2 business days.</p>
+          <p><strong>Your ticket ID:</strong> <code>#{ticket_id[:8]}</code></p>
+        """,
+    )
+    send_email(
+        to_email=msg.email,
+        subject=f"Re: {msg.subject} [Ticket #{ticket_id[:8]}]",
+        html_content=auto_reply,
+        from_email=EMAIL_SUPPORT,
+    )
+    return {"submitted": True, "ticket_id": ticket_id[:8]}
+
 # ============== Health Check ==============
 
 @api_router.get("/")
@@ -1879,6 +2013,60 @@ async def get_admin_users(admin: dict = Depends(require_admin)):
     all_admins = {u["id"]: u for u in db_admins + env_admins}
     return list(all_admins.values())
 
+def _do_email_blast(subject: str, body_html: str, recipients: list) -> None:
+    """Background worker: sends marketing emails to a list of recipients."""
+    frontend_url = os.environ.get("FRONTEND_URL", "https://gab44.com")
+    for recipient in recipients:
+        html = build_promotional_email(
+            name=recipient.get("name", "Seeker"),
+            headline=subject,
+            body_html=body_html,
+            cta_text="Open Gab44",
+            cta_url=frontend_url,
+        )
+        send_email(
+            to_email=recipient["email"],
+            subject=subject,
+            html_content=html,
+            from_email=EMAIL_MARKETING,
+        )
+
+@api_router.post("/admin/send-email-blast")
+async def send_email_blast(
+    req: EmailBlastRequest,
+    background_tasks: BackgroundTasks,
+    admin: dict = Depends(require_admin),
+):
+    """Send a marketing email blast to a filtered subset of verified users (runs in background)."""
+    query: dict = {"email_verified": True}
+    if req.tier_filter != "all":
+        query["subscription_tier"] = req.tier_filter
+
+    # Fetch up to 10 000 recipients in batches using cursor
+    recipients = await db.users.find(query, {"_id": 0, "email": 1, "name": 1}).to_list(10_000)
+    if not recipients:
+        return {"queued": 0, "message": "No matching recipients"}
+
+    # Schedule the actual sends as a background task so the HTTP response is immediate
+    background_tasks.add_task(_do_email_blast, req.subject, req.body_html, recipients)
+    return {"queued": len(recipients), "message": f"Email blast queued for {len(recipients)} recipients"}
+
+@api_router.get("/admin/newsletter-subscribers")
+async def get_newsletter_subscribers(admin: dict = Depends(require_admin)):
+    """Return all newsletter subscribers."""
+    subs = await db.newsletter_subscribers.find(
+        {"active": True}, {"_id": 0, "id": 1, "email": 1, "name": 1, "subscribed_at": 1}
+    ).sort("subscribed_at", -1).to_list(5000)
+    return {"count": len(subs), "subscribers": subs}
+
+@api_router.get("/admin/contact-messages")
+async def get_contact_messages(admin: dict = Depends(require_admin)):
+    """Return all contact / support tickets."""
+    tickets = await db.contact_messages.find(
+        {}, {"_id": 0}
+    ).sort("created_at", -1).to_list(500)
+    return {"count": len(tickets), "tickets": tickets}
+
 # Include router and setup middleware
 app.include_router(api_router)
 
@@ -1907,6 +2095,8 @@ async def create_indexes():
     await db.chat_messages.create_index("user_id")
     await db.chat_messages.create_index("session_id")
     await db.chat_messages.create_index([("user_id", 1), ("session_id", 1)])
+    # Chat message daily limit helper index
+    await db.chat_messages.create_index([("user_id", 1), ("role", 1), ("timestamp", 1)])
     # Birth charts
     await db.birth_charts.create_index("user_id", unique=True)
     await db.birth_charts.create_index("share_token", sparse=True)
@@ -1915,6 +2105,10 @@ async def create_indexes():
     await db.compatibility_reports.create_index("id", unique=True)
     # Daily guidance cache
     await db.daily_guidance.create_index([("user_id", 1), ("date", 1)], unique=True)
+    # Newsletter subscribers
+    await db.newsletter_subscribers.create_index("email", unique=True)
+    # Contact messages
+    await db.contact_messages.create_index("created_at")
     logger.info("MongoDB indexes created")
 
 @app.on_event("shutdown")
