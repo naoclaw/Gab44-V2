@@ -35,7 +35,9 @@ export default function AuthPage() {
   const [cityResults, setCityResults] = useState([]);
   const [showCityDropdown, setShowCityDropdown] = useState(false);
   const [cityLoading, setCityLoading] = useState(false);
+  const [highlightIndex, setHighlightIndex] = useState(-1);
   const cityDropdownRef = useRef(null);
+  const cityListRef = useRef(null);
 
   useEffect(() => {
     if (user) {
@@ -47,6 +49,7 @@ export default function AuthPage() {
   useEffect(() => {
     if (!cityQuery || cityQuery.length < 1) {
       setCityResults([]);
+      setHighlightIndex(-1);
       return;
     }
     const timer = setTimeout(async () => {
@@ -54,6 +57,7 @@ export default function AuthPage() {
       try {
         const res = await axios.get(`${API}/cities`, { params: { q: cityQuery } });
         setCityResults(res.data);
+        setHighlightIndex(-1);
       } catch {
         setCityResults([]);
       } finally {
@@ -84,6 +88,57 @@ export default function AuthPage() {
     });
     setCityQuery(displayName);
     setShowCityDropdown(false);
+    setHighlightIndex(-1);
+  };
+
+  // Keyboard navigation for city dropdown
+  const handleCityKeyDown = (e) => {
+    if (!showCityDropdown || cityResults.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightIndex((prev) => {
+        const next = prev < cityResults.length - 1 ? prev + 1 : 0;
+        scrollToItem(next);
+        return next;
+      });
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightIndex((prev) => {
+        const next = prev > 0 ? prev - 1 : cityResults.length - 1;
+        scrollToItem(next);
+        return next;
+      });
+    } else if (e.key === "Enter" && highlightIndex >= 0) {
+      e.preventDefault();
+      selectCity(cityResults[highlightIndex]);
+    } else if (e.key === "Escape") {
+      setShowCityDropdown(false);
+      setHighlightIndex(-1);
+    }
+  };
+
+  const scrollToItem = (index) => {
+    if (cityListRef.current) {
+      const items = cityListRef.current.querySelectorAll("[data-city-item]");
+      if (items[index]) {
+        items[index].scrollIntoView({ block: "nearest" });
+      }
+    }
+  };
+
+  // Highlight matching text in city name
+  const highlightMatch = (text, query) => {
+    if (!query) return text;
+    const idx = text.toLowerCase().indexOf(query.toLowerCase());
+    if (idx === -1) return text;
+    return (
+      <>
+        {text.slice(0, idx)}
+        <span className="text-primary font-semibold">{text.slice(idx, idx + query.length)}</span>
+        {text.slice(idx + query.length)}
+      </>
+    );
   };
 
   const handleChange = (e) => {
@@ -226,7 +281,7 @@ export default function AuthPage() {
                     <Input
                       id="birth_place"
                       type="text"
-                      placeholder="Search city..."
+                      placeholder="Start typing a city name..."
                       value={cityQuery}
                       onChange={(e) => {
                         setCityQuery(e.target.value);
@@ -239,38 +294,57 @@ export default function AuthPage() {
                       onFocus={() => {
                         if (cityQuery.length >= 1) setShowCityDropdown(true);
                       }}
+                      onKeyDown={handleCityKeyDown}
                       className="bg-muted/30 border-border h-12 rounded-xl focus-glow pl-10"
                       data-testid="birth-place-input"
                       autoComplete="off"
+                      role="combobox"
+                      aria-expanded={showCityDropdown}
+                      aria-autocomplete="list"
                     />
                     {formData.birth_latitude && (
                       <Check className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
                     )}
                   </div>
 
-                  {/* City Dropdown */}
+                  {/* City Autocomplete Dropdown */}
                   {showCityDropdown && cityQuery.length >= 1 && (
-                    <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-xl shadow-lg max-h-60 overflow-y-auto" data-testid="city-dropdown">
+                    <div 
+                      ref={cityListRef}
+                      className="absolute z-50 w-full mt-1 bg-card border border-border rounded-xl shadow-lg max-h-60 overflow-y-auto" 
+                      data-testid="city-dropdown"
+                      role="listbox"
+                    >
                       {cityLoading ? (
                         <div className="p-3 text-center text-sm text-muted-foreground">Searching...</div>
                       ) : cityResults.length > 0 ? (
-                        cityResults.map((city) => (
-                          <button
-                            key={`${city.name}-${city.country}`}
-                            type="button"
-                            onClick={() => selectCity(city)}
-                            className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors flex items-center justify-between first:rounded-t-xl last:rounded-b-xl"
-                            data-testid={`city-option-${city.name.toLowerCase().replace(/\s/g, '-')}`}
-                          >
-                            <div>
-                              <span className="text-sm text-foreground font-medium">{city.name}</span>
-                              <span className="text-sm text-muted-foreground">, {city.country}</span>
-                            </div>
-                            <span className="text-xs text-muted-foreground font-mono">
-                              {city.latitude.toFixed(1)}°, {city.longitude.toFixed(1)}°
-                            </span>
-                          </button>
-                        ))
+                        <>
+                          {cityResults.map((city, idx) => (
+                            <button
+                              key={`${city.name}-${city.country}`}
+                              type="button"
+                              data-city-item
+                              onClick={() => selectCity(city)}
+                              className={`w-full text-left px-4 py-2.5 transition-colors flex items-center justify-between first:rounded-t-xl last:rounded-b-xl ${
+                                idx === highlightIndex ? "bg-primary/10" : "hover:bg-muted/50"
+                              }`}
+                              role="option"
+                              aria-selected={idx === highlightIndex}
+                              data-testid={`city-option-${city.name.toLowerCase().replace(/\s/g, '-')}`}
+                            >
+                              <div>
+                                <span className="text-sm text-foreground">{highlightMatch(city.name, cityQuery)}</span>
+                                <span className="text-sm text-muted-foreground">, {highlightMatch(city.country, cityQuery)}</span>
+                              </div>
+                              <span className="text-xs text-muted-foreground font-mono ml-2 flex-shrink-0">
+                                {city.latitude.toFixed(1)}°, {city.longitude.toFixed(1)}°
+                              </span>
+                            </button>
+                          ))}
+                          <div className="px-4 py-1.5 text-xs text-muted-foreground border-t border-border bg-muted/20 rounded-b-xl">
+                            {cityResults.length} result{cityResults.length !== 1 ? "s" : ""} · ↑↓ navigate · Enter select
+                          </div>
+                        </>
                       ) : (
                         <div className="p-3 text-center text-sm text-muted-foreground">
                           No cities found for "{cityQuery}"
