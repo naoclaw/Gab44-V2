@@ -15,6 +15,7 @@ import bcrypt
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 from numerology import calculate_full_profile
 from gematria import calculate_all as calculate_gematria
+from cities import search_cities, find_city
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -292,6 +293,16 @@ async def register(user_data: UserCreate):
     
     # Create user
     user_id = str(uuid.uuid4())
+
+    # Auto-populate lat/lng from static city database if not provided
+    lat = user_data.birth_latitude
+    lng = user_data.birth_longitude
+    if (lat is None or lng is None) and user_data.birth_place:
+        city = find_city(user_data.birth_place)
+        if city:
+            lat = city["latitude"]
+            lng = city["longitude"]
+
     user_doc = {
         "id": user_id,
         "email": user_data.email,
@@ -300,8 +311,8 @@ async def register(user_data: UserCreate):
         "birth_date": user_data.birth_date,
         "birth_time": user_data.birth_time,
         "birth_place": user_data.birth_place,
-        "birth_latitude": user_data.birth_latitude,
-        "birth_longitude": user_data.birth_longitude,
+        "birth_latitude": lat,
+        "birth_longitude": lng,
         "sun_sign": sun_sign,
         "subscription_tier": "seeker",
         "created_at": datetime.now(timezone.utc).isoformat()
@@ -662,6 +673,14 @@ async def gematria_calculate(request: GematriaRequest):
     if len(text) > 500:
         raise HTTPException(status_code=400, detail="Text must be 500 characters or less")
     return calculate_gematria(text)
+
+# ============== Cities (Static Geocoding) ==============
+
+@api_router.get("/cities")
+async def get_cities(q: str = ""):
+    """Search cities for birth location. No auth required."""
+    results = search_cities(query=q, limit=20)
+    return results
 
 # ============== Health Check ==============
 

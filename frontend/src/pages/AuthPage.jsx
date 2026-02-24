@@ -1,12 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useAuth } from "@/App";
+import { useAuth, API } from "@/App";
 import { useTheme } from "@/context/ThemeContext";
+import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Sparkles, ArrowLeft, Eye, EyeOff, MapPin, Calendar, Clock, Sun, Moon } from "lucide-react";
+import { Sparkles, ArrowLeft, Eye, EyeOff, MapPin, Calendar, Clock, Sun, Moon, Search, Check } from "lucide-react";
 
 export default function AuthPage() {
   const [searchParams] = useSearchParams();
@@ -24,14 +25,65 @@ export default function AuthPage() {
     name: "",
     birth_date: "",
     birth_time: "",
-    birth_place: ""
+    birth_place: "",
+    birth_latitude: null,
+    birth_longitude: null,
   });
+
+  // City search state
+  const [cityQuery, setCityQuery] = useState("");
+  const [cityResults, setCityResults] = useState([]);
+  const [showCityDropdown, setShowCityDropdown] = useState(false);
+  const [cityLoading, setCityLoading] = useState(false);
+  const cityDropdownRef = useRef(null);
 
   useEffect(() => {
     if (user) {
       navigate("/dashboard");
     }
   }, [user, navigate]);
+
+  // Search cities when query changes
+  useEffect(() => {
+    if (!cityQuery || cityQuery.length < 1) {
+      setCityResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setCityLoading(true);
+      try {
+        const res = await axios.get(`${API}/cities`, { params: { q: cityQuery } });
+        setCityResults(res.data);
+      } catch {
+        setCityResults([]);
+      } finally {
+        setCityLoading(false);
+      }
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [cityQuery]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (cityDropdownRef.current && !cityDropdownRef.current.contains(e.target)) {
+        setShowCityDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectCity = (city) => {
+    setFormData({
+      ...formData,
+      birth_place: city.name,
+      birth_latitude: city.latitude,
+      birth_longitude: city.longitude,
+    });
+    setCityQuery(`${city.name}, ${city.country}`);
+    setShowCityDropdown(false);
+  };
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -45,6 +97,11 @@ export default function AuthPage() {
       if (isRegister) {
         if (!formData.name || !formData.birth_date || !formData.birth_place) {
           toast.error("Please fill in all required fields");
+          setLoading(false);
+          return;
+        }
+        if (!formData.birth_latitude) {
+          toast.error("Please select a city from the dropdown");
           setLoading(false);
           return;
         }
@@ -157,22 +214,73 @@ export default function AuthPage() {
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2" ref={cityDropdownRef}>
                 <Label htmlFor="birth_place" className="flex items-center gap-2 text-foreground">
                   <MapPin className="w-4 h-4 text-muted-foreground" />
                   Birth Place *
                 </Label>
-                <Input
-                  id="birth_place"
-                  name="birth_place"
-                  type="text"
-                  placeholder="City, Country"
-                  value={formData.birth_place}
-                  onChange={handleChange}
-                  className="bg-muted/30 border-border h-12 rounded-xl focus-glow"
-                  data-testid="birth-place-input"
-                  required
-                />
+                <div className="relative">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                    <Input
+                      id="birth_place"
+                      type="text"
+                      placeholder="Search city..."
+                      value={cityQuery}
+                      onChange={(e) => {
+                        setCityQuery(e.target.value);
+                        setShowCityDropdown(true);
+                        // Clear lat/lng when user types (they need to re-select)
+                        setFormData({ ...formData, birth_place: "", birth_latitude: null, birth_longitude: null });
+                      }}
+                      onFocus={() => {
+                        if (cityQuery.length >= 1) setShowCityDropdown(true);
+                      }}
+                      className="bg-muted/30 border-border h-12 rounded-xl focus-glow pl-10"
+                      data-testid="birth-place-input"
+                      autoComplete="off"
+                    />
+                    {formData.birth_latitude && (
+                      <Check className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
+                    )}
+                  </div>
+
+                  {/* City Dropdown */}
+                  {showCityDropdown && cityQuery.length >= 1 && (
+                    <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-xl shadow-lg max-h-60 overflow-y-auto" data-testid="city-dropdown">
+                      {cityLoading ? (
+                        <div className="p-3 text-center text-sm text-muted-foreground">Searching...</div>
+                      ) : cityResults.length > 0 ? (
+                        cityResults.map((city) => (
+                          <button
+                            key={`${city.name}-${city.country}`}
+                            type="button"
+                            onClick={() => selectCity(city)}
+                            className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors flex items-center justify-between first:rounded-t-xl last:rounded-b-xl"
+                            data-testid={`city-option-${city.name.toLowerCase().replace(/\s/g, '-')}`}
+                          >
+                            <div>
+                              <span className="text-sm text-foreground font-medium">{city.name}</span>
+                              <span className="text-sm text-muted-foreground">, {city.country}</span>
+                            </div>
+                            <span className="text-xs text-muted-foreground font-mono">
+                              {city.latitude.toFixed(1)}°, {city.longitude.toFixed(1)}°
+                            </span>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="p-3 text-center text-sm text-muted-foreground">
+                          No cities found for "{cityQuery}"
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {formData.birth_latitude && (
+                  <p className="text-xs text-muted-foreground">
+                    📍 {formData.birth_latitude.toFixed(4)}°, {formData.birth_longitude.toFixed(4)}°
+                  </p>
+                )}
               </div>
             </>
           )}
