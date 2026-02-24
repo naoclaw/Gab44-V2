@@ -474,3 +474,101 @@ def find_city(name: str, country: str = "") -> dict | None:
             if not country_lower or city["country"].lower() == country_lower:
                 return city
     return None
+
+
+# ============== Mapbox Geocoding API ==============
+
+import os
+import requests
+import logging
+
+logger = logging.getLogger(__name__)
+
+MAPBOX_ACCESS_TOKEN = os.environ.get("MAPBOX_ACCESS_TOKEN", "")
+
+
+def _mapbox_geocode(query: str, limit: int = 10) -> list:
+    """
+    Search for places using the Mapbox Geocoding API.
+    Returns a list of city dicts in the same format as the static database.
+    Only queries for 'place' types (cities/towns) — not street addresses.
+    """
+    if not MAPBOX_ACCESS_TOKEN:
+        return []
+
+    try:
+        url = "https://api.mapbox.com/geocoding/v5/mapbox.places/" + requests.utils.quote(query) + ".json"
+        params = {
+            "access_token": MAPBOX_ACCESS_TOKEN,
+            "types": "place",
+            "limit": min(limit, 10),
+            "language": "en",
+        }
+        resp = requests.get(url, params=params, timeout=3)
+        resp.raise_for_status()
+        data = resp.json()
+
+        results = []
+        for feature in data.get("features", []):
+            # Extract country from context
+            country = ""
+            for ctx in feature.get("context", []):
+                if ctx.get("id", "").startswith("country"):
+                    country = ctx.get("text", "")
+                    break
+
+            # Mapbox returns [longitude, latitude]
+            coords = feature.get("center", [0, 0])
+
+            results.append({
+                "name": feature.get("text", ""),
+                "country": country,
+                "latitude": round(coords[1], 4),
+                "longitude": round(coords[0], 4),
+                "timezone": "",  # Mapbox doesn't return timezone in geocoding
+            })
+
+        return results
+    except Exception as e:
+        logger.warning(f"Mapbox geocoding failed: {e}")
+        return []
+
+
+def geocode_search(query: str = "", limit: int = 20) -> list:
+    """
+    Hybrid city search: uses Mapbox API when available, falls back to static database.
+    This is the function the API endpoint should call.
+    """
+    if not query:
+        return CITIES[:limit]
+
+    # If Mapbox is configured, use it for real geocoding
+    if MAPBOX_ACCESS_TOKEN:
+        results = _mapbox_geocode(query, limit=limit)
+        if results:
+            return results
+
+    # Fallback to static database
+    return search_cities(query, limit=limit)
+
+
+def geocode_lookup(place_name: str) -> dict | None:
+    """
+    Look up a single place by name. Returns coordinates.
+    Uses Mapbox if available, falls back to static database.
+    """
+    # Try static database first (fastest, no API call)
+    parts = [p.strip() for p in place_name.split(",", 1)]
+    city_name = parts[0]
+    city_country = parts[1] if len(parts) > 1 else ""
+    static = find_city(city_name, city_country)
+    if static:
+        return static
+
+    # Try Mapbox for places not in our static database
+    if MAPBOX_ACCESS_TOKEN:
+        results = _mapbox_geocode(place_name, limit=1)
+        if results:
+            return results[0]
+
+    return None

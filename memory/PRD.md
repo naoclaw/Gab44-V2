@@ -444,6 +444,7 @@ The V2 package includes proven Python implementations:
 |----------|-------|-------------|
 | `OPENAI_API_KEY` | backend | GPT-4o for AI guidance, coach, compatibility |
 | `EMERGENT_LLM_KEY` | backend | Emergent integrations LLM key |
+| `MAPBOX_ACCESS_TOKEN` | backend | Mapbox geocoding for birth city autocomplete (falls back to static 327-city database if not set) |
 | `SENDGRID_API_KEY` | backend | Transactional + marketing email |
 | `STRIPE_SECRET_KEY` | backend | Payments |
 | `STRIPE_PUBLISHABLE_KEY` | backend | Stripe frontend key |
