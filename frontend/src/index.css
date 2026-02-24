@@ -287,6 +287,18 @@
   @apply bg-muted border border-border;
 }
 
+/* Friend (Saoul) chat bubble — warmer, rose-tinted */
+.chat-bubble-friend {
+  @apply bg-muted border border-border;
+  border-color: hsl(350 60% 50% / 0.15);
+  background: hsl(350 60% 50% / 0.06);
+}
+
+.dark .chat-bubble-friend {
+  border-color: hsl(350 60% 60% / 0.15);
+  background: hsl(350 60% 60% / 0.08);
+}
+
 /* Transit card */
 .transit-card {
   transition: transform 0.3s ease, box-shadow 0.3s ease;

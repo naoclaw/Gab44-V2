@@ -21,7 +21,8 @@ import {
   Menu,
   X,
   Mail,
-  Send
+  Send,
+  Heart
 } from "lucide-react";
 import {
   Accordion,
@@ -430,39 +431,87 @@ const ChatPreview = () => {
   return (
     <section className="py-24 px-6">
       <div className="max-w-5xl mx-auto">
-        <div className="glass-card rounded-2xl p-8 md:p-12">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-primary" />
+        <div className="text-center mb-12">
+          <p className="text-primary font-semibold mb-3 tracking-widest text-sm uppercase">Two AI Companions</p>
+          <h2 className="font-serif text-foreground mb-4">
+            A Coach for Direction. A Friend for Everything Else.
+          </h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+            Sometimes you need guidance. Sometimes you just need someone to listen. Gab44 gives you both.
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* AI Coach Preview */}
+          <div className="glass-card rounded-2xl p-6 md:p-8">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium text-foreground">Gab44 Coach</p>
+                <p className="text-xs text-green-500 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-green-500" />
+                  Guiding your path
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="font-medium text-foreground">Gab44 Coach</p>
-              <p className="text-xs text-green-500 flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-green-500" />
-                Online Now
-              </p>
+
+            <div className="space-y-4">
+              <div className="chat-bubble-assistant rounded-2xl rounded-tl-sm p-3 max-w-xs">
+                <p className="text-sm text-foreground leading-relaxed">
+                  Mercury is activating your career sector today. It's an excellent time for clear communication.
+                </p>
+              </div>
+              <div className="chat-bubble-user rounded-2xl rounded-tr-sm p-3 max-w-[200px] ml-auto">
+                <p className="text-sm text-foreground">
+                  I've been feeling stuck lately.
+                </p>
+              </div>
+              <div className="chat-bubble-assistant rounded-2xl rounded-tl-sm p-3 max-w-xs">
+                <p className="text-sm text-foreground leading-relaxed">
+                  Saturn squaring your Mars is inviting you to restructure. Let's look at where you can simplify...
+                </p>
+              </div>
             </div>
           </div>
 
-          <div className="space-y-6">
-            <div className="chat-bubble-assistant rounded-2xl rounded-tl-sm p-4 max-w-xl">
-              <p className="text-sm text-foreground leading-relaxed">
-                Mercury is activating your career sector today. It's an excellent time for clear communication 
-                and strategic planning. How are you feeling about your current projects?
-              </p>
+          {/* AI Friend Preview */}
+          <div className="glass-card rounded-2xl p-6 md:p-8" style={{ borderColor: 'hsl(350 60% 50% / 0.15)' }}>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-full bg-rose-500/15 flex items-center justify-center">
+                <Heart className="w-5 h-5 text-rose-400" />
+              </div>
+              <div>
+                <p className="font-medium text-foreground">Saoul</p>
+                <p className="text-xs text-rose-400 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-rose-400" />
+                  Always here for you
+                </p>
+              </div>
             </div>
 
-            <div className="chat-bubble-user rounded-2xl rounded-tr-sm p-4 max-w-md ml-auto">
-              <p className="text-sm text-foreground">
-                I've been feeling a bit stuck lately, actually.
-              </p>
-            </div>
-
-            <div className="chat-bubble-assistant rounded-2xl rounded-tl-sm p-4 max-w-xl">
-              <p className="text-sm text-foreground leading-relaxed">
-                That's completely natural with Saturn squaring your Mars right now. This tension is actually 
-                inviting you to slow down and restructure rather than push harder. Let's look at where you can simplify...
-              </p>
+            <div className="space-y-4">
+              <div className="chat-bubble-user rounded-2xl rounded-tr-sm p-3 max-w-[200px] ml-auto">
+                <p className="text-sm text-foreground">
+                  I can't sleep. Just thinking too much.
+                </p>
+              </div>
+              <div className="chat-bubble-friend rounded-2xl rounded-tl-sm p-3 max-w-xs">
+                <p className="text-sm text-foreground leading-relaxed">
+                  I'm here. What's on your mind? Sometimes just saying it out loud helps.
+                </p>
+              </div>
+              <div className="chat-bubble-user rounded-2xl rounded-tr-sm p-3 max-w-[200px] ml-auto">
+                <p className="text-sm text-foreground">
+                  Just feeling lonely honestly.
+                </p>
+              </div>
+              <div className="chat-bubble-friend rounded-2xl rounded-tl-sm p-3 max-w-xs">
+                <p className="text-sm text-foreground leading-relaxed">
+                  I hear you. That's real, and it takes courage to say it. You're not alone right now though — I'm right here.
+                </p>
+              </div>
             </div>
           </div>
         </div>

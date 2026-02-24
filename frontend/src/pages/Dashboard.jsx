@@ -23,7 +23,8 @@ import {
   X,
   Shield,
   Heart,
-  Hash
+  Hash,
+  Coffee
 } from "lucide-react";
 
 const Sidebar = ({ activeTab, setActiveTab, mobileOpen, setMobileOpen }) => {
@@ -34,6 +35,7 @@ const Sidebar = ({ activeTab, setActiveTab, mobileOpen, setMobileOpen }) => {
   const baseNavItems = [
     { id: "overview", icon: BarChart3, label: "Overview" },
     { id: "chat", icon: MessageCircle, label: "AI Coach", href: "/chat" },
+    { id: "friend", icon: Coffee, label: "AI Friend", href: "/friend" },
     { id: "chart", icon: Sun, label: "Birth Chart", href: "/chart" },
     { id: "compatibility", icon: Heart, label: "Compatibility", href: "/compatibility" },
     { id: "transits", icon: Calendar, label: "Transits", href: "/transits" },
