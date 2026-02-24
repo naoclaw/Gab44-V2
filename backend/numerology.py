@@ -267,7 +267,6 @@ BIRTHDAY_MEANINGS = {
     9: "Born on the 9th — You are compassionate, idealistic, and drawn to humanitarian causes.",
     11: "Born on the 11th — Master Number: You have heightened intuition and inspirational gifts.",
     22: "Born on the 22nd — Master Number: You are a master builder with the ability to manifest great visions.",
-    33: "Born on the 33rd — Master Number: Extremely rare. You embody the highest form of nurturing and teaching.",
 }
 
 PERSONAL_YEAR_MEANINGS = {

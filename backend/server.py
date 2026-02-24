@@ -634,10 +634,12 @@ async def get_numerology_profile(user: dict = Depends(get_current_user)):
 
     profile = calculate_full_profile(full_name, birth_date)
     profile_doc = {"user_id": user["id"], **profile}
-    await db.numerology_profiles.insert_one(profile_doc)
+    await db.numerology_profiles.update_one(
+        {"user_id": user["id"]},
+        {"$set": profile_doc},
+        upsert=True
+    )
 
-    # Remove MongoDB _id before returning
-    profile_doc.pop("_id", None)
     return profile_doc
 
 # ============== Gematria Routes ==============
