@@ -22,8 +22,31 @@ import {
   Type,
   Eye,
   Save,
-  LogOut
+  LogOut,
+  Loader2
 } from "lucide-react";
+
+// OneSignal SDK is initialized in public/index.html with the App ID.
+// These helpers wrap the async SDK interface.
+
+async function requestPushPermission() {
+  if (!window.OneSignalDeferred) return null;
+  return new Promise((resolve) => {
+    window.OneSignalDeferred.push(async (OneSignal) => {
+      try {
+        const permission = await OneSignal.Notifications.requestPermission();
+        if (permission) {
+          const playerId = await OneSignal.User.PushSubscription.id;
+          resolve(playerId || null);
+        } else {
+          resolve(null);
+        }
+      } catch {
+        resolve(null);
+      }
+    });
+  });
+}
 
 export default function SettingsPage() {
   const { user, token, logout, updateUser } = useAuth();
@@ -45,6 +68,8 @@ export default function SettingsPage() {
     weeklyReport: false,
     marketing: false
   });
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
 
   const [profileEdit, setProfileEdit] = useState({
     name: user?.name || "",
@@ -53,6 +78,7 @@ export default function SettingsPage() {
     birth_place: user?.birth_place || ""
   });
   const [savingProfile, setSavingProfile] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
 
   const handleFontSizeChange = (value) => {
     setFontSize(value[0]);
@@ -72,6 +98,41 @@ export default function SettingsPage() {
       root.style.setProperty("--reading-letter-spacing", "0.01em");
     }
     toast.success(checked ? "Reading mode enabled" : "Reading mode disabled");
+  };
+
+  const handlePushToggle = async (checked) => {
+    if (!window.OneSignalDeferred) {
+      toast.error("Push notifications are not supported in this browser.");
+      return;
+    }
+    setPushLoading(true);
+    try {
+      if (checked) {
+        const playerId = await requestPushPermission();
+        if (playerId) {
+          await axios.post(`${API}/notifications/register-device`, { player_id: playerId }, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          setPushEnabled(true);
+          toast.success("Push notifications enabled!");
+        } else {
+          toast.error("Permission denied. Please allow notifications in your browser settings.");
+        }
+      } else {
+        // Unsubscribe via OneSignal SDK
+        if (window.OneSignalDeferred) {
+          window.OneSignalDeferred.push((OneSignal) => {
+            OneSignal.User.PushSubscription.optOut().catch(() => {});
+          });
+        }
+        setPushEnabled(false);
+        toast.success("Push notifications disabled.");
+      }
+    } catch (e) {
+      toast.error("Could not update push notification settings.");
+    } finally {
+      setPushLoading(false);
+    }
   };
 
   const handleProfileChange = (e) => {
@@ -116,6 +177,25 @@ export default function SettingsPage() {
       toast.error(message);
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  const handleManageSubscription = async () => {
+    if (user?.subscription_tier === "seeker") {
+      navigate("/pricing");
+      return;
+    }
+    setPortalLoading(true);
+    try {
+      const response = await axios.post(`${API}/payments/portal`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      window.location.href = response.data.portal_url;
+    } catch (error) {
+      const detail = error.response?.data?.detail || "Unable to open billing portal. Please try again.";
+      toast.error(detail);
+    } finally {
+      setPortalLoading(false);
     }
   };
 
@@ -189,23 +269,39 @@ export default function SettingsPage() {
       icon: Bell,
       content: (
         <div className="space-y-4">
-          {[
-            { key: "dailyGuidance", label: "Daily Guidance", desc: "Receive your daily cosmic insights" },
-            { key: "transitAlerts", label: "Transit Alerts", desc: "Get notified about important transits" },
-            { key: "weeklyReport", label: "Weekly Report", desc: "Summary of the week ahead" },
-            { key: "marketing", label: "Updates & Offers", desc: "News about new features and promotions" }
-          ].map(({ key, label, desc }) => (
-            <div key={key} className="flex items-center justify-between">
-              <div className="space-y-1">
-                <Label className="text-foreground">{label}</Label>
-                <p className="text-sm text-muted-foreground">{desc}</p>
-              </div>
-              <Switch
-                checked={notifications[key]}
-                onCheckedChange={(checked) => setNotifications(prev => ({ ...prev, [key]: checked }))}
-              />
+          {/* Push Notifications master toggle */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label className="text-foreground">Push Notifications</Label>
+              <p className="text-sm text-muted-foreground">Receive alerts directly in your browser</p>
             </div>
-          ))}
+            <Switch
+              checked={pushEnabled}
+              onCheckedChange={handlePushToggle}
+              disabled={pushLoading}
+              data-testid="push-notifications-toggle"
+            />
+          </div>
+          <div className="border-t border-border/50 pt-4 space-y-4">
+            {[
+              { key: "dailyGuidance", label: "Daily Guidance", desc: "Receive your daily cosmic insights" },
+              { key: "transitAlerts", label: "Transit Alerts", desc: "Get notified about important transits" },
+              { key: "weeklyReport", label: "Weekly Report", desc: "Summary of the week ahead" },
+              { key: "marketing", label: "Updates & Offers", desc: "News about new features and promotions" }
+            ].map(({ key, label, desc }) => (
+              <div key={key} className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label className="text-foreground">{label}</Label>
+                  <p className="text-sm text-muted-foreground">{desc}</p>
+                </div>
+                <Switch
+                  checked={notifications[key]}
+                  onCheckedChange={(checked) => setNotifications(prev => ({ ...prev, [key]: checked }))}
+                  disabled={!pushEnabled}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       )
     },
@@ -302,16 +398,22 @@ export default function SettingsPage() {
               <div>
                 <h3 className="font-medium text-foreground capitalize">{user?.subscription_tier || "Seeker"} Plan</h3>
                 <p className="text-sm text-muted-foreground">
-                  {user?.subscription_tier === "seeker" ? "Free forever" : "Billed monthly"}
+                  {user?.subscription_tier === "seeker" ? "Free forever" : "Billed monthly via Stripe"}
                 </p>
               </div>
               <Sparkles className="w-6 h-6 text-primary" />
             </div>
             <Button 
-              onClick={() => navigate("/pricing")}
+              onClick={handleManageSubscription}
+              disabled={portalLoading}
               className="w-full bg-primary/10 text-primary hover:bg-primary/20 rounded-xl"
             >
-              {user?.subscription_tier === "seeker" ? "Upgrade Plan" : "Manage Subscription"}
+              {portalLoading ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Opening…
+                </span>
+              ) : user?.subscription_tier === "seeker" ? "Upgrade Plan" : "Manage Subscription"}
             </Button>
           </div>
         </div>

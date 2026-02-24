@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -9,6 +9,8 @@ from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr, field_validator
 import json
 import re
+import stripe
+import requests as _requests
 from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone, timedelta
@@ -43,6 +45,25 @@ EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 
 # Admin emails (set via environment variable)
 ADMIN_EMAILS = [e.strip().lower() for e in os.environ.get('ADMIN_EMAILS', '').split(',') if e.strip()]
+
+# Stripe Configuration
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', '')
+if STRIPE_SECRET_KEY:
+    stripe.api_key = STRIPE_SECRET_KEY
+
+# Plan → price (in cents) mapping for inline checkout
+STRIPE_PLAN_PRICES = {
+    "enthusiast": {"amount": 1999, "name": "Gab44 Enthusiast"},
+    "advanced":   {"amount": 4999, "name": "Gab44 Advanced"},
+    "professional": {"amount": 9900, "name": "Gab44 Professional"},
+}
+
+# OneSignal Configuration
+ONESIGNAL_APP_ID = os.environ.get('ONESIGNAL_APP_ID', '')
+ONESIGNAL_API_KEY = os.environ.get('ONESIGNAL_API_KEY', '')
+ONESIGNAL_API_URL = "https://api.onesignal.com/notifications"
 
 app = FastAPI(title="Gab44 - Astrology AI Coaching Platform")
 api_router = APIRouter(prefix="/api")
@@ -185,6 +206,14 @@ class CompatibilityReport(BaseModel):
     growth_opportunities: List[str]
     ai_analysis: str
     created_at: str
+
+# ============== Payment + Notification Models ==============
+
+class CheckoutRequest(BaseModel):
+    tier: str  # enthusiast | advanced | professional
+
+class DeviceRegistration(BaseModel):
+    player_id: str  # OneSignal player/subscription ID
 
 # ============== Auth Helpers ==============
 
@@ -1195,6 +1224,197 @@ async def get_pricing():
         ]
     }
 
+# ============== OneSignal Helper ==============
+
+def send_onesignal_notification(player_ids: List[str], title: str, message: str, url: str = "/dashboard") -> bool:
+    """Send a push notification via OneSignal REST API."""
+    if not ONESIGNAL_APP_ID or not ONESIGNAL_API_KEY or not player_ids:
+        return False
+    try:
+        payload = {
+            "app_id": ONESIGNAL_APP_ID,
+            "include_player_ids": player_ids,
+            "headings": {"en": title},
+            "contents": {"en": message},
+            "url": url,
+        }
+        resp = _requests.post(
+            ONESIGNAL_API_URL,
+            json=payload,
+            headers={
+                "Authorization": f"Key {ONESIGNAL_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            timeout=10,
+        )
+        resp.raise_for_status()
+        return True
+    except Exception as exc:
+        logging.error("OneSignal notification failed: %s", exc)
+        return False
+
+# ============== Payment Routes (Stripe) ==============
+
+@api_router.post("/payments/create-checkout-session")
+async def create_checkout_session(req: CheckoutRequest, user: dict = Depends(get_current_user)):
+    """Create a Stripe Checkout session for a subscription plan."""
+    if not STRIPE_SECRET_KEY:
+        raise HTTPException(status_code=503, detail="Payment processing not configured")
+
+    tier = req.tier.lower()
+    plan = STRIPE_PLAN_PRICES.get(tier)
+    if not plan:
+        raise HTTPException(status_code=400, detail=f"Unknown plan: {tier}. Choose enthusiast or advanced.")
+
+    frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+
+    # Attach or retrieve Stripe customer for this user
+    stripe_customer_id = user.get("stripe_customer_id")
+    if not stripe_customer_id:
+        customer = stripe.Customer.create(
+            email=user["email"],
+            name=user.get("name", ""),
+            metadata={"user_id": user["id"]},
+        )
+        stripe_customer_id = customer.id
+        await db.users.update_one({"id": user["id"]}, {"$set": {"stripe_customer_id": stripe_customer_id}})
+
+    session = stripe.checkout.Session.create(
+        customer=stripe_customer_id,
+        payment_method_types=["card"],
+        mode="subscription",
+        line_items=[{
+            "price_data": {
+                "currency": "usd",
+                "product_data": {"name": plan["name"]},
+                "unit_amount": plan["amount"],
+                "recurring": {"interval": "month"},
+            },
+            "quantity": 1,
+        }],
+        success_url=f"{frontend_url}/dashboard?subscription=success&tier={tier}",
+        cancel_url=f"{frontend_url}/pricing",
+        metadata={"user_id": user["id"], "tier": tier},
+    )
+
+    return {"checkout_url": session.url, "session_id": session.id}
+
+
+@api_router.post("/payments/portal")
+async def create_portal_session(user: dict = Depends(get_current_user)):
+    """Create a Stripe Customer Portal session so the user can manage/cancel their subscription."""
+    if not STRIPE_SECRET_KEY:
+        raise HTTPException(status_code=503, detail="Payment processing not configured")
+
+    stripe_customer_id = user.get("stripe_customer_id")
+    if not stripe_customer_id:
+        raise HTTPException(status_code=400, detail="No active subscription found")
+
+    frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+    session = stripe.billing_portal.Session.create(
+        customer=stripe_customer_id,
+        return_url=f"{frontend_url}/settings",
+    )
+    return {"portal_url": session.url}
+
+
+@api_router.post("/payments/webhook")
+async def stripe_webhook(request: Request):
+    """Handle Stripe webhook events."""
+    if not STRIPE_SECRET_KEY:
+        raise HTTPException(status_code=503, detail="Payment processing not configured")
+
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature", "")
+
+    try:
+        if STRIPE_WEBHOOK_SECRET:
+            event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
+        else:
+            # Accept without signature verification when webhook secret not configured (dev only)
+            event = stripe.Event.construct_from(json.loads(payload), stripe.api_key)
+    except (ValueError, stripe.error.SignatureVerificationError) as e:
+        logging.error("Stripe webhook error: %s", e)
+        raise HTTPException(status_code=400, detail="Invalid webhook payload")
+
+    event_type = event["type"]
+    logging.info("Stripe webhook: %s", event_type)
+
+    if event_type == "checkout.session.completed":
+        session_obj = event["data"]["object"]
+        user_id = session_obj.get("metadata", {}).get("user_id")
+        tier = session_obj.get("metadata", {}).get("tier")
+        stripe_customer_id = session_obj.get("customer")
+        stripe_subscription_id = session_obj.get("subscription")
+
+        if user_id and tier:
+            await db.users.update_one(
+                {"id": user_id},
+                {"$set": {
+                    "subscription_tier": tier,
+                    "stripe_customer_id": stripe_customer_id,
+                    "stripe_subscription_id": stripe_subscription_id,
+                }},
+            )
+            logging.info("Upgraded user %s to %s", user_id, tier)
+
+    elif event_type in ("customer.subscription.updated", "customer.subscription.deleted"):
+        sub = event["data"]["object"]
+        stripe_customer_id = sub.get("customer")
+        status_val = sub.get("status")
+
+        user_doc = await db.users.find_one({"stripe_customer_id": stripe_customer_id}, {"_id": 0})
+        if user_doc:
+            if event_type == "customer.subscription.deleted" or status_val in ("canceled", "unpaid", "past_due"):
+                await db.users.update_one(
+                    {"stripe_customer_id": stripe_customer_id},
+                    {"$set": {"subscription_tier": "seeker", "stripe_subscription_id": None}},
+                )
+                logging.info("Downgraded customer %s to seeker", stripe_customer_id)
+
+    return {"received": True}
+
+
+# ============== Notification Routes (OneSignal) ==============
+
+@api_router.post("/notifications/register-device")
+async def register_device(reg: DeviceRegistration, user: dict = Depends(get_current_user)):
+    """Store a OneSignal player_id for push notification delivery."""
+    player_id = reg.player_id.strip()
+    if not player_id:
+        raise HTTPException(status_code=400, detail="player_id is required")
+
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$addToSet": {"onesignal_player_ids": player_id}},
+    )
+    return {"registered": True}
+
+
+@api_router.post("/notifications/send-daily")
+async def send_daily_notifications(admin: dict = Depends(require_admin)):
+    """Admin endpoint: send daily guidance push to all users with push enabled."""
+    users_with_push = await db.users.find(
+        {"onesignal_player_ids": {"$exists": True, "$ne": []}},
+        {"_id": 0, "onesignal_player_ids": 1},
+    ).to_list(1000)
+
+    all_player_ids = []
+    for u in users_with_push:
+        all_player_ids.extend(u.get("onesignal_player_ids", []))
+
+    if not all_player_ids:
+        return {"sent": False, "reason": "No registered devices"}
+
+    today = datetime.now(timezone.utc).strftime("%B %d")
+    sent = send_onesignal_notification(
+        player_ids=all_player_ids,
+        title="✨ Your Daily Cosmic Guidance",
+        message=f"Your personalized astrological guidance for {today} is ready.",
+        url="/dashboard",
+    )
+    return {"sent": sent, "devices": len(all_player_ids)}
+
 # ============== Health Check ==============
 
 @api_router.get("/")
@@ -1361,6 +1581,7 @@ async def create_indexes():
     # Users collection
     await db.users.create_index("email", unique=True)
     await db.users.create_index("id", unique=True)
+    await db.users.create_index("stripe_customer_id", sparse=True)
     # Chat messages
     await db.chat_messages.create_index("user_id")
     await db.chat_messages.create_index("session_id")
