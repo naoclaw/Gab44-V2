@@ -295,9 +295,9 @@ Using Don Norman's three levels of emotional design:
 
 3. **Hero background image** — Uses an Unsplash direct link (`photo-1419242902214-272b3f66ee7a`), which is different from the `design_guidelines.json` recommendation (`photo-1767188789485-54e0922d76a8`). The actual hero image is a generic starry sky, while the design spec called for a "Deep space nebula background."
 
-4. **Emoji in code** — The Gematria section uses a 🔮 emoji as an icon (`<span className="text-xl">🔮</span>`), which directly violates the design guidelines: *"NEVER use AI assistant Emoji characters like 🔮 etc for icons."*
+4. **Emoji in code** — The Gematria section uses a 🔮 emoji as an icon (`<span className="text-xl">🔮</span>`), which directly violates the design guidelines: *"NEVER use AI assistant Emoji characters like 🔮 etc for icons."* Emojis render inconsistently across operating systems and browsers (different colors, sizes, and glyphs on iOS vs Android vs Windows), are not styleable with CSS (can't match brand colors), and screen readers may announce them with verbose alt-text like "crystal ball" which disrupts the reading flow. Use a Lucide or Phosphor icon instead (e.g., `<Hash>` or a custom SVG).
 
-5. **No reading-mode context used in pages** — `ReadingModeContext` is imported in `App.js` and wraps the entire app, but none of the pages appear to use it. This is dead code.
+5. **ReadingModeContext usage** — `ReadingModeContext` is imported in `App.js` and wraps the entire app. Verified via codebase search: it is consumed in `SettingsPage.jsx` and `ChatPage.jsx`, so it is *not* dead code. However, its scope could be narrowed — wrapping the entire app with a context only used in two pages adds unnecessary re-render surface.
 
 ---
 
@@ -312,7 +312,7 @@ Using Don Norman's three levels of emotional design:
 | 3 | **Add favicon + OG images** — Create a simple favicon and social preview image | Shareability | 30 min |
 | 4 | **Fix `transition: all`** — Replace with specific property transitions in index.css | Performance | 15 min |
 | 5 | **Fix "99% Accuracy" stat** — Change to "Swiss Ephemeris Precision" or "Arcsecond Accuracy" — don't imply life prediction accuracy | Trust | 5 min |
-| 6 | **Align pricing** — Landing page says $19.99/$49.99, PRD says $9.99/$29.99/$79.99 | Credibility | 10 min |
+| 6 | **Align pricing** — Landing page says $19.99/$49.99, PRD says $9.99/$29.99/$79.99. The PRD (`memory/PRD.md`) is the authoritative source since it reflects the Stripe-configured tiers; update the landing page `PricingSection` to match. | Credibility | 10 min |
 
 ### Tier 2: High Impact, Medium Effort (Do This Sprint)
 
