@@ -1106,7 +1106,7 @@ async def get_my_chart(user: dict = Depends(get_current_user), recalculate: bool
     )
 
     # Calculate numerology from name and birth date
-    numerology_name = user.get("birth_name") or user.get("name", "")
+    numerology_name = (user.get("birth_name") or user.get("name") or "").strip()
     numerology = calculate_numerology(numerology_name, birth_date) if numerology_name else {}
 
     # Build chart document
@@ -1317,16 +1317,18 @@ async def get_daily_guidance(user: dict = Depends(get_current_user)):
                 f"- {t['transit_planet'].title()} {t['aspect']} natal {t['natal_planet'].title()} (orb {t['orb']:.1f}°)"
                 for t in current_transits[:5]
             ])
-        # Numerology for daily tone
+        # Numerology for daily tone — only include lines with real values
         if chart and chart.get("numerology"):
             num = chart["numerology"]
-            py = num.get("personal_year", {})
             lp = num.get("life_path", {})
-            if py or lp:
-                numerology_block = (
-                    f"- Life Path {lp.get('number','?')} ({lp.get('keyword','')})\n"
-                    f"- Personal Year {py.get('number','?')} ({py.get('keyword','')}) — {py.get('theme','')}"
-                )
+            py = num.get("personal_year", {})
+            lines = []
+            if lp.get("number"):
+                lines.append(f"- Life Path {lp['number']} ({lp.get('keyword', '')})")
+            if py.get("number"):
+                lines.append(f"- Personal Year {py['number']} ({py.get('keyword', '')}) — {py.get('theme', '')}")
+            if lines:
+                numerology_block = "\n".join(lines)
     except Exception as e:
         logging.warning(f"Could not fetch transits for daily guidance: {e}")
 

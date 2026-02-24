@@ -463,10 +463,12 @@ def calculate_numerology(name: str, birth_date: str) -> Dict:
         birthday_num = 0
         dt = None
 
-    # --- Personal Year Number (changes each birthday) ---
+    # --- Personal Year Number (changes each birthday; uses prior year until birthday passes) ---
     if dt:
         today = datetime.now()
-        py_raw = _reduce(dt.month) + _reduce(dt.day) + _reduce(sum(int(d) for d in str(today.year)))
+        # If today is before the birth month/day this calendar year, use last year's cycle
+        year_for_py = today.year if (today.month, today.day) >= (dt.month, dt.day) else today.year - 1
+        py_raw = _reduce(dt.month) + _reduce(dt.day) + _reduce(sum(int(d) for d in str(year_for_py)))
         personal_year = _reduce(py_raw)
     else:
         personal_year = 0
@@ -481,21 +483,23 @@ def calculate_numerology(name: str, birth_date: str) -> Dict:
     soul_urge    = _reduce(sum(vowel_digits))  if vowel_digits else 0
     personality  = _reduce(sum(cons_digits))   if cons_digits  else 0
 
-    # First / Last name numbers (split on whitespace)
+    # First / Last name numbers (split on whitespace; omit last_name when only one name)
     parts = name_clean.split()
-    first_name_num = _reduce(sum(_name_to_digits(parts[0])))  if parts       else 0
-    last_name_num  = _reduce(sum(_name_to_digits(parts[-1]))) if len(parts) > 1 else first_name_num
+    first_name_num = _reduce(sum(_name_to_digits(parts[0]))) if parts else 0
+    last_name_num  = _reduce(sum(_name_to_digits(parts[-1]))) if len(parts) > 1 else None
 
-    return {
-        "life_path":        {"number": life_path,      **_number_info(life_path)},
-        "expression":       {"number": expression,     **_number_info(expression)},
-        "soul_urge":        {"number": soul_urge,      **_number_info(soul_urge)},
-        "personality":      {"number": personality,    **_number_info(personality)},
-        "birthday":         {"number": birthday_num,   **_number_info(birthday_num)},
-        "personal_year":    {"number": personal_year,  **_number_info(personal_year)},
-        "first_name":       {"number": first_name_num, **_number_info(first_name_num)},
-        "last_name":        {"number": last_name_num,  **_number_info(last_name_num)},
+    result = {
+        "life_path":     {"number": life_path,     **_number_info(life_path)},
+        "expression":    {"number": expression,    **_number_info(expression)},
+        "soul_urge":     {"number": soul_urge,     **_number_info(soul_urge)},
+        "personality":   {"number": personality,   **_number_info(personality)},
+        "birthday":      {"number": birthday_num,  **_number_info(birthday_num)},
+        "personal_year": {"number": personal_year, **_number_info(personal_year)},
+        "first_name":    {"number": first_name_num, **_number_info(first_name_num)},
     }
+    if last_name_num is not None:
+        result["last_name"] = {"number": last_name_num, **_number_info(last_name_num)}
+    return result
 
 
 def calculate_natal_chart(
