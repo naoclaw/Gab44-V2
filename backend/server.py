@@ -70,7 +70,15 @@ ONESIGNAL_API_URL = "https://api.onesignal.com/notifications"
 
 # SendGrid Configuration
 SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY', '')
-SENDGRID_FROM_EMAIL = os.environ.get('SENDGRID_FROM_EMAIL', 'noreply@gab44.com')
+
+# Separate sender addresses per email type (all must be verified in SendGrid)
+EMAIL_NOREPLY   = os.environ.get('EMAIL_NOREPLY',   'noreply@gab44.com')    # system / automated
+EMAIL_VERIFY    = os.environ.get('EMAIL_VERIFY',    'verify@gab44.com')     # sign-up & verification
+EMAIL_SUPPORT   = os.environ.get('EMAIL_SUPPORT',   'support@gab44.com')    # support replies
+EMAIL_MARKETING = os.environ.get('EMAIL_MARKETING', 'hello@gab44.com')      # promotions & newsletters
+
+# Verification token validity window (informational – shown in email copy)
+EMAIL_VERIFY_EXPIRY_HOURS = 48
 
 app = FastAPI(title="Gab44 - Astrology AI Coaching Platform")
 api_router = APIRouter(prefix="/api")
@@ -267,42 +275,124 @@ async def require_admin(user: dict = Depends(get_current_user)) -> dict:
 
 # ============== Email Helper (SendGrid) ==============
 
-def send_email(to_email: str, subject: str, html_content: str) -> bool:
-    """Send a transactional email via SendGrid. Returns True on success."""
+def send_email(to_email: str, subject: str, html_content: str, from_email: str = None) -> bool:
+    """Send an email via SendGrid.
+    
+    Pass ``from_email`` to override the default sender (EMAIL_NOREPLY).
+    Use the purpose-specific constants:
+      EMAIL_VERIFY    – account / sign-up emails
+      EMAIL_SUPPORT   – support replies
+      EMAIL_MARKETING – promotions & newsletters
+      EMAIL_NOREPLY   – automated system emails (default)
+    """
     if not SENDGRID_API_KEY:
         logging.warning("SENDGRID_API_KEY not configured – email not sent to %s", to_email)
         return False
+    sender = from_email or EMAIL_NOREPLY
     try:
         message = Mail(
-            from_email=SENDGRID_FROM_EMAIL,
+            from_email=sender,
             to_emails=to_email,
             subject=subject,
             html_content=html_content,
         )
         sg = SendGridAPIClient(SENDGRID_API_KEY)
         response = sg.send(message)
-        logging.info("Email sent to %s – status %s", to_email, response.status_code)
+        logging.info("Email sent from %s to %s – status %s", sender, to_email, response.status_code)
         return response.status_code in (200, 202)
     except Exception as exc:
         logging.error("SendGrid error sending to %s: %s", to_email, exc)
         return False
 
+# ---------- Email template builders ----------
+
+_EMAIL_BASE = """
+<div style="font-family:sans-serif;max-width:520px;margin:auto;padding:32px 24px;
+            background:#0a0a0f;color:#e8e0f0;border-radius:16px;">
+  {body}
+  <hr style="border:none;border-top:1px solid #222;margin:24px 0;" />
+  <p style="color:#606080;font-size:12px;margin:0;">
+    Gab44 &middot; Astrology AI Coaching &middot;
+    <a href="mailto:{support}" style="color:#c9a84c;">{support}</a>
+  </p>
+</div>
+"""
+
+def _email_wrap(body: str) -> str:
+    return _EMAIL_BASE.format(body=body, support=EMAIL_SUPPORT)
+
+
 def build_verification_email(name: str, verify_url: str) -> str:
-    return f"""
-    <div style="font-family:sans-serif;max-width:520px;margin:auto;padding:32px 24px;background:#0a0a0f;color:#e8e0f0;border-radius:16px;">
-      <h1 style="font-family:Georgia,serif;font-size:28px;margin-bottom:4px;color:#c9a84c;">✨ Welcome to Gab44</h1>
+    """Sign-up verification email — sent from EMAIL_VERIFY."""
+    body = f"""
+      <h1 style="font-family:Georgia,serif;font-size:28px;margin-bottom:4px;color:#c9a84c;">
+        ✨ Welcome to Gab44</h1>
       <p style="color:#9090b0;margin-top:0;">Your cosmic journey starts with one click.</p>
       <p style="margin-top:24px;">Hi {name},</p>
-      <p>Please verify your email address so we can keep your account secure and send you personalized astrological guidance.</p>
+      <p>Please verify your email address so we can keep your account secure and
+         send you personalized astrological guidance.</p>
       <a href="{verify_url}"
-         style="display:inline-block;margin:24px 0;padding:14px 32px;background:#c9a84c;color:#0a0a0f;font-weight:700;border-radius:12px;text-decoration:none;font-size:16px;">
+         style="display:inline-block;margin:24px 0;padding:14px 32px;background:#c9a84c;
+                color:#0a0a0f;font-weight:700;border-radius:12px;text-decoration:none;font-size:16px;">
         Verify My Email
       </a>
-      <p style="color:#9090b0;font-size:13px;">This link expires in 48 hours. If you didn't create a Gab44 account, you can safely ignore this email.</p>
-      <hr style="border:none;border-top:1px solid #222;margin:24px 0;" />
-      <p style="color:#606080;font-size:12px;margin:0;">Gab44 · Astrology AI Coaching · <a href="mailto:support@gab44.com" style="color:#c9a84c;">support@gab44.com</a></p>
-    </div>
+      <p style="color:#9090b0;font-size:13px;">
+        This link expires in {EMAIL_VERIFY_EXPIRY_HOURS}&nbsp;hours. If you didn't create a Gab44 account,
+        you can safely ignore this email.</p>
     """
+    return _email_wrap(body)
+
+
+def build_welcome_email(name: str, dashboard_url: str) -> str:
+    """Post-verification welcome email — sent from EMAIL_VERIFY."""
+    body = f"""
+      <h1 style="font-family:Georgia,serif;font-size:28px;margin-bottom:4px;color:#c9a84c;">
+        🌟 You're verified, {name}!</h1>
+      <p style="color:#9090b0;margin-top:0;">The cosmos is ready to guide you.</p>
+      <p style="margin-top:24px;">Your Gab44 account is now fully activated.</p>
+      <p>Head to your dashboard to explore your natal chart, daily guidance, and AI coaching.</p>
+      <a href="{dashboard_url}"
+         style="display:inline-block;margin:24px 0;padding:14px 32px;background:#c9a84c;
+                color:#0a0a0f;font-weight:700;border-radius:12px;text-decoration:none;font-size:16px;">
+        Go to My Dashboard
+      </a>
+    """
+    return _email_wrap(body)
+
+
+def build_promotional_email(name: str, headline: str, body_html: str, cta_text: str, cta_url: str) -> str:
+    """Generic promotional / newsletter email — sent from EMAIL_MARKETING."""
+    body = f"""
+      <h1 style="font-family:Georgia,serif;font-size:26px;margin-bottom:4px;color:#c9a84c;">
+        {headline}</h1>
+      <p style="margin-top:16px;">Hi {name},</p>
+      {body_html}
+      <a href="{cta_url}"
+         style="display:inline-block;margin:24px 0;padding:14px 32px;background:#c9a84c;
+                color:#0a0a0f;font-weight:700;border-radius:12px;text-decoration:none;font-size:16px;">
+        {cta_text}
+      </a>
+      <p style="color:#9090b0;font-size:12px;">
+        You're receiving this because you signed up for Gab44 updates.
+        To unsubscribe, reply with "unsubscribe" to
+        <a href="mailto:{EMAIL_MARKETING}" style="color:#c9a84c;">{EMAIL_MARKETING}</a>.
+      </p>
+    """
+    return _email_wrap(body)
+
+
+def build_support_reply_email(name: str, ticket_subject: str, reply_body: str) -> str:
+    """Support reply email — sent from EMAIL_SUPPORT."""
+    body = f"""
+      <h1 style="font-family:Georgia,serif;font-size:22px;margin-bottom:4px;color:#c9a84c;">
+        Re: {ticket_subject}</h1>
+      <p style="margin-top:16px;">Hi {name},</p>
+      {reply_body}
+      <p style="margin-top:24px;">Need more help?
+        <a href="mailto:{EMAIL_SUPPORT}" style="color:#c9a84c;">Reply to this email</a>
+        and we'll get back to you.</p>
+    """
+    return _email_wrap(body)
 
 # ============== Astrology Helpers ==============
 
@@ -671,6 +761,7 @@ async def register(user_data: UserCreate):
         to_email=user_data.email,
         subject="✨ Verify your Gab44 email",
         html_content=build_verification_email(user_data.name, verify_url),
+        from_email=EMAIL_VERIFY,
     )
     
     token = create_token(user_id)
@@ -705,6 +796,14 @@ async def verify_email(token: str):
         {"id": user["id"]},
         {"$set": {"email_verified": True}, "$unset": {"email_verification_token": ""}},
     )
+    # Send a welcome email now that the address is confirmed
+    frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+    send_email(
+        to_email=user["email"],
+        subject="🌟 Welcome to Gab44 – you're all set!",
+        html_content=build_welcome_email(user.get("name", "Seeker"), f"{frontend_url}/dashboard"),
+        from_email=EMAIL_VERIFY,
+    )
     return {"verified": True, "message": "Email verified successfully. You can now log in."}
 
 @api_router.post("/auth/resend-verification")
@@ -720,6 +819,7 @@ async def resend_verification(user: dict = Depends(get_current_user)):
         to_email=user["email"],
         subject="✨ Verify your Gab44 email",
         html_content=build_verification_email(user.get("name", "Seeker"), verify_url),
+        from_email=EMAIL_VERIFY,
     )
     return {"sent": sent}
 
