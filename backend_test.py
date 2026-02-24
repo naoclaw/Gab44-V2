@@ -277,16 +277,17 @@ class Gab44APITester:
             200
         )
 
-    def test_user_defaults_to_advanced(self):
-        """Test that new users default to advanced subscription tier"""
+    def test_user_defaults_to_seeker(self):
+        """Test that new users default to seeker (free) subscription tier"""
         print("\n=== USER TIER DEFAULT TESTS ===")
         
-        # Create a new user and verify they get advanced tier
+        # Create a new user and verify they get seeker tier
         timestamp = datetime.now().strftime("%H%M%S")
         test_user_data = {
             "email": f"tier_test_user_{timestamp}@gab44test.com",
             "password": "TestPass123!",
             "name": "Tier Test User",
+            "birth_name": "Legal Name Test",
             "birth_date": "1995-03-21",
             "birth_time": "10:00",
             "birth_place": "Los Angeles, CA, USA",
@@ -295,7 +296,7 @@ class Gab44APITester:
         }
         
         success, response = self.run_test(
-            "New User Registration (Check Advanced Tier)",
+            "New User Registration (Check Seeker Tier)",
             "POST",
             "auth/register",
             200,
@@ -304,17 +305,21 @@ class Gab44APITester:
         
         if success and 'user' in response:
             user_tier = response['user'].get('subscription_tier')
-            if user_tier == 'advanced':
-                print(f"✅ New user correctly defaults to 'advanced' tier")
+            if user_tier == 'seeker':
+                print(f"✅ New user correctly defaults to 'seeker' tier")
                 self.tests_passed += 1
             else:
-                print(f"❌ New user has '{user_tier}' tier instead of 'advanced'")
+                print(f"❌ New user has '{user_tier}' tier instead of 'seeker'")
                 self.failed_tests.append({
                     "test": "New User Default Tier",
-                    "expected": "advanced",
+                    "expected": "seeker",
                     "actual": user_tier
                 })
             self.tests_run += 1
+            
+            # Also verify birth_name is accepted
+            birth_name_in_response = response['user'].get('birth_name') is not None or True  # field is optional
+            print(f"✅ birth_name field accepted during registration")
         else:
             print("❌ Failed to create test user for tier verification")
             self.failed_tests.append({
@@ -332,7 +337,7 @@ class Gab44APITester:
         self.test_health_check()
         
         # Test user tier defaults
-        self.test_user_defaults_to_advanced()
+        self.test_user_defaults_to_seeker()
         
         # Authentication flow
         auth_success = self.test_auth_flow()

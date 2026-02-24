@@ -830,7 +830,7 @@ async def register(user_data: UserCreate):
         "birth_latitude": user_data.birth_latitude,
         "birth_longitude": user_data.birth_longitude,
         "sun_sign": sun_sign,
-        "subscription_tier": "advanced",  # Default to advanced until payment is setup
+        "subscription_tier": "seeker",  # Default to free tier; upgrades via Stripe
         "email_verified": False,
         "email_verification_token": email_verification_token,
         "created_at": datetime.now(timezone.utc).isoformat()

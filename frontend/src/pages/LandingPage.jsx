@@ -64,6 +64,7 @@ const Navigation = () => {
             <a href="#testimonials" className="nav-link text-sm text-muted-foreground hover:text-foreground link-hover">Testimonials</a>
             <a href="#pricing" className="nav-link text-sm text-muted-foreground hover:text-foreground link-hover">Pricing</a>
             <a href="#faq" className="nav-link text-sm text-muted-foreground hover:text-foreground link-hover">FAQ</a>
+            <a href="#contact" className="nav-link text-sm text-muted-foreground hover:text-foreground link-hover">Contact</a>
           </div>
 
           <div className="hidden md:flex items-center gap-3">
@@ -147,6 +148,7 @@ const Navigation = () => {
             <a href="#testimonials" className="block text-muted-foreground hover:text-foreground py-2">Testimonials</a>
             <a href="#pricing" className="block text-muted-foreground hover:text-foreground py-2">Pricing</a>
             <a href="#faq" className="block text-muted-foreground hover:text-foreground py-2">FAQ</a>
+            <a href="#contact" className="block text-muted-foreground hover:text-foreground py-2">Contact</a>
             <div className="flex gap-2 pt-2">
               {user ? (
                 <Button onClick={() => navigate("/dashboard")} className="flex-1 bg-primary">Dashboard</Button>

@@ -27,6 +27,7 @@ export default function AuthPage() {
     email: "",
     password: "",
     name: "",
+    birth_name: "",
     birth_date: "",
     birth_time: "",
     birth_place: ""
@@ -171,6 +172,23 @@ export default function AuthPage() {
                   className="bg-muted/30 border-border h-12 rounded-xl focus-glow"
                   data-testid="name-input"
                   required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="birth_name" className="text-foreground flex items-center gap-2">
+                  Legal Birth Name
+                  <span className="text-xs text-muted-foreground font-normal">(optional — used for numerology)</span>
+                </Label>
+                <Input
+                  id="birth_name"
+                  name="birth_name"
+                  type="text"
+                  placeholder="As on your birth certificate"
+                  value={formData.birth_name}
+                  onChange={handleChange}
+                  className="bg-muted/30 border-border h-12 rounded-xl focus-glow"
+                  data-testid="birth-name-input"
                 />
               </div>
 
