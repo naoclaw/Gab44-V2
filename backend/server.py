@@ -228,6 +228,7 @@ class CompatibilityRequest(BaseModel):
     partner_birth_date: str  # YYYY-MM-DD
     partner_birth_time: Optional[str] = None
     partner_birth_place: str
+    partner_birth_name: Optional[str] = None  # legal birth name for numerology
 
 class SynastryAspect(BaseModel):
     person1_planet: str
@@ -663,6 +664,23 @@ async def generate_compatibility_analysis(user: dict, partner_data: dict, synast
         f"- {a['person1_planet'].title()} {a['aspect_type']} {a['person2_planet'].title()} ({a['category']})"
         for a in synastry[:8]
     ])
+
+    # Numerology comparison block (included when available)
+    num_block = ""
+    user_num = partner_data.get("user_numerology", {})
+    partner_num = partner_data.get("partner_numerology", {})
+    if user_num and partner_num:
+        u_lp = user_num.get("life_path", {}).get("number", "?")
+        p_lp = partner_num.get("life_path", {}).get("number", "?")
+        u_su = user_num.get("soul_urge", {}).get("number", "?")
+        p_su = partner_num.get("soul_urge", {}).get("number", "?")
+        u_ex = user_num.get("expression", {}).get("number", "?")
+        p_ex = partner_num.get("expression", {}).get("number", "?")
+        num_block = f"""
+NUMEROLOGY COMPARISON:
+- Life Path: {user.get('name', 'Person 1')} = {u_lp}  |  {partner_data.get('name', 'Person 2')} = {p_lp}{"  (MATCH!)" if u_lp == p_lp else ""}
+- Soul Urge: {u_su}  |  {p_su}{"  (MATCH!)" if u_su == p_su else ""}
+- Expression: {u_ex}  |  {p_ex}{"  (MATCH!)" if u_ex == p_ex else ""}"""
     
     prompt = f"""Provide a comprehensive relationship compatibility analysis:
 
@@ -678,12 +696,12 @@ COMPATIBILITY SCORES:
 
 KEY SYNASTRY ASPECTS:
 {aspect_summary}
-
+{num_block}
 Provide:
 1. Overall relationship dynamic and natural chemistry
 2. Key strengths of this pairing
 3. Potential challenges and how to navigate them
-4. Karmic or spiritual themes in this connection
+4. Karmic or spiritual themes in this connection (include numerology Life Path resonance if provided)
 5. Practical advice for building a strong relationship
 
 Keep the analysis warm, insightful, and actionable. Focus on growth potential."""
@@ -1233,15 +1251,77 @@ async def get_upcoming_transits(user: dict = Depends(get_current_user)):
     today = datetime.now(timezone.utc)
     transits = []
     
-    # Transit interpretations
+    # Transit interpretations — (transiting_planet, natal_planet, aspect)
     transit_meanings = {
+        # ── Jupiter transits ──────────────────────────────────────────
+        ("jupiter", "sun", "conjunction"): {
+            "interpretation": "Major growth and abundance. This is your personal Jupiter return moment — dream big!",
+            "action_items": ["Start new ventures", "Travel or learn something new", "Celebrate your achievements"]
+        },
         ("jupiter", "sun", "trine"): {
             "interpretation": "A period of expansion, luck, and opportunity. Your confidence is boosted and doors open easily.",
             "action_items": ["Take bold action on goals", "Expand your horizons", "Share your vision with others"]
         },
-        ("jupiter", "sun", "conjunction"): {
-            "interpretation": "Major growth and abundance. This is your personal Jupiter return moment - dream big!",
-            "action_items": ["Start new ventures", "Travel or learn something new", "Celebrate your achievements"]
+        ("jupiter", "sun", "sextile"): {
+            "interpretation": "Positive opportunities flow your way. Growth comes through collaboration and optimism.",
+            "action_items": ["Network and connect", "Say yes to new experiences", "Invest in your skills"]
+        },
+        ("jupiter", "sun", "square"): {
+            "interpretation": "Watch for over-confidence or excess. Expansion is possible but needs grounding.",
+            "action_items": ["Check your commitments are realistic", "Avoid over-promising", "Grow with intention"]
+        },
+        ("jupiter", "moon", "conjunction"): {
+            "interpretation": "Emotional abundance and nurturing warmth. Family and home life are especially blessed.",
+            "action_items": ["Connect with loved ones", "Create comfort and beauty at home", "Trust your feelings"]
+        },
+        ("jupiter", "moon", "trine"): {
+            "interpretation": "Emotional optimism and generosity flow. Inner happiness supports outer success.",
+            "action_items": ["Share joy with others", "Nurture projects you love", "Enjoy quiet pleasures"]
+        },
+        ("jupiter", "moon", "square"): {
+            "interpretation": "Emotional restlessness may lead to overindulgence. Seek genuine fulfilment, not escapism.",
+            "action_items": ["Set emotional boundaries", "Avoid comfort eating or spending", "Focus on what truly satisfies"]
+        },
+        ("jupiter", "mercury", "conjunction"): {
+            "interpretation": "Your mind is expansive and ideas flow freely. Excellent for writing, teaching, and big-picture thinking.",
+            "action_items": ["Write or publish your ideas", "Pitch proposals", "Explore philosophy or travel"]
+        },
+        ("jupiter", "mercury", "trine"): {
+            "interpretation": "Clear, optimistic thinking. Communication is persuasive and learning comes easily.",
+            "action_items": ["Make important presentations", "Study a new subject", "Sign beneficial agreements"]
+        },
+        ("jupiter", "venus", "conjunction"): {
+            "interpretation": "A peak period for love, beauty, and financial luck. Relationships and creative projects flourish.",
+            "action_items": ["Pursue romance", "Start an artistic project", "Review financial investments"]
+        },
+        ("jupiter", "venus", "trine"): {
+            "interpretation": "Harmony and abundance in love and finances. Others are drawn to your warmth.",
+            "action_items": ["Socialise and enjoy", "Beautify your space", "Express gratitude for abundance"]
+        },
+        ("jupiter", "mars", "conjunction"): {
+            "interpretation": "Energy and ambition are amplified. Drive forward on your biggest goals now.",
+            "action_items": ["Launch projects", "Exercise and channel energy positively", "Set ambitious targets"]
+        },
+        ("jupiter", "mars", "square"): {
+            "interpretation": "Risk of acting too fast or combatively. Channel the burst of energy with discipline.",
+            "action_items": ["Think before acting", "Avoid unnecessary conflicts", "Direct energy into structured effort"]
+        },
+        ("jupiter", "saturn", "conjunction"): {
+            "interpretation": "A reset of your long-term ambitions. Growth through structure and realistic planning.",
+            "action_items": ["Review your 5-year plan", "Commit to disciplined growth", "Start a meaningful long-term project"]
+        },
+        ("jupiter", "pluto", "conjunction"): {
+            "interpretation": "Transformative power surge. Ambitions become larger-than-life — use this wisely.",
+            "action_items": ["Pursue a legacy-level goal", "Step into leadership", "Transform a limiting belief"]
+        },
+        # ── Saturn transits ───────────────────────────────────────────
+        ("saturn", "sun", "conjunction"): {
+            "interpretation": "A defining moment of maturity and responsibility. Structures are tested; only what's real survives.",
+            "action_items": ["Audit your commitments", "Face fears with courage", "Build something lasting"]
+        },
+        ("saturn", "sun", "trine"): {
+            "interpretation": "Disciplined effort now brings lasting reward. Steady progress and earned recognition.",
+            "action_items": ["Work steadily and consistently", "Formalise plans", "Seek mentorship"]
         },
         ("saturn", "sun", "square"): {
             "interpretation": "A testing period requiring discipline and patience. Build solid foundations.",
@@ -1251,17 +1331,128 @@ async def get_upcoming_transits(user: dict = Depends(get_current_user)):
             "interpretation": "Time to evaluate your path and responsibilities. Maturity is required.",
             "action_items": ["Assess long-term goals", "Take responsibility", "Make necessary adjustments"]
         },
+        ("saturn", "moon", "conjunction"): {
+            "interpretation": "Emotional restriction and inner seriousness. A powerful time to mature emotional patterns.",
+            "action_items": ["Journal your feelings", "Release outdated emotional habits", "Seek support if needed"]
+        },
+        ("saturn", "moon", "square"): {
+            "interpretation": "Emotional weight and possible isolation. Be kind to yourself — this phase passes.",
+            "action_items": ["Rest and restore", "Talk to trusted friends", "Simplify your emotional world"]
+        },
+        ("saturn", "moon", "opposition"): {
+            "interpretation": "Tension between responsibility and emotional needs. Important relationship lessons emerge.",
+            "action_items": ["Set healthy boundaries", "Honour your own needs", "Communicate clearly"]
+        },
+        ("saturn", "venus", "conjunction"): {
+            "interpretation": "Love and finances face a reality check. Commitments either solidify or fall away.",
+            "action_items": ["Evaluate relationships honestly", "Review spending habits", "Invest in quality over quantity"]
+        },
+        ("saturn", "venus", "square"): {
+            "interpretation": "Relationship or financial strain. Temporary difficulties clarify what truly matters.",
+            "action_items": ["Have honest conversations", "Reduce unnecessary expenses", "Value depth over surface"]
+        },
+        ("saturn", "mercury", "conjunction"): {
+            "interpretation": "Serious, focused thinking. Excellent for deep study, legal documents, and careful planning.",
+            "action_items": ["Review contracts carefully", "Study systematically", "Speak and write with precision"]
+        },
+        ("saturn", "mars", "square"): {
+            "interpretation": "Frustration and blocked energy. Patience and strategy overcome obstacles.",
+            "action_items": ["Pace yourself", "Don't force situations", "Redirect energy into planning"]
+        },
+        # ── Uranus transits ───────────────────────────────────────────
         ("uranus", "sun", "conjunction"): {
             "interpretation": "Unexpected changes and breakthroughs. Embrace your authentic self.",
-            "action_items": ["Welcome change", "Express individuality", "Try something new"]
+            "action_items": ["Welcome change", "Express individuality", "Try something radically new"]
+        },
+        ("uranus", "sun", "trine"): {
+            "interpretation": "Exciting opportunities for innovation and freedom. Change feels liberating rather than disruptive.",
+            "action_items": ["Experiment with new ideas", "Upgrade your technology or approach", "Embrace the unconventional"]
+        },
+        ("uranus", "sun", "square"): {
+            "interpretation": "Sudden disruptions push you out of your comfort zone. Growth through unexpected upheaval.",
+            "action_items": ["Stay flexible", "Don't resist necessary change", "Find opportunity in disruption"]
+        },
+        ("uranus", "moon", "conjunction"): {
+            "interpretation": "Emotional life is electrified. Sudden shifts in home, family, or feelings — exciting or unsettling.",
+            "action_items": ["Allow yourself to feel", "Embrace new living arrangements", "Release what no longer feels like home"]
+        },
+        ("uranus", "moon", "square"): {
+            "interpretation": "Emotional instability and restlessness. Your need for freedom clashes with familiar patterns.",
+            "action_items": ["Ground yourself daily", "Allow emotions to move without acting impulsively", "Seek novelty within stability"]
+        },
+        ("uranus", "venus", "conjunction"): {
+            "interpretation": "Exciting, unpredictable energy in love and creativity. A relationship may begin or transform suddenly.",
+            "action_items": ["Stay open to unexpected attraction", "Innovate your creative work", "Allow relationships to evolve"]
+        },
+        ("uranus", "mars", "conjunction"): {
+            "interpretation": "Electric drive for freedom and change. Brilliant for breakthroughs — be mindful of impulsiveness.",
+            "action_items": ["Channel energy into innovation", "Avoid reckless actions", "Pursue original projects"]
+        },
+        # ── Neptune transits ──────────────────────────────────────────
+        ("neptune", "sun", "conjunction"): {
+            "interpretation": "A mystical, dissolving transit. Identity and reality feel fluid — lean into spirituality and creativity.",
+            "action_items": ["Meditate and dream", "Create art or music", "Seek spiritual guidance"]
         },
         ("neptune", "sun", "trine"): {
             "interpretation": "Enhanced intuition and creativity. Spiritual insights flow easily.",
             "action_items": ["Trust your intuition", "Engage in creative pursuits", "Practice meditation"]
         },
+        ("neptune", "sun", "square"): {
+            "interpretation": "Confusion and disillusionment test your sense of self. Clarity comes through surrender, not control.",
+            "action_items": ["Be honest with yourself", "Avoid escapism", "Seek a spiritual practice for grounding"]
+        },
+        ("neptune", "moon", "conjunction"): {
+            "interpretation": "Deep psychic and empathic sensitivity. Boundaries with others may dissolve temporarily.",
+            "action_items": ["Protect your energy", "Creative and spiritual work thrives", "Watch for idealising others"]
+        },
+        ("neptune", "moon", "square"): {
+            "interpretation": "Emotional confusion and idealism. It may be hard to trust your feelings right now.",
+            "action_items": ["Keep a dream journal", "Avoid major emotional decisions", "Ground through nature and routine"]
+        },
+        ("neptune", "venus", "conjunction"): {
+            "interpretation": "Romantic idealism and artistic inspiration at their peak. Real love and illusion may be hard to distinguish.",
+            "action_items": ["Enjoy beauty consciously", "Create from inspiration", "Stay grounded in relationships"]
+        },
+        ("neptune", "mercury", "square"): {
+            "interpretation": "Mental fog and confusion. Important communications need double-checking.",
+            "action_items": ["Slow down decisions", "Re-read all contracts", "Trust clear evidence over intuition alone"]
+        },
+        # ── Pluto transits ────────────────────────────────────────────
+        ("pluto", "sun", "conjunction"): {
+            "interpretation": "A once-in-a-lifetime power transit. Profound rebirth of identity and purpose.",
+            "action_items": ["Embrace deep transformation", "Let go of who you were", "Step into your true power"]
+        },
+        ("pluto", "sun", "trine"): {
+            "interpretation": "Transformative power flows effortlessly. Reclaim your personal authority and eliminate what no longer serves.",
+            "action_items": ["Pursue your deepest ambitions", "Release old patterns gracefully", "Own your influence"]
+        },
         ("pluto", "sun", "square"): {
             "interpretation": "Powerful transformation. Old patterns are breaking down for renewal.",
             "action_items": ["Release what no longer serves", "Embrace personal power", "Dig deep"]
+        },
+        ("pluto", "sun", "opposition"): {
+            "interpretation": "Confrontation with power, control, and hidden truths. Others may challenge you — or you them.",
+            "action_items": ["Choose integrity over control", "Negotiate power dynamics", "Transform through challenge"]
+        },
+        ("pluto", "moon", "conjunction"): {
+            "interpretation": "Emotional life is completely overhauled. Deep unconscious patterns rise for healing.",
+            "action_items": ["Enter therapy or shadow work", "Release ancestral patterns", "Embrace emotional death and rebirth"]
+        },
+        ("pluto", "moon", "square"): {
+            "interpretation": "Intense emotional power struggles and compulsive feelings. A time to heal deep wounds.",
+            "action_items": ["Journal shadow material", "Seek professional support if needed", "Observe compulsions without acting"]
+        },
+        ("pluto", "venus", "conjunction"): {
+            "interpretation": "Love and values are transformed at the root. Relationships become profoundly intense.",
+            "action_items": ["Examine what you truly value", "Allow relationships to transform", "Embrace depth over surface"]
+        },
+        ("pluto", "mars", "conjunction"): {
+            "interpretation": "Unstoppable drive meets depth of will. Channel this powerful energy into meaningful transformation.",
+            "action_items": ["Pursue a legacy-level ambition", "Release aggression into creation", "Lead with power and integrity"]
+        },
+        ("pluto", "mercury", "square"): {
+            "interpretation": "Thoughts become obsessive or compulsive. Powerful truths are revealed through research and investigation.",
+            "action_items": ["Investigate deeply", "Speak truth carefully", "Release fixed thinking"]
         },
     }
     
@@ -1519,8 +1710,27 @@ async def analyze_compatibility(request: CompatibilityRequest, user: dict = Depe
         "overall": round(overall_score),
         **{k: round(v) for k, v in category_scores.items()}
     }
-    
-    partner_data = {"name": request.partner_name, "sun_sign": partner_sun}
+
+    # Numerology for both parties
+    user_numerology = calculate_numerology(
+        user.get("birth_name") or user.get("name", ""),
+        user.get("birth_date", "1990-01-01")
+    )
+    partner_num_name = request.partner_birth_name or request.partner_name
+    partner_numerology = calculate_numerology(partner_num_name, request.partner_birth_date)
+
+    # Numerology compatibility score bump (shared Life Path = strong karmic bond)
+    lp_match = user_numerology.get("life_path", {}).get("number") == partner_numerology.get("life_path", {}).get("number")
+    if lp_match:
+        category_scores["karmic"] = min(99, category_scores["karmic"] + 10)
+        overall_score = min(99, overall_score + 2)
+
+    partner_data = {
+        "name": request.partner_name,
+        "sun_sign": partner_sun,
+        "user_numerology": user_numerology,
+        "partner_numerology": partner_numerology,
+    }
     ai_analysis = await generate_compatibility_analysis(user, partner_data, synastry_aspects, scores_for_ai)
     
     # Determine strengths and challenges based on aspects
@@ -1557,6 +1767,11 @@ async def analyze_compatibility(request: CompatibilityRequest, user: dict = Depe
             "Use challenges as catalysts for personal evolution",
             "Build on natural harmonies while working on friction points"
         ],
+        "numerology_compatibility": {
+            "person1": {k: v for k, v in user_numerology.items() if k in ("life_path", "expression", "soul_urge")},
+            "person2": {k: v for k, v in partner_numerology.items() if k in ("life_path", "expression", "soul_urge")},
+            "life_path_match": lp_match,
+        },
         "ai_analysis": ai_analysis,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
