@@ -13,6 +13,8 @@ from datetime import datetime, timezone, timedelta
 import jwt
 import bcrypt
 from emergentintegrations.llm.chat import LlmChat, UserMessage
+from numerology import calculate_full_profile
+from gematria import calculate_all as calculate_gematria
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -118,6 +120,9 @@ class DailyGuidance(BaseModel):
     focus_areas: List[str]
     action_items: List[str]
     transit_highlights: List[dict]
+
+class GematriaRequest(BaseModel):
+    text: str
 
 # ============== Auth Helpers ==============
 
@@ -607,6 +612,45 @@ async def get_pricing():
             }
         ]
     }
+
+# ============== Numerology Routes ==============
+
+@api_router.get("/numerology/profile")
+async def get_numerology_profile(user: dict = Depends(get_current_user)):
+    """Get the user's full numerology profile"""
+    # Check cache
+    cached = await db.numerology_profiles.find_one(
+        {"user_id": user["id"]},
+        {"_id": 0}
+    )
+    if cached:
+        return cached
+
+    # Calculate fresh profile
+    full_name = user.get("name", "")
+    birth_date = user.get("birth_date", "")
+    if not full_name or not birth_date:
+        raise HTTPException(status_code=400, detail="Name and birth date are required for numerology")
+
+    profile = calculate_full_profile(full_name, birth_date)
+    profile_doc = {"user_id": user["id"], **profile}
+    await db.numerology_profiles.insert_one(profile_doc)
+
+    # Remove MongoDB _id before returning
+    profile_doc.pop("_id", None)
+    return profile_doc
+
+# ============== Gematria Routes ==============
+
+@api_router.post("/gematria/calculate")
+async def gematria_calculate(request: GematriaRequest):
+    """Calculate gematria for any text (public endpoint)"""
+    text = request.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Text is required")
+    if len(text) > 500:
+        raise HTTPException(status_code=400, detail="Text must be 500 characters or less")
+    return calculate_gematria(text)
 
 # ============== Health Check ==============
 

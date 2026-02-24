@@ -155,6 +155,8 @@
 | `/transits` | TransitsPage | Yes |
 | `/settings` | SettingsPage | Yes |
 | `/share` | ShareChartPage | Yes |
+| `/numerology` | NumerologyPage | Yes |
+| `/gematria` | GematriaPage | Yes |
 
 ### Target (per main-branch README — to be implemented)
 | Route | Page | Auth Required | Status |
@@ -168,6 +170,8 @@
 | `/transits` | TransitsPage | Yes | ✅ Done |
 | `/settings` | SettingsPage | Yes | ✅ Done |
 | `/share` | ShareChartPage | Yes | ✅ Done |
+| `/numerology` | NumerologyPage | Yes | ✅ Done |
+| `/gematria` | GematriaPage | Yes | ✅ Done |
 | `/compatibility` | CompatibilityPage | Yes | ❌ Not yet |
 | `/admin` | AdminPage | Yes (admin) | ❌ Not yet |
 | `/chart/:shareToken` | PublicChartPage | No | ❌ Not yet |
@@ -189,6 +193,8 @@
 - `GET  /api/transits/upcoming` — Get upcoming transits
 - `GET  /api/guidance/daily` — Get daily guidance
 - `GET  /api/pricing` — Get pricing plans
+- `GET  /api/numerology/profile` — Get user's numerology profile (Life Path, Expression, Soul Urge, Personality, Birthday, Personal Year)
+- `POST /api/gematria/calculate` — Calculate Chaldean + English Ordinal gematria for any text
 - `GET  /api/health` — Health check
 
 ### Target (to be implemented)
@@ -345,6 +351,24 @@ Extended palette: `cosmic-void` (#050505), `cosmic-starlight` (#F8FAFC), `cosmic
 - [x] Strength indicators
 - [ ] Real transit calculations (currently simulated)
 
+### Numerology
+- [x] Life Path Number calculation (with Master Numbers 11, 22, 33)
+- [x] Expression Number (full name, Pythagorean)
+- [x] Soul Urge Number (vowels)
+- [x] Personality Number (consonants)
+- [x] Birthday Number
+- [x] Personal Year Number
+- [x] Letter-by-letter breakdown display
+- [x] Full profile page with overview and details tabs
+
+### Gematria
+- [x] Chaldean (Babylonian) calculation engine
+- [x] English Ordinal calculation engine
+- [x] Letter-by-letter breakdown
+- [x] Per-word value display
+- [x] Numerical significance descriptions
+- [x] Interactive calculator page with quick examples
+
 ---
 
 ## 9. Prioritized Backlog
@@ -353,8 +377,8 @@ Extended palette: `cosmic-void` (#050505), `cosmic-starlight` (#F8FAFC), `cosmic
 - [ ] Swiss Ephemeris integration via `pyswisseph` for real chart calculations (`astro_calculator.py`)
 - [ ] Stripe payment integration (Checkout + Customer Portal + Webhooks)
 - [ ] Email verification and password reset (SendGrid)
-- [ ] Numerology engine (Life Path, Expression, Soul Urge, Personality, Birthday)
-- [ ] Gematria engine (Chaldean + English Ordinal)
+- [x] Numerology engine (Life Path, Expression, Soul Urge, Personality, Birthday, Personal Year) — `numerology.py`
+- [x] Gematria engine (Chaldean + English Ordinal) — `gematria.py`
 
 ### P1 — High (core product value)
 - [ ] Relationship compatibility (synastry + composite charts, 5 relationship types)
