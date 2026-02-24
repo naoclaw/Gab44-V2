@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Sparkles, ArrowLeft, Eye, EyeOff, MapPin, Calendar, Clock, Sun, Moon } from "lucide-react";
+import { Sparkles, ArrowLeft, Eye, EyeOff, MapPin, Calendar, Clock, Sun, Moon, Mail } from "lucide-react";
 
 export default function AuthPage() {
   const [searchParams] = useSearchParams();
@@ -17,6 +17,7 @@ export default function AuthPage() {
   const [isRegister, setIsRegister] = useState(searchParams.get("mode") === "register");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState(null);
   
   const [formData, setFormData] = useState({
     email: "",
@@ -49,12 +50,14 @@ export default function AuthPage() {
           return;
         }
         await register(formData);
-        toast.success("Welcome to Gab44! Your cosmic journey begins now.");
+        setRegisteredEmail(formData.email);
+        toast.success("Welcome to Gab44! Check your inbox to verify your email.");
+        navigate("/dashboard");
       } else {
         await login(formData.email, formData.password);
         toast.success("Welcome back! The stars have been waiting.");
+        navigate("/dashboard");
       }
-      navigate("/dashboard");
     } catch (error) {
       const detail = error.response?.data?.detail;
       let message;

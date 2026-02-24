@@ -16,7 +16,9 @@ import uuid
 from datetime import datetime, timezone, timedelta
 import jwt
 import bcrypt
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from openai import AsyncOpenAI
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 from astro_calculator import (
     calculate_natal_chart, 
     calculate_current_transits, 
@@ -40,8 +42,9 @@ if not JWT_SECRET:
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
 
-# LLM Configuration
-EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
+# OpenAI / LLM Configuration
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
+openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 # Admin emails (set via environment variable)
 ADMIN_EMAILS = [e.strip().lower() for e in os.environ.get('ADMIN_EMAILS', '').split(',') if e.strip()]
@@ -64,6 +67,10 @@ STRIPE_PLAN_PRICES = {
 ONESIGNAL_APP_ID = os.environ.get('ONESIGNAL_APP_ID', '')
 ONESIGNAL_API_KEY = os.environ.get('ONESIGNAL_API_KEY', '')
 ONESIGNAL_API_URL = "https://api.onesignal.com/notifications"
+
+# SendGrid Configuration
+SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY', '')
+SENDGRID_FROM_EMAIL = os.environ.get('SENDGRID_FROM_EMAIL', 'noreply@gab44.com')
 
 app = FastAPI(title="Gab44 - Astrology AI Coaching Platform")
 api_router = APIRouter(prefix="/api")
@@ -118,6 +125,7 @@ class UserProfile(BaseModel):
     sun_sign: Optional[str] = None
     subscription_tier: str = "seeker"
     is_admin: bool = False
+    email_verified: bool = False
     created_at: str
 
 class TokenResponse(BaseModel):
@@ -256,6 +264,45 @@ async def require_admin(user: dict = Depends(get_current_user)) -> dict:
     if not user.get("is_admin", False):
         raise HTTPException(status_code=403, detail="Admin access required")
     return user
+
+# ============== Email Helper (SendGrid) ==============
+
+def send_email(to_email: str, subject: str, html_content: str) -> bool:
+    """Send a transactional email via SendGrid. Returns True on success."""
+    if not SENDGRID_API_KEY:
+        logging.warning("SENDGRID_API_KEY not configured – email not sent to %s", to_email)
+        return False
+    try:
+        message = Mail(
+            from_email=SENDGRID_FROM_EMAIL,
+            to_emails=to_email,
+            subject=subject,
+            html_content=html_content,
+        )
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        response = sg.send(message)
+        logging.info("Email sent to %s – status %s", to_email, response.status_code)
+        return response.status_code in (200, 202)
+    except Exception as exc:
+        logging.error("SendGrid error sending to %s: %s", to_email, exc)
+        return False
+
+def build_verification_email(name: str, verify_url: str) -> str:
+    return f"""
+    <div style="font-family:sans-serif;max-width:520px;margin:auto;padding:32px 24px;background:#0a0a0f;color:#e8e0f0;border-radius:16px;">
+      <h1 style="font-family:Georgia,serif;font-size:28px;margin-bottom:4px;color:#c9a84c;">✨ Welcome to Gab44</h1>
+      <p style="color:#9090b0;margin-top:0;">Your cosmic journey starts with one click.</p>
+      <p style="margin-top:24px;">Hi {name},</p>
+      <p>Please verify your email address so we can keep your account secure and send you personalized astrological guidance.</p>
+      <a href="{verify_url}"
+         style="display:inline-block;margin:24px 0;padding:14px 32px;background:#c9a84c;color:#0a0a0f;font-weight:700;border-radius:12px;text-decoration:none;font-size:16px;">
+        Verify My Email
+      </a>
+      <p style="color:#9090b0;font-size:13px;">This link expires in 48 hours. If you didn't create a Gab44 account, you can safely ignore this email.</p>
+      <hr style="border:none;border-top:1px solid #222;margin:24px 0;" />
+      <p style="color:#606080;font-size:12px;margin:0;">Gab44 · Astrology AI Coaching · <a href="mailto:support@gab44.com" style="color:#c9a84c;">support@gab44.com</a></p>
+    </div>
+    """
 
 # ============== Astrology Helpers ==============
 
@@ -510,14 +557,16 @@ Provide:
 Keep the analysis warm, insightful, and actionable. Focus on growth potential."""
 
     try:
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"compatibility-{user['id']}-{uuid.uuid4()}",
-            system_message="You are Gab44, an expert relationship astrologer. Provide insightful, compassionate compatibility analysis that helps people understand their relationship dynamics and growth opportunities."
-        ).with_model("openai", "gpt-4o")
-        
-        response = await chat.send_message(UserMessage(text=prompt))
-        return response
+        if not openai_client:
+            raise RuntimeError("OpenAI not configured")
+        completion = await openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are Gab44, an expert relationship astrologer. Provide insightful, compassionate compatibility analysis that helps people understand their relationship dynamics and growth opportunities."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        return completion.choices[0].message.content
     except Exception as e:
         logging.error(f"Compatibility analysis error: {e}")
         return f"Based on the {user_sun}-{partner_sun} pairing, this relationship shows {scores.get('overall', 70)}% compatibility. Key themes include balancing {get_sign_element(user_sun)} and {get_sign_element(partner_sun)} energies."
@@ -525,7 +574,7 @@ Keep the analysis warm, insightful, and actionable. Focus on growth potential.""
 # ============== AI Coach ==============
 
 async def get_ai_coach_response(user: dict, message: str, session_id: str) -> str:
-    """Generate AI coaching response using emergentintegrations"""
+    """Generate AI coaching response"""
     
     # Get user's chat history
     history = await db.chat_messages.find(
@@ -561,25 +610,19 @@ RESPONSE FORMAT:
 - End with a thoughtful question or call to action"""
 
     try:
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"gab44-{user['id']}-{session_id}",
-            system_message=system_message
-        ).with_model("openai", "gpt-4o")
-        
-        # Build conversation history context
-        history_text = ""
-        for msg in history[-10:]:  # Last 10 messages for context
-            role = "User" if msg["role"] == "user" else "Gab44"
-            history_text += f"\n{role}: {msg['content']}"
-        
-        full_message = message
-        if history_text:
-            full_message = f"Previous conversation:{history_text}\n\nUser's new message: {message}"
-        
-        user_message = UserMessage(text=full_message)
-        response = await chat.send_message(user_message)
-        return response
+        if not openai_client:
+            raise RuntimeError("OpenAI not configured")
+        # Build messages list with history
+        messages = [{"role": "system", "content": system_message}]
+        for msg in history[-10:]:
+            messages.append({"role": msg["role"], "content": msg["content"]})
+        messages.append({"role": "user", "content": message})
+
+        completion = await openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=messages,
+        )
+        return completion.choices[0].message.content
         
     except Exception as e:
         logging.error(f"AI Coach error: {e}")
@@ -596,6 +639,9 @@ async def register(user_data: UserCreate):
     
     # Calculate sun sign
     sun_sign = calculate_sun_sign(user_data.birth_date)
+
+    # Generate email verification token
+    email_verification_token = str(uuid.uuid4())
     
     # Create user
     user_id = str(uuid.uuid4())
@@ -611,13 +657,24 @@ async def register(user_data: UserCreate):
         "birth_longitude": user_data.birth_longitude,
         "sun_sign": sun_sign,
         "subscription_tier": "advanced",  # Default to advanced until payment is setup
+        "email_verified": False,
+        "email_verification_token": email_verification_token,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
     await db.users.insert_one(user_doc)
+
+    # Send verification email (non-blocking – registration succeeds even if email fails)
+    frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+    verify_url = f"{frontend_url}/verify-email?token={email_verification_token}"
+    send_email(
+        to_email=user_data.email,
+        subject="✨ Verify your Gab44 email",
+        html_content=build_verification_email(user_data.name, verify_url),
+    )
     
     token = create_token(user_id)
-    user_profile = {k: v for k, v in user_doc.items() if k != "password" and k != "_id"}
+    user_profile = {k: v for k, v in user_doc.items() if k != "password" and k != "_id" and k != "email_verification_token"}
     user_email = user_data.email.lower()
     user_profile["is_admin"] = user_email in ADMIN_EMAILS
     
@@ -630,7 +687,7 @@ async def login(credentials: UserLogin):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
     token = create_token(user["id"])
-    user_profile = {k: v for k, v in user.items() if k != "password" and k != "_id"}
+    user_profile = {k: v for k, v in user.items() if k != "password" and k != "_id" and k != "email_verification_token"}
     user_email = user.get("email", "").lower()
     is_admin_by_role = user.get("role") == "admin"
     is_admin_by_env = user_email in ADMIN_EMAILS
@@ -638,10 +695,38 @@ async def login(credentials: UserLogin):
     
     return TokenResponse(access_token=token, user=UserProfile(**user_profile))
 
+@api_router.get("/auth/verify-email")
+async def verify_email(token: str):
+    """Verify a user's email address via the token link sent at registration."""
+    user = await db.users.find_one({"email_verification_token": token})
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification token")
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"email_verified": True}, "$unset": {"email_verification_token": ""}},
+    )
+    return {"verified": True, "message": "Email verified successfully. You can now log in."}
+
+@api_router.post("/auth/resend-verification")
+async def resend_verification(user: dict = Depends(get_current_user)):
+    """Resend the email verification link to the current user."""
+    if user.get("email_verified"):
+        return {"sent": False, "message": "Email is already verified"}
+    token = str(uuid.uuid4())
+    await db.users.update_one({"id": user["id"]}, {"$set": {"email_verification_token": token}})
+    frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+    verify_url = f"{frontend_url}/verify-email?token={token}"
+    sent = send_email(
+        to_email=user["email"],
+        subject="✨ Verify your Gab44 email",
+        html_content=build_verification_email(user.get("name", "Seeker"), verify_url),
+    )
+    return {"sent": sent}
+
 @api_router.get("/auth/me")
 async def get_me(user: dict = Depends(get_current_user)):
-    # Include is_admin in response
-    response = {**user}
+    # Exclude internal token from response
+    response = {k: v for k, v in user.items() if k != "email_verification_token"}
     return response
 
 @api_router.put("/auth/me", response_model=UserProfile)
@@ -658,7 +743,9 @@ async def update_me(update_data: UserUpdate, user: dict = Depends(get_current_us
     
     await db.users.update_one({"id": user["id"]}, {"$set": updates})
     
-    updated_user = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password": 0})
+    updated_user = await db.users.find_one(
+        {"id": user["id"]}, {"_id": 0, "password": 0, "email_verification_token": 0}
+    )
     if not updated_user:
         raise HTTPException(status_code=404, detail="User not found")
     
@@ -962,15 +1049,16 @@ Respond ONLY with valid JSON matching this exact structure:
 
     guidance = None
     try:
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"guidance-{user['id']}-{today}",
-            system_message="You are Gab44, an expert astrology AI. Return only valid JSON as instructed."
-        ).with_model("openai", "gpt-4o")
-        
-        raw = await chat.send_message(UserMessage(text=prompt))
-        # Strip markdown code fences if present
-        raw = raw.strip()
+        if not openai_client:
+            raise RuntimeError("OpenAI not configured")
+        completion = await openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are Gab44, an expert astrology AI. Return only valid JSON as instructed."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        raw = completion.choices[0].message.content.strip()
         match = re.search(r"```(?:json)?\s*([\s\S]+?)```", raw)
         if match:
             raw = match.group(1).strip()

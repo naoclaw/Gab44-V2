@@ -23,7 +23,8 @@ import {
   Eye,
   Save,
   LogOut,
-  Loader2
+  Loader2,
+  Mail
 } from "lucide-react";
 
 // OneSignal SDK is initialized in public/index.html with the App ID.
@@ -374,6 +375,30 @@ export default function SettingsPage() {
               />
             </div>
           </div>
+
+          {!user?.email_verified && (
+            <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+              <Mail className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-amber-300 font-medium">Email not verified</p>
+                <p className="text-amber-400/70 text-xs mt-0.5">Check your inbox or resend the link.</p>
+              </div>
+              <button
+                type="button"
+                className="text-xs text-amber-400 underline underline-offset-2 hover:text-amber-300 flex-shrink-0"
+                onClick={async () => {
+                  try {
+                    await axios.post(`${API}/auth/resend-verification`, {}, { headers: { Authorization: `****** } });
+                    toast.success("Verification email sent!");
+                  } catch {
+                    toast.error("Could not send email. Please try again.");
+                  }
+                }}
+              >
+                Resend
+              </button>
+            </div>
+          )}
 
           <Button
             type="submit"

@@ -18,7 +18,7 @@ from datetime import datetime
 # Get base URL from environment - no default!
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 if not BASE_URL:
-    BASE_URL = "https://cosmic-admin-lab.preview.emergentagent.com"
+    BASE_URL = "http://localhost:8001"
 
 API_URL = f"{BASE_URL}/api"
 

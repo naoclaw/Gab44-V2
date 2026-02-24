@@ -18,6 +18,7 @@ import SettingsPage from "@/pages/SettingsPage";
 import ShareChartPage from "@/pages/ShareChartPage";
 import AdminPage from "@/pages/AdminPage";
 import CompatibilityPage from "@/pages/CompatibilityPage";
+import VerifyEmailPage from "@/pages/VerifyEmailPage";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
@@ -150,6 +151,7 @@ function App() {
               <Route path="/" element={<LandingPage />} />
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/pricing" element={<PricingPage />} />
+              <Route path="/verify-email" element={<VerifyEmailPage />} />
               <Route 
                 path="/dashboard" 
                 element={
