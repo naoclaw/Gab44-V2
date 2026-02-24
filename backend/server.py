@@ -418,8 +418,10 @@ async def get_my_chart(user: dict = Depends(get_current_user)):
         # Calculate real chart using Swiss Ephemeris
         birth_date = user.get("birth_date", "1990-01-01")
         birth_time = user.get("birth_time")
-        latitude = user.get("birth_latitude", 0.0) or 0.0
-        longitude = user.get("birth_longitude", 0.0) or 0.0
+        lat = user.get("birth_latitude")
+        latitude = lat if lat is not None else 0.0
+        lng = user.get("birth_longitude")
+        longitude = lng if lng is not None else 0.0
 
         computed = calculate_natal_chart(birth_date, birth_time, latitude, longitude)
 
@@ -454,8 +456,10 @@ async def get_upcoming_transits(user: dict = Depends(get_current_user)):
         # Calculate natal chart on the fly
         birth_date = user.get("birth_date", "1990-01-01")
         birth_time = user.get("birth_time")
-        latitude = user.get("birth_latitude", 0.0) or 0.0
-        longitude = user.get("birth_longitude", 0.0) or 0.0
+        lat = user.get("birth_latitude")
+        latitude = lat if lat is not None else 0.0
+        lng = user.get("birth_longitude")
+        longitude = lng if lng is not None else 0.0
         computed = calculate_natal_chart(birth_date, birth_time, latitude, longitude)
         natal_positions = computed["planets"]
     else:

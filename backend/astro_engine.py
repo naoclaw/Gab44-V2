@@ -132,8 +132,11 @@ def parse_birth_datetime(birth_date: str, birth_time: str = None) -> float:
 
     hour = 12.0  # Default to noon if no time provided
     if birth_time:
-        time_parts = birth_time.split(":")
-        hour = float(time_parts[0]) + float(time_parts[1]) / 60.0
+        try:
+            time_parts = birth_time.split(":")
+            hour = float(time_parts[0]) + float(time_parts[1]) / 60.0
+        except (ValueError, IndexError):
+            raise ValueError("Invalid birth_time format. Expected HH:MM")
 
     return swe.julday(year, month, day, hour)
 
@@ -436,7 +439,7 @@ def calculate_current_transits(
     Returns a list of active transit activations.
     """
     now = datetime.now(timezone.utc)
-    jd_now = swe.julday(now.year, now.month, now.day, now.hour + now.minute / 60.0)
+    jd_now = swe.julday(now.year, now.month, now.day, now.hour + now.minute / 60.0 + now.second / 3600.0)
 
     current = calculate_planet_positions(jd_now)
 
