@@ -6,6 +6,12 @@ import swisseph as swe
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 import math
+import requests
+from functools import lru_cache
+import logging
+
+_NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
+_NOMINATIM_USER_AGENT = "Gab44-Astrology/2.0"
 
 # Initialize Swiss Ephemeris - use built-in ephemeris (Moshier, less accurate but no files needed)
 swe.set_ephe_path('')
@@ -539,18 +545,51 @@ CITY_COORDINATES = {
 }
 
 
+@lru_cache(maxsize=256)
+def _geocode_nominatim(place: str) -> Tuple[float, float]:
+    """Call OpenStreetMap Nominatim to look up coordinates for any place name.
+
+    Results are cached per unique place string.  Only *successful* lookups are
+    cached — if Nominatim returns no results the call is not stored so that a
+    retry is possible (e.g. after a transient network failure).
+    """
+    try:
+        response = requests.get(
+            _NOMINATIM_URL,
+            params={"q": place, "format": "json", "limit": 1},
+            headers={"User-Agent": _NOMINATIM_USER_AGENT},
+            timeout=5,
+        )
+        response.raise_for_status()
+        results = response.json()
+        if results:
+            return (float(results[0]["lat"]), float(results[0]["lon"]))
+        logging.warning("Nominatim returned no results for place: %r", place)
+    except (requests.RequestException, ValueError, KeyError) as exc:
+        logging.warning("Nominatim geocoding failed for %r: %s", place, exc)
+
+    # Evict this cache entry so transient failures can be retried
+    _geocode_nominatim.cache_clear()
+    return (0.0, 0.0)
+
+
 def get_coordinates(place: str) -> Tuple[float, float]:
-    """Get coordinates for a place name (simplified lookup)"""
+    """Get coordinates for a place name.
+
+    Fast-path: static lookup table of 90+ cities.
+    Fallback: live Nominatim geocoding (cached per unique place string).
+    Returns (0.0, 0.0) only when both sources fail.
+    """
     place_lower = place.lower().strip()
-    
-    # Check direct match
+
+    # Check direct match in static table
     if place_lower in CITY_COORDINATES:
         return CITY_COORDINATES[place_lower]
-    
-    # Check partial match
+
+    # Check partial match in static table
     for city, coords in CITY_COORDINATES.items():
         if city in place_lower or place_lower in city:
             return coords
-    
-    # Default to 0,0 if not found (will still calculate without houses)
-    return (0.0, 0.0)
+
+    # Live geocoding fallback via OpenStreetMap Nominatim
+    return _geocode_nominatim(place.strip())
