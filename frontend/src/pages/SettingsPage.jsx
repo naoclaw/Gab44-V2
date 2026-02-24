@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 
 export default function SettingsPage() {
-  const { user, token, logout } = useAuth();
+  const { user, token, logout, updateUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   
@@ -93,15 +93,18 @@ export default function SettingsPage() {
         return;
       }
 
-      await axios.put(`${API}/auth/me`, updates, {
+      const response = await axios.put(`${API}/auth/me`, updates, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      updateUser(response.data);
       toast.success("Profile updated successfully");
     } catch (error) {
       const status = error.response?.status;
       const detail = error.response?.data?.detail;
       let message;
-      if (detail) {
+      if (Array.isArray(detail)) {
+        message = detail.map(e => e.msg?.replace(/^Value error,\s*/i, "") || "Validation error").join("; ");
+      } else if (detail) {
         message = detail;
       } else if (status === 401) {
         message = "Unauthorized. Please log in again.";

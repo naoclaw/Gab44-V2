@@ -8,6 +8,7 @@ import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr, field_validator
 import json
+import re
 from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone, timedelta
@@ -62,7 +63,6 @@ class UserCreate(BaseModel):
     @field_validator("password")
     @classmethod
     def validate_password(cls, v: str) -> str:
-        import re
         if len(v) < 8:
             raise ValueError("Password must be at least 8 characters long")
         if not re.search(r"[A-Za-z]", v):
@@ -939,11 +939,10 @@ Respond ONLY with valid JSON matching this exact structure:
             system_message="You are Gab44, an expert astrology AI. Return only valid JSON as instructed."
         ).with_model("openai", "gpt-4o")
         
-        import re as _re
         raw = await chat.send_message(UserMessage(text=prompt))
         # Strip markdown code fences if present
         raw = raw.strip()
-        match = _re.search(r"```(?:json)?\s*([\s\S]+?)```", raw)
+        match = re.search(r"```(?:json)?\s*([\s\S]+?)```", raw)
         if match:
             raw = match.group(1).strip()
         parsed = json.loads(raw)

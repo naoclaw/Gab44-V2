@@ -56,7 +56,14 @@ export default function AuthPage() {
       }
       navigate("/dashboard");
     } catch (error) {
-      const message = error.response?.data?.detail || "Something went wrong";
+      const detail = error.response?.data?.detail;
+      let message;
+      if (Array.isArray(detail)) {
+        // Pydantic validation error - extract readable messages
+        message = detail.map(e => e.msg?.replace(/^Value error,\s*/i, "") || "Validation error").join("; ");
+      } else {
+        message = detail || "Something went wrong";
+      }
       toast.error(message);
     } finally {
       setLoading(false);
