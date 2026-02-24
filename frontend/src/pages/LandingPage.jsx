@@ -168,8 +168,8 @@ const HeroSection = () => {
   const calculateSunSign = () => {
     if (!birthDate) return;
     const date = new Date(birthDate);
-    const month = date.getMonth() + 1;
-    const day = date.getDate();
+    const month = date.getUTCMonth() + 1;
+    const day = date.getUTCDate();
 
     const signs = [
       { start: [3, 21], end: [4, 19], sign: "Aries" },
@@ -545,12 +545,26 @@ const PricingSection = () => {
       ],
       cta: "Upgrade Now",
       popular: false
+    },
+    {
+      name: "Professional",
+      tagline: "For astrologers serving clients",
+      price: 99,
+      features: [
+        "Everything in Advanced",
+        "Client Management System",
+        "White-label Reports",
+        "API Access",
+        "Priority Support"
+      ],
+      cta: "Contact Sales",
+      popular: false
     }
   ];
 
   return (
     <section id="pricing" className="py-24 px-6">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
           <p className="text-primary font-semibold mb-3 tracking-widest text-sm uppercase">Pricing</p>
           <h2 className="font-serif text-foreground mb-4">
@@ -561,7 +575,7 @@ const PricingSection = () => {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           {plans.map((plan, index) => (
             <div 
               key={plan.name}
