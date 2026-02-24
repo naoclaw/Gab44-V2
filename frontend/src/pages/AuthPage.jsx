@@ -341,7 +341,7 @@ export default function AuthPage() {
                               </span>
                             </button>
                           ))}
-                          <div className="px-4 py-1.5 text-xs text-muted-foreground border-t border-border bg-muted/20 rounded-b-xl">
+                          <div className="px-4 py-1.5 text-xs text-muted-foreground border-t border-border bg-muted/20 rounded-b-xl" aria-label={`${cityResults.length} results. Use up and down arrows to navigate, Enter to select`}>
                             {cityResults.length} result{cityResults.length !== 1 ? "s" : ""} · ↑↓ navigate · Enter select
                           </div>
                         </>

@@ -1,10 +1,8 @@
 """
-Gab44 Static City Geocoding Database
-======================================
-327 major world cities with coordinates and IANA timezones.
-
-Used for birth location selection during registration.
-Eliminates the need for an external geocoding API.
+Gab44 City Geocoding
+=====================
+Hybrid geocoding: Mapbox API when MAPBOX_ACCESS_TOKEN is set, otherwise
+falls back to a static database of 327 major world cities.
 
 Each city includes:
 - name: City name
@@ -13,6 +11,15 @@ Each city includes:
 - longitude: Decimal degrees (positive = East)
 - timezone: IANA timezone identifier
 """
+
+import os
+import logging
+
+import requests
+
+logger = logging.getLogger(__name__)
+
+MAPBOX_ACCESS_TOKEN = os.environ.get("MAPBOX_ACCESS_TOKEN", "")
 
 CITIES = [
     # =========================================================================
@@ -478,20 +485,16 @@ def find_city(name: str, country: str = "") -> dict | None:
 
 # ============== Mapbox Geocoding API ==============
 
-import os
-import requests
-import logging
-
-logger = logging.getLogger(__name__)
-
-MAPBOX_ACCESS_TOKEN = os.environ.get("MAPBOX_ACCESS_TOKEN", "")
-
 
 def _mapbox_geocode(query: str, limit: int = 10) -> list:
     """
     Search for places using the Mapbox Geocoding API.
     Returns a list of city dicts in the same format as the static database.
     Only queries for 'place' types (cities/towns) — not street addresses.
+
+    Note: Mapbox geocoding does not return timezone info. The 'timezone' field
+    will be empty for API results. Timezone can be derived from coordinates
+    when needed (e.g., via timezonefinder or a separate Mapbox Tilequery).
     """
     if not MAPBOX_ACCESS_TOKEN:
         return []
