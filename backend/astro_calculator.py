@@ -7,11 +7,21 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 import math
 import requests
-from functools import lru_cache
 import logging
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+try:
+    from timezonefinder import TimezoneFinder as _TimezoneFinder
+    _tf = _TimezoneFinder()
+except ImportError:
+    _tf = None
+    logging.warning("timezonefinder not installed — birth times will be assumed UTC")
 
 _NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 _NOMINATIM_USER_AGENT = "Gab44-Astrology/2.0"
+
+# Success-only geocoding cache (avoids wiping all entries on transient failures)
+_geocode_cache: Dict[str, Tuple[float, float]] = {}
 
 # Initialize Swiss Ephemeris - use built-in ephemeris (Moshier, less accurate but no files needed)
 swe.set_ephe_path('')
@@ -36,8 +46,8 @@ PLANETS = {
     swe.PLUTO: "pluto",
 }
 
-# Additional points
-NORTH_NODE = swe.MEAN_NODE
+# Additional points — True Node is standard for natal charts
+NORTH_NODE = swe.TRUE_NODE
 CHIRON = swe.CHIRON
 
 # Aspect definitions (degree, name, orb, harmony)
@@ -72,9 +82,29 @@ def parse_birth_datetime(birth_date: str, birth_time: Optional[str] = None) -> d
 
 
 def datetime_to_julian(dt: datetime) -> float:
-    """Convert datetime to Julian Day number"""
-    # Assume UTC for simplicity - in production, handle timezone conversion
+    """Convert a UTC (or UT-equivalent) datetime to Julian Day number."""
     return swe.julday(dt.year, dt.month, dt.day, dt.hour + dt.minute / 60.0)
+
+
+def local_to_utc(dt: datetime, latitude: float, longitude: float) -> datetime:
+    """Convert a naive local birth datetime to UTC using the birth location's timezone.
+
+    Falls back to treating the datetime as UTC when location is unavailable or
+    timezone lookup fails (no data loss — just a known limitation).
+    """
+    if _tf is None or (latitude == 0.0 and longitude == 0.0):
+        return dt  # No location data — treat as UTC
+    try:
+        tz_name = _tf.timezone_at(lat=latitude, lng=longitude)
+        if not tz_name:
+            return dt
+        local_tz = ZoneInfo(tz_name)
+        local_dt = dt.replace(tzinfo=local_tz)
+        utc_dt = local_dt.astimezone(ZoneInfo("UTC"))
+        return utc_dt.replace(tzinfo=None)  # Return naive UTC for swe.julday
+    except (ZoneInfoNotFoundError, Exception) as exc:
+        logging.warning("Timezone conversion failed for (%.4f, %.4f): %s", latitude, longitude, exc)
+        return dt
 
 
 def calculate_planetary_positions(jd: float) -> Dict[str, Dict]:
@@ -93,7 +123,8 @@ def calculate_planetary_positions(jd: float) -> Dict[str, Dict]:
                 "sign": sign,
                 "sign_degree": round(sign_degree, 2),
                 "retrograde": result[3] < 0,  # Negative speed = retrograde
-                "house": house
+                "speed": round(result[3], 4),   # degrees/day — needed for applying aspects
+                "house": None  # Assigned later by assign_houses_to_planets
             }
         except Exception as e:
             print(f"Error calculating {planet_name}: {e}")
@@ -108,7 +139,7 @@ def calculate_planetary_positions(jd: float) -> Dict[str, Dict]:
             "degree": round(longitude, 2),
             "sign": sign,
             "sign_degree": round(sign_degree, 2),
-            "house": house
+            "house": None
         }
         # South Node (Ketu) is opposite
         south_lon = (longitude + 180) % 360
@@ -117,7 +148,7 @@ def calculate_planetary_positions(jd: float) -> Dict[str, Dict]:
             "degree": round(south_lon, 2),
             "sign": south_sign,
             "sign_degree": round(south_degree, 2),
-            "house": south_house
+            "house": None
         }
     except Exception as e:
         print(f"Error calculating nodes: {e}")
@@ -131,7 +162,7 @@ def calculate_planetary_positions(jd: float) -> Dict[str, Dict]:
             "degree": round(longitude, 2),
             "sign": sign,
             "sign_degree": round(sign_degree, 2),
-            "house": house
+            "house": None
         }
     except Exception as e:
         print(f"Error calculating Chiron: {e}")
@@ -218,6 +249,14 @@ def calculate_aspects(positions: Dict[str, Dict], orb_factor: float = 1.0) -> Li
                 
                 if orb <= effective_orb:
                     strength = 1 - (orb / effective_orb)
+                    # Applying: project 1 hour ahead using each planet's speed
+                    # If future orb is smaller the aspect is applying (converging)
+                    p1_next = (p1["degree"] + p1.get("speed", 0) / 24) % 360
+                    p2_next = (p2["degree"] + p2.get("speed", 0) / 24) % 360
+                    future_diff = abs(p1_next - p2_next)
+                    if future_diff > 180:
+                        future_diff = 360 - future_diff
+                    future_orb = abs(future_diff - aspect_angle)
                     aspects.append({
                         "planet1": p1_name,
                         "planet2": p2_name,
@@ -225,7 +264,7 @@ def calculate_aspects(positions: Dict[str, Dict], orb_factor: float = 1.0) -> Li
                         "orb": round(orb, 2),
                         "strength": round(strength, 2),
                         "harmony": harmony,
-                        "applying": p1.get("retrograde", False) != p2.get("retrograde", False)
+                        "applying": future_orb < orb
                     })
                     break
     
@@ -369,8 +408,10 @@ def calculate_natal_chart(
     Returns:
         Complete chart data including planets, houses, aspects, and patterns
     """
-    # Parse datetime and convert to Julian Day
+    # Parse datetime; convert from local time at birth location to UTC
     dt = parse_birth_datetime(birth_date, birth_time)
+    if latitude != 0.0 or longitude != 0.0:
+        dt = local_to_utc(dt, latitude, longitude)
     jd = datetime_to_julian(dt)
     
     # Calculate planetary positions
@@ -545,14 +586,14 @@ CITY_COORDINATES = {
 }
 
 
-@lru_cache(maxsize=256)
 def _geocode_nominatim(place: str) -> Tuple[float, float]:
     """Call OpenStreetMap Nominatim to look up coordinates for any place name.
 
-    Results are cached per unique place string.  Only *successful* lookups are
-    cached — if Nominatim returns no results the call is not stored so that a
-    retry is possible (e.g. after a transient network failure).
+    Only successful results are cached.  Transient failures return (0.0, 0.0)
+    without caching so a retry on the next request is always possible.
     """
+    if place in _geocode_cache:
+        return _geocode_cache[place]
     try:
         response = requests.get(
             _NOMINATIM_URL,
@@ -563,13 +604,12 @@ def _geocode_nominatim(place: str) -> Tuple[float, float]:
         response.raise_for_status()
         results = response.json()
         if results:
-            return (float(results[0]["lat"]), float(results[0]["lon"]))
+            coords = (float(results[0]["lat"]), float(results[0]["lon"]))
+            _geocode_cache[place] = coords  # Only cache successes
+            return coords
         logging.warning("Nominatim returned no results for place: %r", place)
     except (requests.RequestException, ValueError, KeyError) as exc:
         logging.warning("Nominatim geocoding failed for %r: %s", place, exc)
-
-    # Evict this cache entry so transient failures can be retried
-    _geocode_nominatim.cache_clear()
     return (0.0, 0.0)
 
 

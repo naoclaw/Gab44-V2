@@ -461,39 +461,12 @@ def build_password_reset_email(name: str, reset_url: str) -> str:
 # ============== Astrology Helpers ==============
 
 def calculate_sun_sign(birth_date: str) -> str:
-    """Calculate sun sign from birth date"""
-    date = datetime.strptime(birth_date, "%Y-%m-%d")
-    month, day = date.month, date.day
-    
-    signs = [
-        ((3, 21), (4, 19), "Aries"),
-        ((4, 20), (5, 20), "Taurus"),
-        ((5, 21), (6, 20), "Gemini"),
-        ((6, 21), (7, 22), "Cancer"),
-        ((7, 23), (8, 22), "Leo"),
-        ((8, 23), (9, 22), "Virgo"),
-        ((9, 23), (10, 22), "Libra"),
-        ((10, 23), (11, 21), "Scorpio"),
-        ((11, 22), (12, 21), "Sagittarius"),
-        ((12, 22), (1, 19), "Capricorn"),
-        ((1, 20), (2, 18), "Aquarius"),
-        ((2, 19), (3, 20), "Pisces"),
-    ]
-    
-    for start, end, sign in signs:
-        if start[0] == 12 and month == 12 and day >= start[1]:
-            return sign
-        if start[0] == 12 and month == 1 and day <= end[1]:
-            return sign
-        if start[0] <= month <= end[0]:
-            if month == start[0] and day >= start[1]:
-                return sign
-            if month == end[0] and day <= end[1]:
-                return sign
-            if start[0] < month < end[0]:
-                return sign
-    
-    return "Unknown"
+    """Calculate sun sign using Swiss Ephemeris for exact accuracy (handles cusp days correctly)."""
+    try:
+        chart = calculate_natal_chart(birth_date)
+        return chart.get("sun_sign", "Unknown")
+    except Exception:
+        return "Unknown"
 
 def get_sign_element(sign: str) -> str:
     """Get the element for a zodiac sign"""
