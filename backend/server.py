@@ -1142,6 +1142,27 @@ async def get_my_chart(user: dict = Depends(get_current_user), recalculate: bool
     
     return {k: v for k, v in chart_doc.items() if k != "_id"}
 
+
+@api_router.get("/numerology/me")
+async def get_my_numerology(user: dict = Depends(get_current_user)):
+    """Return Pythagorean numerology profile for the current user.
+
+    Uses ``birth_name`` (legal name) when set, falls back to display ``name``.
+    Looks up cached chart first so numerology is consistent with the chart page.
+    """
+    # Return cached result from stored chart when available
+    chart = await db.birth_charts.find_one({"user_id": user["id"]}, {"_id": 0, "numerology": 1})
+    if chart and chart.get("numerology"):
+        return chart["numerology"]
+
+    # Recalculate on-the-fly if chart hasn't been generated yet
+    name = (user.get("birth_name") or user.get("name") or "").strip()
+    birth_date = user.get("birth_date", "1990-01-01")
+    if not name:
+        return {}
+    return calculate_numerology(name, birth_date)
+
+
 @api_router.post("/chart/share")
 async def generate_share_token(user: dict = Depends(get_current_user)):
     """Generate (or return existing) a public share token for the user's chart."""

@@ -11,7 +11,8 @@ import {
   Moon,
   Star,
   ChevronRight,
-  Share2
+  Share2,
+  Printer
 } from "lucide-react";
 import {
   Tooltip,
@@ -82,9 +83,9 @@ export default function ChartPage() {
     <div className="min-h-screen bg-background p-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-8 print:hidden">
           <div>
-            <div className="flex items-center gap-4 mb-4">
+            <div className="flex items-center gap-4 mb-4 print:hidden">
               <Link to="/dashboard" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
                 <ArrowLeft className="w-4 h-4" />
                 <span className="text-sm">Dashboard</span>
@@ -103,7 +104,16 @@ export default function ChartPage() {
             </p>
           </div>
           
-          <div className="flex gap-3">
+          <div className="flex gap-3 print:hidden">
+            <Button 
+              onClick={() => window.print()}
+              variant="outline"
+              className="border-border rounded-xl"
+              data-testid="print-chart-btn"
+            >
+              <Printer className="w-4 h-4 mr-2" />
+              Print / PDF
+            </Button>
             <Button 
               onClick={() => navigate("/share")}
               variant="outline"
@@ -166,8 +176,13 @@ export default function ChartPage() {
                       <div className="flex items-center gap-3">
                         <span className="text-2xl w-8 text-center">{PLANET_SYMBOLS[planet]}</span>
                         <div>
-                          <p className="font-medium text-foreground capitalize">{planet.replace('_', ' ')}</p>
-                          <p className="text-xs text-muted-foreground">House {house}</p>
+                          <p className="font-medium text-foreground capitalize flex items-center gap-1.5">
+                            {planet.replace('_', ' ')}
+                            {data?.retrograde && (
+                              <span className="text-xs text-orange-400 font-mono" title="Retrograde">℞</span>
+                            )}
+                          </p>
+                          <p className="text-xs text-muted-foreground">House {house !== null && house !== undefined ? house : '—'}</p>
                         </div>
                       </div>
                       

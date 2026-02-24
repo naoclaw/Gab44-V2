@@ -171,7 +171,15 @@ export default function TransitsPage() {
                       <span>Peak</span>
                       <span>End</span>
                     </div>
-                    <Progress value={50} className="h-2" />
+                    <Progress
+                      value={(() => {
+                        const start = new Date(transit.start_date).getTime();
+                        const end = new Date(transit.end_date).getTime();
+                        if (end <= start) return 50; // Guard: equal dates → show midpoint
+                        return Math.min(100, Math.max(0, ((Date.now() - start) / (end - start)) * 100));
+                      })()}
+                      className="h-2"
+                    />
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span>{new Date(transit.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                       <span>{new Date(transit.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
