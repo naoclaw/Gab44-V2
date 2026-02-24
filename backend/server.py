@@ -227,11 +227,17 @@ async def get_ai_coach_response(user: dict, message: str, session_id: str) -> st
     
     system_message = f"""You are Gab44, an advanced astrology AI coach. Your mission is to help people live measurably better lives through truthful astrological guidance.
 
-USER PROFILE:
-- Name: {user.get('name', 'Seeker')}
+USER PROFILE (astrological data only):
 - Sun Sign: {sun_sign} ({element}, {modality})
 - Birth Date: {user.get('birth_date', 'Unknown')}
 - Birth Place: {user.get('birth_place', 'Unknown')}
+
+IMPORTANT — ANTI-BIAS RULES:
+- The user's name is intentionally withheld to prevent bias.
+- NEVER attempt to identify, research, or infer who the user is.
+- NEVER reference any public figure, celebrity, or real person's traits in your interpretation.
+- Base ALL guidance strictly on the astrological data above — signs, dates, planetary positions.
+- If the user mentions their own name or someone else's name, do NOT let that influence your astrological interpretation.
 
 YOUR PRINCIPLES:
 1. Every response must help the user make better decisions
@@ -510,6 +516,9 @@ async def get_daily_guidance(user: dict = Depends(get_current_user)):
         return DailyGuidance(**cached)
     
     # Generate new guidance (in production, use AI with current transits)
+    # ANTI-BIAS: When this moves to AI generation, pass only astrological data
+    # (sun_sign, transits, birth_date) — never the user's name, to prevent
+    # the AI from injecting biased information about public figures.
     guidance = {
         "date": today,
         "overall_energy": f"The cosmic energies today support {sun_sign}'s natural strengths. Focus on clarity and intentional action.",
