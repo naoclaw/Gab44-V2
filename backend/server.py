@@ -298,7 +298,11 @@ async def register(user_data: UserCreate):
     lat = user_data.birth_latitude
     lng = user_data.birth_longitude
     if (lat is None or lng is None) and user_data.birth_place:
-        city = find_city(user_data.birth_place)
+        # Parse "City, Country" format from the frontend
+        parts = [p.strip() for p in user_data.birth_place.split(",", 1)]
+        city_name = parts[0]
+        city_country = parts[1] if len(parts) > 1 else ""
+        city = find_city(city_name, city_country)
         if city:
             lat = city["latitude"]
             lng = city["longitude"]

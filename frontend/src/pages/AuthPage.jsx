@@ -75,13 +75,14 @@ export default function AuthPage() {
   }, []);
 
   const selectCity = (city) => {
+    const displayName = `${city.name}, ${city.country}`;
     setFormData({
       ...formData,
-      birth_place: city.name,
+      birth_place: displayName,
       birth_latitude: city.latitude,
       birth_longitude: city.longitude,
     });
-    setCityQuery(`${city.name}, ${city.country}`);
+    setCityQuery(displayName);
     setShowCityDropdown(false);
   };
 
@@ -230,8 +231,10 @@ export default function AuthPage() {
                       onChange={(e) => {
                         setCityQuery(e.target.value);
                         setShowCityDropdown(true);
-                        // Clear lat/lng when user types (they need to re-select)
-                        setFormData({ ...formData, birth_place: "", birth_latitude: null, birth_longitude: null });
+                        // Clear coordinates when user types (they need to re-select)
+                        if (formData.birth_latitude) {
+                          setFormData({ ...formData, birth_latitude: null, birth_longitude: null });
+                        }
                       }}
                       onFocus={() => {
                         if (cityQuery.length >= 1) setShowCityDropdown(true);
