@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useAuth } from "@/App";
+import axios from "axios";
+import { useAuth, API } from "@/App";
 import { useTheme } from "@/context/ThemeContext";
+import { parseApiError } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Sparkles, ArrowLeft, Eye, EyeOff, MapPin, Calendar, Clock, Sun, Moon } from "lucide-react";
+import { Sparkles, ArrowLeft, Eye, EyeOff, MapPin, Calendar, Clock, Sun, Moon, Mail } from "lucide-react";
 
 export default function AuthPage() {
   const [searchParams] = useSearchParams();
@@ -15,13 +17,17 @@ export default function AuthPage() {
   const { theme, toggleTheme } = useTheme();
   
   const [isRegister, setIsRegister] = useState(searchParams.get("mode") === "register");
+  const [isForgot, setIsForgot] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState(null);
+  const [forgotEmail, setForgotEmail] = useState("");
   
   const [formData, setFormData] = useState({
     email: "",
     password: "",
     name: "",
+    birth_name: "",
     birth_date: "",
     birth_time: "",
     birth_place: ""
@@ -37,6 +43,20 @@ export default function AuthPage() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const handleForgotSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await axios.post(`${API}/auth/forgot-password`, { email: forgotEmail });
+      toast.success("If that email is registered, a reset link has been sent.");
+      setIsForgot(false);
+    } catch {
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -49,15 +69,16 @@ export default function AuthPage() {
           return;
         }
         await register(formData);
-        toast.success("Welcome to Gab44! Your cosmic journey begins now.");
+        setRegisteredEmail(formData.email);
+        toast.success("Welcome to Gab44! Check your inbox to verify your email.");
+        navigate("/dashboard");
       } else {
         await login(formData.email, formData.password);
         toast.success("Welcome back! The stars have been waiting.");
+        navigate("/dashboard");
       }
-      navigate("/dashboard");
     } catch (error) {
-      const message = error.response?.data?.detail || "Something went wrong";
-      toast.error(message);
+      toast.error(parseApiError(error));
     } finally {
       setLoading(false);
     }
@@ -69,7 +90,7 @@ export default function AuthPage() {
       <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 md:px-16 lg:px-24 py-12">
         <div className="flex items-center justify-between mb-12">
           <button 
-            onClick={() => navigate("/")}
+            onClick={() => { setIsForgot(false); navigate("/"); }}
             className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
             data-testid="back-to-home"
           >
@@ -94,6 +115,38 @@ export default function AuthPage() {
           <span className="font-serif text-xl text-foreground">Gab44</span>
         </div>
 
+        {/* ── Forgot Password Panel ── */}
+        {isForgot && (
+          <div className="max-w-sm">
+            <h1 className="font-serif text-3xl text-foreground mb-2">Reset Password</h1>
+            <p className="text-muted-foreground mb-8">Enter your email and we'll send you a reset link.</p>
+            <form onSubmit={handleForgotSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="forgot-email" className="text-foreground">Email</Label>
+                <Input
+                  id="forgot-email"
+                  type="email"
+                  placeholder="your@email.com"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  className="bg-muted/30 border-border h-12 rounded-xl focus-glow"
+                  required
+                />
+              </div>
+              <Button type="submit" disabled={loading} className="w-full glow-button bg-primary text-primary-foreground h-12 text-base rounded-xl">
+                {loading ? <span className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />Sending...</span> : "Send Reset Link"}
+              </Button>
+            </form>
+            <p className="text-sm text-muted-foreground mt-6 text-center">
+              <button onClick={() => setIsForgot(false)} className="text-primary hover:underline font-medium">
+                Back to Sign In
+              </button>
+            </p>
+          </div>
+        )}
+
+        {!isForgot && (
+        <>
         <h1 className="font-serif text-3xl md:text-4xl text-foreground mb-2">
           {isRegister ? "Create Your Account" : "Welcome Back"}
         </h1>
@@ -119,6 +172,23 @@ export default function AuthPage() {
                   className="bg-muted/30 border-border h-12 rounded-xl focus-glow"
                   data-testid="name-input"
                   required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="birth_name" className="text-foreground flex items-center gap-2">
+                  Legal Birth Name
+                  <span className="text-xs text-muted-foreground font-normal">(optional — used for numerology)</span>
+                </Label>
+                <Input
+                  id="birth_name"
+                  name="birth_name"
+                  type="text"
+                  placeholder="As on your birth certificate"
+                  value={formData.birth_name}
+                  onChange={handleChange}
+                  className="bg-muted/30 border-border h-12 rounded-xl focus-glow"
+                  data-testid="birth-name-input"
                 />
               </div>
 
@@ -214,6 +284,11 @@ export default function AuthPage() {
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
+            {isRegister && (
+              <p className="text-xs text-muted-foreground">
+                Min. 8 characters, must include a letter and a digit or special character.
+              </p>
+            )}
           </div>
 
           <Button 
@@ -233,7 +308,18 @@ export default function AuthPage() {
           </Button>
         </form>
 
-        <p className="text-sm text-muted-foreground mt-6 text-center">
+        {!isRegister && (
+          <p className="text-sm text-muted-foreground mt-3 text-center">
+            <button
+              onClick={() => { setIsForgot(true); setForgotEmail(formData.email); }}
+              className="text-primary hover:underline font-medium"
+            >
+              Forgot your password?
+            </button>
+          </p>
+        )}
+
+        <p className="text-sm text-muted-foreground mt-4 text-center">
           {isRegister ? "Already have an account?" : "Don't have an account?"}{" "}
           <button
             onClick={() => setIsRegister(!isRegister)}
@@ -243,6 +329,8 @@ export default function AuthPage() {
             {isRegister ? "Sign In" : "Create One"}
           </button>
         </p>
+        </>
+        )}
       </div>
 
       {/* Right Side - Image */}

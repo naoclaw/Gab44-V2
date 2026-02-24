@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
+import axios from "axios";
 import { 
   ArrowLeft, 
   User, 
@@ -21,11 +22,35 @@ import {
   Type,
   Eye,
   Save,
-  LogOut
+  LogOut,
+  Loader2,
+  Mail
 } from "lucide-react";
 
+// OneSignal SDK is initialized in public/index.html with the App ID.
+// These helpers wrap the async SDK interface.
+
+async function requestPushPermission() {
+  if (!window.OneSignalDeferred) return null;
+  return new Promise((resolve) => {
+    window.OneSignalDeferred.push(async (OneSignal) => {
+      try {
+        const permission = await OneSignal.Notifications.requestPermission();
+        if (permission) {
+          const playerId = await OneSignal.User.PushSubscription.id;
+          resolve(playerId || null);
+        } else {
+          resolve(null);
+        }
+      } catch {
+        resolve(null);
+      }
+    });
+  });
+}
+
 export default function SettingsPage() {
-  const { user, logout } = useAuth();
+  const { user, token, logout, updateUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   
@@ -44,6 +69,18 @@ export default function SettingsPage() {
     weeklyReport: false,
     marketing: false
   });
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
+
+  const [profileEdit, setProfileEdit] = useState({
+    name: user?.name || "",
+    birth_name: user?.birth_name || "",
+    birth_date: user?.birth_date || "",
+    birth_time: user?.birth_time || "",
+    birth_place: user?.birth_place || ""
+  });
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
 
   const handleFontSizeChange = (value) => {
     setFontSize(value[0]);
@@ -63,6 +100,106 @@ export default function SettingsPage() {
       root.style.setProperty("--reading-letter-spacing", "0.01em");
     }
     toast.success(checked ? "Reading mode enabled" : "Reading mode disabled");
+  };
+
+  const handlePushToggle = async (checked) => {
+    if (!window.OneSignalDeferred) {
+      toast.error("Push notifications are not supported in this browser.");
+      return;
+    }
+    setPushLoading(true);
+    try {
+      if (checked) {
+        const playerId = await requestPushPermission();
+        if (playerId) {
+          await axios.post(`${API}/notifications/register-device`, { player_id: playerId }, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          setPushEnabled(true);
+          toast.success("Push notifications enabled!");
+        } else {
+          toast.error("Permission denied. Please allow notifications in your browser settings.");
+        }
+      } else {
+        // Unsubscribe via OneSignal SDK
+        if (window.OneSignalDeferred) {
+          window.OneSignalDeferred.push((OneSignal) => {
+            OneSignal.User.PushSubscription.optOut().catch(() => {});
+          });
+        }
+        setPushEnabled(false);
+        toast.success("Push notifications disabled.");
+      }
+    } catch (e) {
+      toast.error("Could not update push notification settings.");
+    } finally {
+      setPushLoading(false);
+    }
+  };
+
+  const handleProfileChange = (e) => {
+    setProfileEdit({ ...profileEdit, [e.target.name]: e.target.value });
+  };
+
+  const handleProfileSave = async (e) => {
+    e.preventDefault();
+    setSavingProfile(true);
+    try {
+      const updates = {};
+      if (profileEdit.name && profileEdit.name !== user?.name) updates.name = profileEdit.name;
+      if (profileEdit.birth_name !== (user?.birth_name || "")) updates.birth_name = profileEdit.birth_name || null;
+      if (profileEdit.birth_date && profileEdit.birth_date !== user?.birth_date) updates.birth_date = profileEdit.birth_date;
+      if (profileEdit.birth_time !== (user?.birth_time || "")) updates.birth_time = profileEdit.birth_time || null;
+      if (profileEdit.birth_place && profileEdit.birth_place !== user?.birth_place) updates.birth_place = profileEdit.birth_place;
+
+      if (Object.keys(updates).length === 0) {
+        toast.info("No changes to save");
+        return;
+      }
+
+      const response = await axios.put(`${API}/auth/me`, updates, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      updateUser(response.data);
+      toast.success("Profile updated successfully");
+    } catch (error) {
+      const status = error.response?.status;
+      const detail = error.response?.data?.detail;
+      let message;
+      if (Array.isArray(detail)) {
+        message = detail.map(e => e.msg?.replace(/^Value error,\s*/i, "") || "Validation error").join("; ");
+      } else if (detail) {
+        message = detail;
+      } else if (status === 401) {
+        message = "Unauthorized. Please log in again.";
+      } else if (status === 404) {
+        message = "Profile not found.";
+      } else {
+        message = "Failed to update profile";
+      }
+      toast.error(message);
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleManageSubscription = async () => {
+    if (user?.subscription_tier === "seeker") {
+      navigate("/pricing");
+      return;
+    }
+    setPortalLoading(true);
+    try {
+      const response = await axios.post(`${API}/payments/portal`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      window.location.href = response.data.portal_url;
+    } catch (error) {
+      const detail = error.response?.data?.detail || "Unable to open billing portal. Please try again.";
+      toast.error(detail);
+    } finally {
+      setPortalLoading(false);
+    }
   };
 
   const settingsSections = [
@@ -135,23 +272,39 @@ export default function SettingsPage() {
       icon: Bell,
       content: (
         <div className="space-y-4">
-          {[
-            { key: "dailyGuidance", label: "Daily Guidance", desc: "Receive your daily cosmic insights" },
-            { key: "transitAlerts", label: "Transit Alerts", desc: "Get notified about important transits" },
-            { key: "weeklyReport", label: "Weekly Report", desc: "Summary of the week ahead" },
-            { key: "marketing", label: "Updates & Offers", desc: "News about new features and promotions" }
-          ].map(({ key, label, desc }) => (
-            <div key={key} className="flex items-center justify-between">
-              <div className="space-y-1">
-                <Label className="text-foreground">{label}</Label>
-                <p className="text-sm text-muted-foreground">{desc}</p>
-              </div>
-              <Switch
-                checked={notifications[key]}
-                onCheckedChange={(checked) => setNotifications(prev => ({ ...prev, [key]: checked }))}
-              />
+          {/* Push Notifications master toggle */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label className="text-foreground">Push Notifications</Label>
+              <p className="text-sm text-muted-foreground">Receive alerts directly in your browser</p>
             </div>
-          ))}
+            <Switch
+              checked={pushEnabled}
+              onCheckedChange={handlePushToggle}
+              disabled={pushLoading}
+              data-testid="push-notifications-toggle"
+            />
+          </div>
+          <div className="border-t border-border/50 pt-4 space-y-4">
+            {[
+              { key: "dailyGuidance", label: "Daily Guidance", desc: "Receive your daily cosmic insights" },
+              { key: "transitAlerts", label: "Transit Alerts", desc: "Get notified about important transits" },
+              { key: "weeklyReport", label: "Weekly Report", desc: "Summary of the week ahead" },
+              { key: "marketing", label: "Updates & Offers", desc: "News about new features and promotions" }
+            ].map(({ key, label, desc }) => (
+              <div key={key} className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label className="text-foreground">{label}</Label>
+                  <p className="text-sm text-muted-foreground">{desc}</p>
+                </div>
+                <Switch
+                  checked={notifications[key]}
+                  onCheckedChange={(checked) => setNotifications(prev => ({ ...prev, [key]: checked }))}
+                  disabled={!pushEnabled}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       )
     },
@@ -160,7 +313,7 @@ export default function SettingsPage() {
       title: "Account",
       icon: User,
       content: (
-        <div className="space-y-4">
+        <form onSubmit={handleProfileSave} className="space-y-4">
           <div className="glass-card rounded-xl p-4">
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center font-serif text-2xl text-primary">
@@ -178,21 +331,101 @@ export default function SettingsPage() {
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="name" className="text-foreground">Name</Label>
+            <Input
+              id="name"
+              name="name"
+              value={profileEdit.name}
+              onChange={handleProfileChange}
+              className="bg-muted/30 rounded-xl"
+              data-testid="profile-name-input"
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label className="text-foreground">Birth Place</Label>
-            <Input value={user?.birth_place || ""} disabled className="bg-muted/30 rounded-xl" />
+            <Input
+              name="birth_place"
+              value={profileEdit.birth_place}
+              onChange={handleProfileChange}
+              className="bg-muted/30 rounded-xl"
+              data-testid="profile-birth-place-input"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-foreground flex items-center gap-2">
+              Legal Birth Name <span className="text-xs text-muted-foreground font-normal">(for numerology — leave blank to use display name)</span>
+            </Label>
+            <Input
+              name="birth_name"
+              value={profileEdit.birth_name}
+              onChange={handleProfileChange}
+              placeholder={profileEdit.name}
+              className="bg-muted/30 rounded-xl"
+              data-testid="profile-birth-name-input"
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-foreground">Birth Date</Label>
-              <Input value={user?.birth_date || ""} disabled className="bg-muted/30 rounded-xl" />
+              <Input
+                name="birth_date"
+                type="date"
+                value={profileEdit.birth_date}
+                onChange={handleProfileChange}
+                className="bg-muted/30 rounded-xl"
+                data-testid="profile-birth-date-input"
+              />
             </div>
             <div className="space-y-2">
               <Label className="text-foreground">Birth Time</Label>
-              <Input value={user?.birth_time || "Not provided"} disabled className="bg-muted/30 rounded-xl" />
+              <Input
+                name="birth_time"
+                type="time"
+                value={profileEdit.birth_time}
+                onChange={handleProfileChange}
+                className="bg-muted/30 rounded-xl"
+                data-testid="profile-birth-time-input"
+              />
             </div>
           </div>
-        </div>
+
+          {!user?.email_verified && (
+            <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+              <Mail className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-amber-300 font-medium">Email not verified</p>
+                <p className="text-amber-400/70 text-xs mt-0.5">Check your inbox or resend the link.</p>
+              </div>
+              <button
+                type="button"
+                className="text-xs text-amber-400 underline underline-offset-2 hover:text-amber-300 flex-shrink-0"
+                onClick={async () => {
+                  try {
+                    await axios.post(`${API}/auth/resend-verification`, {}, { headers: { Authorization: `****** } });
+                    toast.success("Verification email sent!");
+                  } catch {
+                    toast.error("Could not send email. Please try again.");
+                  }
+                }}
+              >
+                Resend
+              </button>
+            </div>
+          )}
+
+          <Button
+            type="submit"
+            disabled={savingProfile}
+            className="w-full rounded-xl"
+            data-testid="save-profile-btn"
+          >
+            <Save className="w-4 h-4 mr-2" />
+            {savingProfile ? "Saving..." : "Save Profile"}
+          </Button>
+        </form>
       )
     },
     {
@@ -206,16 +439,22 @@ export default function SettingsPage() {
               <div>
                 <h3 className="font-medium text-foreground capitalize">{user?.subscription_tier || "Seeker"} Plan</h3>
                 <p className="text-sm text-muted-foreground">
-                  {user?.subscription_tier === "seeker" ? "Free forever" : "Billed monthly"}
+                  {user?.subscription_tier === "seeker" ? "Free forever" : "Billed monthly via Stripe"}
                 </p>
               </div>
               <Sparkles className="w-6 h-6 text-primary" />
             </div>
             <Button 
-              onClick={() => navigate("/pricing")}
+              onClick={handleManageSubscription}
+              disabled={portalLoading}
               className="w-full bg-primary/10 text-primary hover:bg-primary/20 rounded-xl"
             >
-              {user?.subscription_tier === "seeker" ? "Upgrade Plan" : "Manage Subscription"}
+              {portalLoading ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Opening…
+                </span>
+              ) : user?.subscription_tier === "seeker" ? "Upgrade Plan" : "Manage Subscription"}
             </Button>
           </div>
         </div>

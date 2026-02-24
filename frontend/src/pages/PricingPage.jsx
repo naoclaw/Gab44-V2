@@ -3,15 +3,19 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth, API } from "@/App";
 import { useTheme } from "@/context/ThemeContext";
 import axios from "axios";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Check, ArrowLeft, Star, Sun, Moon } from "lucide-react";
+import { Sparkles, Check, ArrowLeft, Star, Sun, Moon, Loader2 } from "lucide-react";
+
+const PAID_TIERS = ["enthusiast", "advanced", "professional"];
 
 export default function PricingPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [checkoutLoading, setCheckoutLoading] = useState(null); // tier being checked out
 
   useEffect(() => {
     const fetchPricing = async () => {
@@ -26,6 +30,45 @@ export default function PricingPage() {
     };
     fetchPricing();
   }, []);
+
+  const handlePlanClick = async (plan) => {
+    // Free plan — just go to register/dashboard
+    if (plan.id === "seeker") {
+      navigate(user ? "/dashboard" : "/auth?mode=register");
+      return;
+    }
+    // Professional — contact sales
+    if (plan.id === "professional") {
+      window.location.href = "mailto:contact@gab44.com?subject=Professional Plan";
+      return;
+    }
+    // Paid plan — must be logged in
+    if (!user) {
+      navigate("/auth?mode=register");
+      return;
+    }
+    // Already on this tier
+    if (user.subscription_tier === plan.id) {
+      toast.info("You are already on this plan.");
+      return;
+    }
+
+    setCheckoutLoading(plan.id);
+    try {
+      const response = await axios.post(
+        `${API}/payments/create-checkout-session`,
+        { tier: plan.id },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      // Redirect to Stripe Checkout
+      window.location.href = response.data.checkout_url;
+    } catch (error) {
+      const msg = error.response?.data?.detail || "Unable to start checkout. Please try again.";
+      toast.error(msg);
+    } finally {
+      setCheckoutLoading(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -73,45 +116,60 @@ export default function PricingPage() {
 
         {/* Pricing Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          {plans.map((plan, index) => (
-            <div 
-              key={plan.id}
-              className={`glass-card rounded-2xl p-6 relative card-lift ${plan.popular ? 'pricing-popular' : ''}`}
-              data-testid={`pricing-plan-${index}`}
-            >
-              {plan.popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-semibold px-4 py-1.5 rounded-full flex items-center gap-1">
-                  <Star className="w-3 h-3" />
-                  Most Popular
-                </div>
-              )}
-              
-              <h3 className="font-serif text-xl text-foreground mb-1">{plan.name}</h3>
-              <p className="text-sm text-muted-foreground mb-6">{plan.tagline}</p>
-              
-              <div className="mb-6">
-                <span className="font-serif text-4xl text-foreground">${plan.price}</span>
-                <span className="text-muted-foreground">/{plan.period}</span>
-              </div>
-
-              <ul className="space-y-3 mb-6">
-                {plan.features.map((feature, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-
-              <Button 
-                className={`w-full rounded-xl ${plan.popular ? 'glow-button bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}
-                onClick={() => navigate(user ? "/dashboard" : "/auth?mode=register")}
-                data-testid={`pricing-cta-${index}`}
+          {plans.map((plan, index) => {
+            const isCurrent = user?.subscription_tier === plan.id;
+            const isLoading = checkoutLoading === plan.id;
+            return (
+              <div 
+                key={plan.id}
+                className={`glass-card rounded-2xl p-6 relative card-lift ${plan.popular ? 'pricing-popular' : ''}`}
+                data-testid={`pricing-plan-${index}`}
               >
-                {plan.cta}
-              </Button>
-            </div>
-          ))}
+                {plan.popular && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-semibold px-4 py-1.5 rounded-full flex items-center gap-1">
+                    <Star className="w-3 h-3" />
+                    Most Popular
+                  </div>
+                )}
+                {isCurrent && (
+                  <div className="absolute -top-3 right-4 bg-green-500 text-white text-xs font-semibold px-3 py-1 rounded-full">
+                    Current Plan
+                  </div>
+                )}
+                
+                <h3 className="font-serif text-xl text-foreground mb-1">{plan.name}</h3>
+                <p className="text-sm text-muted-foreground mb-6">{plan.tagline}</p>
+                
+                <div className="mb-6">
+                  <span className="font-serif text-4xl text-foreground">${plan.price}</span>
+                  <span className="text-muted-foreground">/{plan.period}</span>
+                </div>
+
+                <ul className="space-y-3 mb-6">
+                  {plan.features.map((feature, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                      <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+
+                <Button 
+                  className={`w-full rounded-xl ${plan.popular ? 'glow-button bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}
+                  onClick={() => handlePlanClick(plan)}
+                  disabled={isLoading || isCurrent}
+                  data-testid={`pricing-cta-${index}`}
+                >
+                  {isLoading ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Redirecting…
+                    </span>
+                  ) : isCurrent ? "Current Plan" : plan.cta}
+                </Button>
+              </div>
+            );
+          })}
         </div>
 
         {/* FAQ Link */}

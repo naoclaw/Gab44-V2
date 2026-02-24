@@ -6,6 +6,22 @@ import swisseph as swe
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 import math
+import requests
+import logging
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+try:
+    from timezonefinder import TimezoneFinder as _TimezoneFinder
+    _tf = _TimezoneFinder()
+except ImportError:
+    _tf = None
+    logging.warning("timezonefinder not installed — birth times will be assumed UTC")
+
+_NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
+_NOMINATIM_USER_AGENT = "Gab44-Astrology/2.0"
+
+# Success-only geocoding cache (avoids wiping all entries on transient failures)
+_geocode_cache: Dict[str, Tuple[float, float]] = {}
 
 # Initialize Swiss Ephemeris - use built-in ephemeris (Moshier, less accurate but no files needed)
 swe.set_ephe_path('')
@@ -30,9 +46,10 @@ PLANETS = {
     swe.PLUTO: "pluto",
 }
 
-# Additional points
-NORTH_NODE = swe.MEAN_NODE
+# Additional points — True Node is standard for natal charts
+NORTH_NODE = swe.TRUE_NODE
 CHIRON = swe.CHIRON
+LILITH = swe.MEAN_APOG  # Mean Black Moon Lilith (mean apogee of the Moon)
 
 # Aspect definitions (degree, name, orb, harmony)
 ASPECTS = [
@@ -66,9 +83,29 @@ def parse_birth_datetime(birth_date: str, birth_time: Optional[str] = None) -> d
 
 
 def datetime_to_julian(dt: datetime) -> float:
-    """Convert datetime to Julian Day number"""
-    # Assume UTC for simplicity - in production, handle timezone conversion
+    """Convert a UTC (or UT-equivalent) datetime to Julian Day number."""
     return swe.julday(dt.year, dt.month, dt.day, dt.hour + dt.minute / 60.0)
+
+
+def local_to_utc(dt: datetime, latitude: float, longitude: float) -> datetime:
+    """Convert a naive local birth datetime to UTC using the birth location's timezone.
+
+    Falls back to treating the datetime as UTC when location is unavailable or
+    timezone lookup fails (no data loss — just a known limitation).
+    """
+    if _tf is None or (latitude == 0.0 and longitude == 0.0):
+        return dt  # No location data — treat as UTC
+    try:
+        tz_name = _tf.timezone_at(lat=latitude, lng=longitude)
+        if not tz_name:
+            return dt
+        local_tz = ZoneInfo(tz_name)
+        local_dt = dt.replace(tzinfo=local_tz)
+        utc_dt = local_dt.astimezone(ZoneInfo("UTC"))
+        return utc_dt.replace(tzinfo=None)  # Return naive UTC for swe.julday
+    except (ZoneInfoNotFoundError, Exception) as exc:
+        logging.warning("Timezone conversion failed for (%.4f, %.4f): %s", latitude, longitude, exc)
+        return dt
 
 
 def calculate_planetary_positions(jd: float) -> Dict[str, Dict]:
@@ -87,7 +124,8 @@ def calculate_planetary_positions(jd: float) -> Dict[str, Dict]:
                 "sign": sign,
                 "sign_degree": round(sign_degree, 2),
                 "retrograde": result[3] < 0,  # Negative speed = retrograde
-                "house": house
+                "speed": round(result[3], 4),   # degrees/day — needed for applying aspects
+                "house": None  # Assigned later by assign_houses_to_planets
             }
         except Exception as e:
             print(f"Error calculating {planet_name}: {e}")
@@ -102,7 +140,7 @@ def calculate_planetary_positions(jd: float) -> Dict[str, Dict]:
             "degree": round(longitude, 2),
             "sign": sign,
             "sign_degree": round(sign_degree, 2),
-            "house": house
+            "house": None
         }
         # South Node (Ketu) is opposite
         south_lon = (longitude + 180) % 360
@@ -111,7 +149,7 @@ def calculate_planetary_positions(jd: float) -> Dict[str, Dict]:
             "degree": round(south_lon, 2),
             "sign": south_sign,
             "sign_degree": round(south_degree, 2),
-            "house": south_house
+            "house": None
         }
     except Exception as e:
         print(f"Error calculating nodes: {e}")
@@ -125,11 +163,27 @@ def calculate_planetary_positions(jd: float) -> Dict[str, Dict]:
             "degree": round(longitude, 2),
             "sign": sign,
             "sign_degree": round(sign_degree, 2),
-            "house": house
+            "house": None
         }
     except Exception as e:
         print(f"Error calculating Chiron: {e}")
-    
+
+    # Calculate Black Moon Lilith (Mean Apogee)
+    try:
+        result, flag = swe.calc_ut(jd, LILITH)
+        longitude = result[0]
+        sign, sign_degree, _ = degree_to_sign(longitude)
+        positions["lilith"] = {
+            "degree": round(longitude, 2),
+            "sign": sign,
+            "sign_degree": round(sign_degree, 2),
+            "house": None,
+            "retrograde": False,  # Mean Lilith moves uniformly — no retrograde
+            "speed": round(result[3], 4),
+        }
+    except Exception as e:
+        print(f"Error calculating Lilith: {e}")
+
     return positions
 
 
@@ -212,6 +266,14 @@ def calculate_aspects(positions: Dict[str, Dict], orb_factor: float = 1.0) -> Li
                 
                 if orb <= effective_orb:
                     strength = 1 - (orb / effective_orb)
+                    # Applying: project 1 hour ahead using each planet's speed
+                    # If future orb is smaller the aspect is applying (converging)
+                    p1_next = (p1["degree"] + p1.get("speed", 0) / 24) % 360
+                    p2_next = (p2["degree"] + p2.get("speed", 0) / 24) % 360
+                    future_diff = abs(p1_next - p2_next)
+                    if future_diff > 180:
+                        future_diff = 360 - future_diff
+                    future_orb = abs(future_diff - aspect_angle)
                     aspects.append({
                         "planet1": p1_name,
                         "planet2": p2_name,
@@ -219,7 +281,7 @@ def calculate_aspects(positions: Dict[str, Dict], orb_factor: float = 1.0) -> Li
                         "orb": round(orb, 2),
                         "strength": round(strength, 2),
                         "harmony": harmony,
-                        "applying": p1.get("retrograde", False) != p2.get("retrograde", False)
+                        "applying": future_orb < orb
                     })
                     break
     
@@ -345,6 +407,222 @@ def assign_houses_to_planets(positions: Dict[str, Dict], houses: Dict) -> Dict[s
     return positions
 
 
+# ---------------------------------------------------------------------------
+# Pythagorean Numerology Engine
+# ---------------------------------------------------------------------------
+
+# Pythagorean letter-to-digit mapping
+_PYTH_MAP: Dict[str, int] = {
+    'a': 1, 'b': 2, 'c': 3, 'd': 4, 'e': 5, 'f': 6, 'g': 7, 'h': 8, 'i': 9,
+    'j': 1, 'k': 2, 'l': 3, 'm': 4, 'n': 5, 'o': 6, 'p': 7, 'q': 8, 'r': 9,
+    's': 1, 't': 2, 'u': 3, 'v': 4, 'w': 5, 'x': 6, 'y': 7, 'z': 8,
+}
+_VOWELS = set('aeiou')
+
+# Master numbers are never reduced further
+_MASTER_NUMBERS = {11, 22, 33}
+
+_NUMBER_MEANINGS: Dict[int, Dict[str, str]] = {
+    1:  {"keyword": "Leadership",    "theme": "Independence, pioneering drive, original thinking"},
+    2:  {"keyword": "Partnership",   "theme": "Diplomacy, intuition, cooperation, sensitivity"},
+    3:  {"keyword": "Expression",    "theme": "Creativity, joy, communication, social magnetism"},
+    4:  {"keyword": "Foundation",    "theme": "Hard work, discipline, stability, practical mastery"},
+    5:  {"keyword": "Freedom",       "theme": "Adventure, adaptability, change, sensory experience"},
+    6:  {"keyword": "Harmony",       "theme": "Nurturing, responsibility, beauty, domestic love"},
+    7:  {"keyword": "Wisdom",        "theme": "Introspection, analysis, spiritual seeking, truth"},
+    8:  {"keyword": "Abundance",     "theme": "Ambition, authority, material mastery, karma"},
+    9:  {"keyword": "Completion",    "theme": "Compassion, universal love, humanitarian service"},
+    11: {"keyword": "Illumination",  "theme": "Spiritual messenger, visionary insight, nervous intensity"},
+    22: {"keyword": "Master Builder","theme": "Manifesting grand visions, disciplined idealism"},
+    33: {"keyword": "Master Teacher","theme": "Selfless service, Christ-like compassion, healing"},
+}
+
+
+def _reduce(n: int, preserve_masters: bool = True) -> int:
+    """Reduce n to a single digit, preserving master numbers when requested."""
+    while n > 9 and (not preserve_masters or n not in _MASTER_NUMBERS):
+        n = sum(int(d) for d in str(n))
+    return n
+
+
+def _name_to_digits(name: str) -> List[int]:
+    """Convert alphabetic characters in a name to Pythagorean digits."""
+    return [_PYTH_MAP[c] for c in name.lower() if c in _PYTH_MAP]
+
+
+def _number_info(n: int) -> Dict[str, str]:
+    return _NUMBER_MEANINGS.get(n, {"keyword": "Unknown", "theme": ""})
+
+
+def calculate_numerology(name: str, birth_date: str) -> Dict:
+    """
+    Calculate a complete Pythagorean numerology profile.
+
+    Args:
+        name:       Full birth name (as on birth certificate for accuracy)
+        birth_date: YYYY-MM-DD
+
+    Returns:
+        Dict with life_path, expression, soul_urge, personality, birthday,
+        personal_year, first_name_number, last_name_number, and meanings.
+    """
+    # --- Life Path Number (from birth date) ---
+    try:
+        dt = datetime.strptime(birth_date, "%Y-%m-%d")
+        # Reduce each component separately before summing (standard method)
+        month_r = _reduce(dt.month)
+        day_r = _reduce(dt.day)
+        year_r = _reduce(sum(int(d) for d in str(dt.year)))
+        life_path = _reduce(month_r + day_r + year_r)
+        birthday_num = _reduce(dt.day)
+    except ValueError:
+        life_path = 0
+        birthday_num = 0
+        dt = None
+
+    # --- Personal Year Number (changes each birthday; uses prior year until birthday passes) ---
+    if dt:
+        today = datetime.now()
+        # If today is before the birth month/day this calendar year, use last year's cycle
+        year_for_py = today.year if (today.month, today.day) >= (dt.month, dt.day) else today.year - 1
+        py_raw = _reduce(dt.month) + _reduce(dt.day) + _reduce(sum(int(d) for d in str(year_for_py)))
+        personal_year = _reduce(py_raw)
+    else:
+        personal_year = 0
+
+    # --- Name-based numbers ---
+    name_clean = name.strip()
+    all_digits  = _name_to_digits(name_clean)
+    vowel_digits = [_PYTH_MAP[c] for c in name_clean.lower() if c in _VOWELS and c in _PYTH_MAP]
+    cons_digits  = [_PYTH_MAP[c] for c in name_clean.lower() if c.isalpha() and c not in _VOWELS and c in _PYTH_MAP]
+
+    expression   = _reduce(sum(all_digits))    if all_digits   else 0
+    soul_urge    = _reduce(sum(vowel_digits))  if vowel_digits else 0
+    personality  = _reduce(sum(cons_digits))   if cons_digits  else 0
+
+    # First / Last name numbers (split on whitespace; omit last_name when only one name)
+    parts = name_clean.split()
+    first_name_num = _reduce(sum(_name_to_digits(parts[0]))) if parts else 0
+    last_name_num  = _reduce(sum(_name_to_digits(parts[-1]))) if len(parts) > 1 else None
+
+    result = {
+        "life_path":     {"number": life_path,     **_number_info(life_path)},
+        "expression":    {"number": expression,    **_number_info(expression)},
+        "soul_urge":     {"number": soul_urge,     **_number_info(soul_urge)},
+        "personality":   {"number": personality,   **_number_info(personality)},
+        "birthday":      {"number": birthday_num,  **_number_info(birthday_num)},
+        "personal_year": {"number": personal_year, **_number_info(personal_year)},
+        "first_name":    {"number": first_name_num, **_number_info(first_name_num)},
+    }
+    if last_name_num is not None:
+        result["last_name"] = {"number": last_name_num, **_number_info(last_name_num)}
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Gematria Engine (Chaldean + English Ordinal)
+# ---------------------------------------------------------------------------
+
+# Chaldean cipher — ancient Babylonian system, the same civilisation that
+# gave us astrology.  Letters map to cosmic values 1–8; 9 is considered
+# sacred and never assigned to a letter.
+_CHALDEAN_MAP: Dict[str, int] = {
+    'A': 1, 'I': 1, 'J': 1, 'Q': 1, 'Y': 1,
+    'B': 2, 'K': 2, 'R': 2,
+    'C': 3, 'G': 3, 'L': 3, 'S': 3,
+    'D': 4, 'M': 4, 'T': 4,
+    'E': 5, 'H': 5, 'N': 5, 'X': 5,
+    'U': 6, 'V': 6, 'W': 6,
+    'O': 7, 'Z': 7,
+    'F': 8, 'P': 8,
+}
+
+
+def calculate_gematria(text: str) -> Dict:
+    """Calculate gematria using two cipher systems.
+
+    English Ordinal — A=1 … Z=26 (modern, widely used).
+    Chaldean — ancient Babylonian values 1–8 (cosmically connected to
+    astrology's Mesopotamian roots; 9 is sacred and unassigned).
+
+    Returns both totals, their reductions, number meanings, and a per-letter
+    breakdown for the Chaldean system (useful for UI display).
+    """
+    cleaned = ''.join(c.upper() for c in text if c.isalpha())
+    if not cleaned:
+        return {}
+
+    # English Ordinal: A=1, B=2 … Z=26
+    ordinal_total = sum(ord(c) - 64 for c in cleaned)
+    ordinal_reduced = _reduce(ordinal_total)
+
+    # Chaldean
+    chaldean_total = sum(_CHALDEAN_MAP.get(c, 0) for c in cleaned)
+    chaldean_reduced = _reduce(chaldean_total)
+
+    # Letter breakdown — cap at 24 chars (covers most names; keeps API payload lean
+    # and fits comfortably in the UI letter-tile row without wrapping)
+    letters = [
+        {"letter": c, "ordinal": ord(c) - 64, "chaldean": _CHALDEAN_MAP.get(c, 0)}
+        for c in cleaned[:24]
+    ]
+
+    return {
+        "text": text,
+        "ordinal": {
+            "total": ordinal_total,
+            "reduced": ordinal_reduced,
+            **_number_info(ordinal_reduced),
+        },
+        "chaldean": {
+            "total": chaldean_total,
+            "reduced": chaldean_reduced,
+            **_number_info(chaldean_reduced),
+        },
+        "letters": letters,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Part of Fortune (classical Lot / Arabic Part)
+# ---------------------------------------------------------------------------
+
+def _calculate_part_of_fortune(positions: Dict, ascendant_degree: float) -> Dict:
+    """Calculate the Lot of Fortune.
+
+    Must be called **after** ``assign_houses_to_planets`` so that
+    ``positions["sun"]["house"]`` is populated for correct day/night determination.
+
+    Day chart  (Sun in houses 7-12, above horizon): ASC + Moon − Sun
+    Night chart (Sun in houses 1-6, below horizon): ASC + Sun  − Moon
+
+    The returned dict has ``house: None``; the caller is responsible for
+    running the result through ``assign_houses_to_planets`` to set a real house.
+    """
+    sun_deg  = positions.get("sun",  {}).get("degree", 0)
+    moon_deg = positions.get("moon", {}).get("degree", 0)
+
+    # Sun in houses 7-12 = above horizon = day chart
+    sun_house = positions.get("sun", {}).get("house")
+    is_day = sun_house is not None and sun_house >= 7
+
+    if is_day:
+        pof_degree = (ascendant_degree + moon_deg - sun_deg) % 360
+    else:
+        pof_degree = (ascendant_degree + sun_deg - moon_deg) % 360
+
+    sign, sign_degree, _ = degree_to_sign(pof_degree)
+    return {
+        "degree": round(pof_degree, 2),
+        "sign": sign,
+        "sign_degree": round(sign_degree, 2),
+        "house": None,
+        "retrograde": False,
+        "speed": 0,
+        "chart_type": "day" if is_day else "night",
+    }
+
+
 def calculate_natal_chart(
     birth_date: str,
     birth_time: Optional[str] = None,
@@ -363,8 +641,10 @@ def calculate_natal_chart(
     Returns:
         Complete chart data including planets, houses, aspects, and patterns
     """
-    # Parse datetime and convert to Julian Day
+    # Parse datetime; convert from local time at birth location to UTC
     dt = parse_birth_datetime(birth_date, birth_time)
+    if latitude != 0.0 or longitude != 0.0:
+        dt = local_to_utc(dt, latitude, longitude)
     jd = datetime_to_julian(dt)
     
     # Calculate planetary positions
@@ -374,7 +654,15 @@ def calculate_natal_chart(
     houses = {}
     if latitude != 0.0 or longitude != 0.0:
         houses = calculate_houses(jd, latitude, longitude)
+        # Assign houses to all planets first (Sun needs its house for day/night detection)
         positions = assign_houses_to_planets(positions, houses)
+        # Now calculate Part of Fortune (requires Sun's house to be set for day/night formula)
+        asc_degree = houses.get("ascendant", {}).get("degree")
+        if asc_degree is not None:
+            pof = _calculate_part_of_fortune(positions, asc_degree)
+            # Assign PoF's own house number
+            pof_assigned = assign_houses_to_planets({"part_of_fortune": pof}, houses)
+            positions["part_of_fortune"] = pof_assigned["part_of_fortune"]
     
     # Calculate aspects
     aspects = calculate_aspects(positions)
@@ -539,18 +827,50 @@ CITY_COORDINATES = {
 }
 
 
+def _geocode_nominatim(place: str) -> Tuple[float, float]:
+    """Call OpenStreetMap Nominatim to look up coordinates for any place name.
+
+    Only successful results are cached.  Transient failures return (0.0, 0.0)
+    without caching so a retry on the next request is always possible.
+    """
+    if place in _geocode_cache:
+        return _geocode_cache[place]
+    try:
+        response = requests.get(
+            _NOMINATIM_URL,
+            params={"q": place, "format": "json", "limit": 1},
+            headers={"User-Agent": _NOMINATIM_USER_AGENT},
+            timeout=5,
+        )
+        response.raise_for_status()
+        results = response.json()
+        if results:
+            coords = (float(results[0]["lat"]), float(results[0]["lon"]))
+            _geocode_cache[place] = coords  # Only cache successes
+            return coords
+        logging.warning("Nominatim returned no results for place: %r", place)
+    except (requests.RequestException, ValueError, KeyError) as exc:
+        logging.warning("Nominatim geocoding failed for %r: %s", place, exc)
+    return (0.0, 0.0)
+
+
 def get_coordinates(place: str) -> Tuple[float, float]:
-    """Get coordinates for a place name (simplified lookup)"""
+    """Get coordinates for a place name.
+
+    Fast-path: static lookup table of 90+ cities.
+    Fallback: live Nominatim geocoding (cached per unique place string).
+    Returns (0.0, 0.0) only when both sources fail.
+    """
     place_lower = place.lower().strip()
-    
-    # Check direct match
+
+    # Check direct match in static table
     if place_lower in CITY_COORDINATES:
         return CITY_COORDINATES[place_lower]
-    
-    # Check partial match
+
+    # Check partial match in static table
     for city, coords in CITY_COORDINATES.items():
         if city in place_lower or place_lower in city:
             return coords
-    
-    # Default to 0,0 if not found (will still calculate without houses)
-    return (0.0, 0.0)
+
+    # Live geocoding fallback via OpenStreetMap Nominatim
+    return _geocode_nominatim(place.strip())

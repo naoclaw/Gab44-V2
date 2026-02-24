@@ -18,6 +18,9 @@ import SettingsPage from "@/pages/SettingsPage";
 import ShareChartPage from "@/pages/ShareChartPage";
 import AdminPage from "@/pages/AdminPage";
 import CompatibilityPage from "@/pages/CompatibilityPage";
+import VerifyEmailPage from "@/pages/VerifyEmailPage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
+import PublicChartPage from "@/pages/PublicChartPage";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
@@ -81,8 +84,12 @@ const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  const updateUser = (updatedData) => {
+    setUser(prev => ({ ...prev, ...updatedData }));
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout, loading }}>
+    <AuthContext.Provider value={{ user, token, login, register, logout, updateUser, loading }}>
       {children}
     </AuthContext.Provider>
   );
@@ -146,6 +153,9 @@ function App() {
               <Route path="/" element={<LandingPage />} />
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/pricing" element={<PricingPage />} />
+              <Route path="/verify-email" element={<VerifyEmailPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
+              <Route path="/chart/public/:token" element={<PublicChartPage />} />
               <Route 
                 path="/dashboard" 
                 element={

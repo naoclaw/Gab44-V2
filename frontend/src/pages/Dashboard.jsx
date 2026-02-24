@@ -22,7 +22,8 @@ import {
   Menu,
   X,
   Shield,
-  Heart
+  Heart,
+  Hash
 } from "lucide-react";
 
 const Sidebar = ({ activeTab, setActiveTab, mobileOpen, setMobileOpen }) => {
@@ -189,21 +190,26 @@ const DashboardOverview = () => {
   const navigate = useNavigate();
   const [dailyGuidance, setDailyGuidance] = useState(null);
   const [transits, setTransits] = useState([]);
+  const [numerology, setNumerology] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [guidanceRes, transitsRes] = await Promise.all([
+        const [guidanceRes, transitsRes, numerologyRes] = await Promise.all([
           axios.get(`${API}/guidance/daily`, {
             headers: { Authorization: `Bearer ${token}` }
           }),
           axios.get(`${API}/transits/upcoming`, {
             headers: { Authorization: `Bearer ${token}` }
-          })
+          }),
+          axios.get(`${API}/numerology/me`, {
+            headers: { Authorization: `Bearer ${token}` }
+          }).catch((err) => { console.warn("Numerology fetch failed:", err); return { data: null }; })
         ]);
         setDailyGuidance(guidanceRes.data);
         setTransits(transitsRes.data.slice(0, 3));
+        setNumerology(numerologyRes.data);
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
       } finally {
@@ -304,6 +310,43 @@ const DashboardOverview = () => {
             ))}
           </div>
         </div>
+
+        {/* Numerology Quick View */}
+        {numerology && (numerology.life_path?.number || numerology.personal_year?.number) && (
+          <div className="glass-card rounded-xl p-5 lg:p-6 md:col-span-2 lg:col-span-4" data-testid="numerology-dashboard-card">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Hash className="w-5 h-5 text-primary" />
+                <h2 className="font-medium text-foreground">Your Numerology</h2>
+              </div>
+              <Link to="/chart" className="text-xs text-primary hover:text-primary/80 transition-colors flex items-center gap-1">
+                Full Profile <ChevronRight className="w-3 h-3" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { key: "life_path",     label: "Life Path",     icon: "🌟", desc: "Core life mission" },
+                { key: "personal_year", label: "Personal Year", icon: "📅", desc: "Your theme this year" },
+                { key: "soul_urge",     label: "Soul Urge",     icon: "💜", desc: "What you truly desire" },
+                { key: "expression",    label: "Expression",    icon: "📢", desc: "How you manifest" },
+              ].map(({ key, label, icon, desc }) => {
+                const entry = numerology[key];
+                if (!entry?.number) return null;
+                const isMaster = [11, 22, 33].includes(entry.number);
+                return (
+                  <div key={key} className="p-4 rounded-xl bg-muted/30 text-center">
+                    <div className="text-xl mb-1">{icon}</div>
+                    <div className={`text-2xl font-bold mb-0.5 font-serif ${isMaster ? "text-yellow-400" : "text-primary"}`}>
+                      {entry.number}{isMaster && <span className="text-xs ml-0.5">✦</span>}
+                    </div>
+                    <div className="text-xs font-medium text-foreground">{label}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{entry.keyword}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Upcoming Transits */}
@@ -376,6 +419,21 @@ const DashboardOverview = () => {
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { token, updateUser } = useAuth();
+
+  // Handle Stripe Checkout success redirect (?subscription=success&tier=...)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("subscription") === "success") {
+      const tier = params.get("tier");
+      if (tier) updateUser({ subscription_tier: tier });
+      // Remove query params from URL without reload
+      window.history.replaceState({}, "", window.location.pathname);
+      import("sonner").then(({ toast }) => {
+        toast.success("🎉 Subscription activated! Welcome to your new plan.");
+      });
+    }
+  }, [updateUser]);
 
   return (
     <div className="min-h-screen bg-background">

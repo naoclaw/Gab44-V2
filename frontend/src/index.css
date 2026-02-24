@@ -393,3 +393,47 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* =========================================================
+   Print / Save as PDF
+   ========================================================= */
+@media print {
+  /* White background, dark text */
+  body {
+    background: white !important;
+    color: #111 !important;
+    font-size: 11pt;
+  }
+
+  /* Remove noise overlay */
+  .noise-overlay { display: none !important; }
+
+  /* Flatten glass-cards to plain bordered boxes */
+  .glass-card {
+    background: white !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+
+  /* Print title added automatically */
+  h1.font-serif::before {
+    content: "Gab44 — ";
+    font-weight: 400;
+    opacity: 0.4;
+  }
+
+  /* Ensure color indicators still show */
+  .text-primary { color: #b45309 !important; }
+
+  /* Avoid page breaks inside a card */
+  .glass-card {
+    break-inside: avoid;
+  }
+
+  /* Suppress animations */
+  *, ::before, ::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

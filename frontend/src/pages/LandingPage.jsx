@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "@/App";
+import axios from "axios";
+import { useAuth, API } from "@/App";
 import { useTheme } from "@/context/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +19,9 @@ import {
   Zap,
   Users,
   Menu,
-  X
+  X,
+  Mail,
+  Send
 } from "lucide-react";
 import {
   Accordion,
@@ -26,6 +29,28 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+
+// Chaldean gematria cipher (ancient Babylonian, values 1–8; 9 is sacred/excluded)
+const CHALDEAN = {
+  a:1,b:2,c:3,d:4,e:5,f:8,g:3,h:5,i:1,j:1,k:2,l:3,m:4,
+  n:5,o:7,p:8,q:1,r:2,s:3,t:4,u:6,v:6,w:6,x:5,y:1,z:7
+};
+// Master numbers (11, 22, 33) are never reduced in Chaldean gematria
+function chaldeanReduce(n) {
+  while (n > 9 && ![11, 22, 33].includes(n)) {
+    n = String(n).split("").reduce((s, d) => s + Number(d), 0);
+  }
+  return n;
+}
+function computeLandingGematria(text) {
+  const clean = text.toLowerCase().replace(/[^a-z]/g, "");
+  if (!clean) return null;
+  const letters = clean.split("").map(c => ({ letter: c.toUpperCase(), value: CHALDEAN[c] || 0 }));
+  const total = letters.reduce((s, l) => s + l.value, 0);
+  return { letters, total, reduced: chaldeanReduce(total) };
+}
 
 const Navigation = () => {
   const { user, logout } = useAuth();
@@ -57,8 +82,10 @@ const Navigation = () => {
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="nav-link text-sm text-muted-foreground hover:text-foreground link-hover">Features</a>
             <a href="#testimonials" className="nav-link text-sm text-muted-foreground hover:text-foreground link-hover">Testimonials</a>
+            <a href="#gematria" className="nav-link text-sm text-muted-foreground hover:text-foreground link-hover">Gematria</a>
             <a href="#pricing" className="nav-link text-sm text-muted-foreground hover:text-foreground link-hover">Pricing</a>
             <a href="#faq" className="nav-link text-sm text-muted-foreground hover:text-foreground link-hover">FAQ</a>
+            <a href="#contact" className="nav-link text-sm text-muted-foreground hover:text-foreground link-hover">Contact</a>
           </div>
 
           <div className="hidden md:flex items-center gap-3">
@@ -140,8 +167,10 @@ const Navigation = () => {
           <div className="md:hidden mt-4 pb-4 border-t border-border pt-4 space-y-4">
             <a href="#features" className="block text-muted-foreground hover:text-foreground py-2">Features</a>
             <a href="#testimonials" className="block text-muted-foreground hover:text-foreground py-2">Testimonials</a>
+            <a href="#gematria" className="block text-muted-foreground hover:text-foreground py-2">Gematria</a>
             <a href="#pricing" className="block text-muted-foreground hover:text-foreground py-2">Pricing</a>
             <a href="#faq" className="block text-muted-foreground hover:text-foreground py-2">FAQ</a>
+            <a href="#contact" className="block text-muted-foreground hover:text-foreground py-2">Contact</a>
             <div className="flex gap-2 pt-2">
               {user ? (
                 <Button onClick={() => navigate("/dashboard")} className="flex-1 bg-primary">Dashboard</Button>
@@ -686,6 +715,237 @@ const CTASection = () => {
   );
 };
 
+const GematriaSection = () => {
+  const navigate = useNavigate();
+  const [input, setInput] = useState("Your Name");
+  const [result, setResult] = useState(() => computeLandingGematria("Your Name"));
+
+  const analyse = (val) => {
+    setInput(val);
+    setResult(computeLandingGematria(val));
+  };
+
+  const NUMBER_THEMES = {
+    1: "Leadership · Independence · Originality",
+    2: "Partnership · Sensitivity · Diplomacy",
+    3: "Creativity · Expression · Joy",
+    4: "Structure · Stability · Hard Work",
+    5: "Freedom · Adventure · Change",
+    6: "Harmony · Responsibility · Love",
+    7: "Intuition · Wisdom · Mysticism",
+    8: "Abundance · Authority · Manifestation",
+    9: "Completion · Compassion · Universal Love",
+  };
+
+  return (
+    <section id="gematria" className="py-20 px-6 bg-background border-t border-border">
+      <div className="max-w-3xl mx-auto">
+        <div className="text-center mb-10">
+          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 mx-auto mb-4">
+            <span className="text-xl">🔮</span>
+          </div>
+          <h2 className="font-serif text-3xl lg:text-4xl text-foreground mb-3">Chaldean Gematria</h2>
+          <p className="text-muted-foreground max-w-xl mx-auto">
+            Every letter carries a vibration. The ancient Babylonian system assigns numbers 1–8 to each letter — try your name, a city, or any word below.
+          </p>
+        </div>
+
+        <div className="glass-card rounded-2xl p-6 lg:p-8">
+          <div className="flex gap-3 mb-6">
+            <Input
+              value={input}
+              onChange={e => analyse(e.target.value)}
+              placeholder="Type any name or word…"
+              className="bg-background border-border rounded-xl h-12 text-lg"
+              maxLength={40}
+            />
+            <Button
+              onClick={() => analyse(input)}
+              className="glow-button bg-primary text-primary-foreground h-12 rounded-xl shrink-0"
+            >
+              Analyse
+            </Button>
+          </div>
+
+          {result && (
+            <>
+              {/* Letter breakdown */}
+              <div className="flex flex-wrap gap-2 mb-6">
+                {result.letters.map((l, i) => (
+                  <div key={i} className="flex flex-col items-center bg-primary/5 border border-primary/10 rounded-lg px-3 py-2 min-w-[2.5rem]">
+                    <span className="font-serif text-primary font-semibold text-lg leading-none">{l.letter}</span>
+                    <span className="text-xs text-muted-foreground mt-1">{l.value}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Totals */}
+              <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                <div className="flex-1 bg-primary/10 border border-primary/20 rounded-xl p-4 text-center">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Total</p>
+                  <p className="font-serif text-3xl text-primary font-bold">{result.total}</p>
+                </div>
+                <div className="flex-1 bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 text-center">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Reduced</p>
+                  <p className="font-serif text-3xl text-yellow-400 font-bold">{result.reduced}</p>
+                </div>
+                <div className="flex-1 bg-muted/40 border border-border rounded-xl p-4 text-center flex items-center justify-center">
+                  <p className="text-sm text-muted-foreground leading-snug italic">
+                    {NUMBER_THEMES[result.reduced] || "A sacred vibration"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground mb-3">Get your full natal chart with gematria, numerology, and AI guidance</p>
+                <Button onClick={() => navigate("/auth?mode=register")} className="glow-button bg-primary text-primary-foreground rounded-xl">
+                  <Sparkles className="w-4 h-4 mr-2" /> Create Your Free Chart
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const NewsletterSection = () => {
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await axios.post(`${API}/subscribe`, { email, name });
+      setDone(true);
+    } catch {
+      // Even on duplicate, show success to avoid enumeration
+      setDone(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <section id="newsletter" className="py-20 px-6 bg-primary/5 border-t border-border">
+      <div className="max-w-2xl mx-auto text-center">
+        <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 mx-auto mb-6">
+          <Mail className="w-6 h-6 text-primary" />
+        </div>
+        <h2 className="font-serif text-3xl text-foreground mb-3">Stay Aligned</h2>
+        <p className="text-muted-foreground mb-8">
+          Weekly astrological insights, feature announcements, and cosmic guidance — straight to your inbox.
+        </p>
+        {done ? (
+          <div className="flex items-center justify-center gap-3 text-green-500">
+            <Check className="w-5 h-5" />
+            <span className="font-medium">You're on the list! ✨</span>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+            <Input
+              type="text"
+              placeholder="Your name (optional)"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="bg-background border-border rounded-xl h-12"
+            />
+            <Input
+              type="email"
+              placeholder="your@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="bg-background border-border rounded-xl h-12 flex-1"
+              required
+            />
+            <Button type="submit" disabled={loading} className="glow-button bg-primary text-primary-foreground h-12 rounded-xl shrink-0">
+              {loading ? <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" /> : <><Send className="w-4 h-4 mr-2" />Subscribe</>}
+            </Button>
+          </form>
+        )}
+      </div>
+    </section>
+  );
+};
+
+const ContactSection = () => {
+  const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await axios.post(`${API}/contact`, form);
+      setDone(true);
+    } catch (err) {
+      const msg = err.response?.data?.detail || "Failed to send message. Please try again.";
+      toast.error(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <section id="contact" className="py-24 px-6">
+      <div className="max-w-2xl mx-auto">
+        <div className="text-center mb-12">
+          <p className="text-primary font-semibold mb-3 tracking-widest text-sm uppercase">Contact</p>
+          <h2 className="font-serif text-foreground">Get in Touch</h2>
+          <p className="text-muted-foreground mt-3">Questions, partnerships, or feedback — we'd love to hear from you.</p>
+        </div>
+
+        {done ? (
+          <div className="glass-card rounded-2xl p-10 text-center space-y-4">
+            <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center mx-auto">
+              <Check className="w-8 h-8 text-green-500" />
+            </div>
+            <h3 className="font-serif text-2xl text-foreground">Message Received ✨</h3>
+            <p className="text-muted-foreground">We'll get back to you within 1–2 business days. Check your inbox for a confirmation.</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="glass-card rounded-2xl p-8 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-foreground">Name</label>
+                <Input name="name" placeholder="Your name" value={form.name} onChange={handleChange}
+                  className="bg-muted/30 border-border rounded-xl" required />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-foreground">Email</label>
+                <Input name="email" type="email" placeholder="your@email.com" value={form.email} onChange={handleChange}
+                  className="bg-muted/30 border-border rounded-xl" required />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-foreground">Subject</label>
+              <Input name="subject" placeholder="What's on your mind?" value={form.subject} onChange={handleChange}
+                className="bg-muted/30 border-border rounded-xl" required />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-foreground">Message</label>
+              <Textarea name="message" placeholder="Tell us more..." value={form.message} onChange={handleChange}
+                className="bg-muted/30 border-border rounded-xl min-h-[140px]" required />
+            </div>
+            <Button type="submit" disabled={loading} className="w-full glow-button bg-primary text-primary-foreground h-12 rounded-xl">
+              {loading
+                ? <span className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />Sending...</span>
+                : <><Send className="w-4 h-4 mr-2" />Send Message</>}
+            </Button>
+          </form>
+        )}
+      </div>
+    </section>
+  );
+};
+
 const Footer = () => {
   return (
     <footer className="border-t border-border py-12 px-6">
@@ -705,7 +965,7 @@ const Footer = () => {
           <div className="flex gap-6">
             <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Privacy</a>
             <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Terms</a>
-            <a href="mailto:contact@gab44.com" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Contact</a>
+            <a href="#contact" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Contact</a>
           </div>
         </div>
       </div>
@@ -720,10 +980,13 @@ export default function LandingPage() {
       <HeroSection />
       <FeaturesSection />
       <ChatPreview />
+      <GematriaSection />
       <TestimonialsSection />
       <PricingSection />
       <FAQSection />
       <CTASection />
+      <NewsletterSection />
+      <ContactSection />
       <Footer />
     </div>
   );

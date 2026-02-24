@@ -26,15 +26,27 @@ import {
   Flame,
   Brain,
   Shield,
-  Target
+  Target,
+  Briefcase,
+  UserCheck,
+  Home
 } from "lucide-react";
 
+// Relationship type config — icon, label, gradient, "connection" category label
+const REL_TYPES = {
+  romantic:   { icon: Heart,        emoji: "💕", label: "Romantic",   gradient: "from-rose-500 to-purple-500",   connection: "Romance",    description: "Partner / lover" },
+  friendship: { icon: Users,        emoji: "🤝", label: "Friendship", gradient: "from-cyan-500 to-blue-500",     connection: "Affinity",   description: "Friend / companion" },
+  family:     { icon: Home,         emoji: "👨‍👩‍👧", label: "Family",    gradient: "from-amber-500 to-orange-500",  connection: "Bond",       description: "Family member" },
+  business:   { icon: Briefcase,    emoji: "💼", label: "Business",   gradient: "from-emerald-500 to-teal-500",  connection: "Vision",     description: "Business partner" },
+  colleague:  { icon: UserCheck,    emoji: "🧑‍💻", label: "Colleague",  gradient: "from-violet-500 to-indigo-500", connection: "Synergy",    description: "Co-worker / colleague" },
+};
+
 const CATEGORY_CONFIG = {
-  romantic: { icon: Flame, color: "text-rose-500", bg: "bg-rose-500/10", label: "Romance" },
-  emotional: { icon: Heart, color: "text-pink-500", bg: "bg-pink-500/10", label: "Emotional" },
+  romantic: { icon: Flame,         color: "text-rose-500",    bg: "bg-rose-500/10",    label: "Connection" },
+  emotional: { icon: Heart,        color: "text-pink-500",    bg: "bg-pink-500/10",    label: "Emotional" },
   communication: { icon: MessageCircle, color: "text-blue-500", bg: "bg-blue-500/10", label: "Communication" },
-  stability: { icon: Shield, color: "text-emerald-500", bg: "bg-emerald-500/10", label: "Stability" },
-  karmic: { icon: Sparkles, color: "text-purple-500", bg: "bg-purple-500/10", label: "Karmic" }
+  stability: { icon: Shield,       color: "text-emerald-500", bg: "bg-emerald-500/10", label: "Stability" },
+  karmic:    { icon: Sparkles,     color: "text-purple-500",  bg: "bg-purple-500/10",  label: "Karmic" }
 };
 
 const ScoreRing = ({ score, size = 120, label }) => {
@@ -107,18 +119,24 @@ const CategoryScore = ({ category, score }) => {
 };
 
 const ReportCard = ({ report, onClick }) => {
+  const rel = REL_TYPES[report.relationship_type] || REL_TYPES.romantic;
+  const Icon = rel.icon;
   return (
     <button
       onClick={onClick}
       className="w-full glass-card rounded-xl p-4 text-left hover:border-primary/30 transition-all group"
     >
       <div className="flex items-center gap-4">
-        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-rose-500/20 to-purple-500/20 flex items-center justify-center">
-          <Heart className="w-6 h-6 text-rose-500" />
+        <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${rel.gradient} opacity-80 flex items-center justify-center`}>
+          <Icon className="w-6 h-6 text-white" />
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="font-medium text-foreground truncate">{report.partner_name}</h3>
-          <p className="text-sm text-muted-foreground">{report.partner_sun_sign} Sun</p>
+          <p className="text-sm text-muted-foreground flex items-center gap-1">
+            <span>{rel.emoji}</span>
+            <span>{rel.label}</span>
+            {report.partner_sun_sign && <span className="text-muted-foreground/50">· {report.partner_sun_sign}</span>}
+          </p>
         </div>
         <div className="text-right">
           <div className="font-serif text-xl text-primary">{Math.round(report.overall_score)}%</div>
@@ -144,7 +162,9 @@ export default function CompatibilityPage() {
     partner_name: "",
     partner_birth_date: "",
     partner_birth_time: "",
-    partner_birth_place: ""
+    partner_birth_place: "",
+    partner_birth_name: "",
+    relationship_type: "romantic"
   });
 
   const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
@@ -180,7 +200,7 @@ export default function CompatibilityPage() {
       setSelectedReport(res.data);
       setReports(prev => [res.data, ...prev]);
       setShowForm(false);
-      setFormData({ partner_name: "", partner_birth_date: "", partner_birth_time: "", partner_birth_place: "" });
+      setFormData({ partner_name: "", partner_birth_date: "", partner_birth_time: "", partner_birth_place: "", partner_birth_name: "", relationship_type: "romantic" });
       toast.success("Compatibility analysis complete!");
     } catch (error) {
       console.error("Analysis error:", error);
@@ -240,28 +260,66 @@ export default function CompatibilityPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* New Analysis Form Modal */}
         {showForm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="glass-card rounded-2xl p-6 w-full max-w-md" data-testid="analysis-form">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-rose-500/20 to-purple-500/20 flex items-center justify-center">
-                  <HeartHandshake className="w-6 h-6 text-rose-500" />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+            <div className="glass-card rounded-2xl p-6 w-full max-w-md my-4" data-testid="analysis-form">
+              {/* Header */}
+              <div className="flex items-center gap-3 mb-5">
+                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${REL_TYPES[formData.relationship_type]?.gradient || "from-rose-500 to-purple-500"} opacity-25 flex items-center justify-center`}>
+                  <span className="text-2xl">{REL_TYPES[formData.relationship_type]?.emoji || "💕"}</span>
                 </div>
                 <div>
                   <h2 className="font-serif text-xl text-foreground">New Compatibility Analysis</h2>
-                  <p className="text-sm text-muted-foreground">Enter your partner's birth details</p>
+                  <p className="text-sm text-muted-foreground">{REL_TYPES[formData.relationship_type]?.description || "Enter birth details"}</p>
+                </div>
+              </div>
+
+              {/* Relationship type selector */}
+              <div className="mb-5">
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">Relationship Type</Label>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {Object.entries(REL_TYPES).map(([key, cfg]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, relationship_type: key }))}
+                      className={`flex flex-col items-center gap-1 py-2 px-1 rounded-xl border text-xs transition-all ${
+                        formData.relationship_type === key
+                          ? `bg-gradient-to-br ${cfg.gradient} text-white border-transparent`
+                          : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                      }`}
+                      data-testid={`rel-type-${key}`}
+                    >
+                      <span className="text-base leading-none">{cfg.emoji}</span>
+                      <span className="leading-none">{cfg.label}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
               <form onSubmit={handleAnalyze} className="space-y-4">
                 <div>
-                  <Label htmlFor="partner_name">Partner's Name *</Label>
+                  <Label htmlFor="partner_name">Their Name *</Label>
                   <Input
                     id="partner_name"
                     value={formData.partner_name}
                     onChange={(e) => setFormData(prev => ({ ...prev, partner_name: e.target.value }))}
-                    placeholder="Enter name"
+                    placeholder="Full name"
                     className="mt-1 rounded-xl"
                     data-testid="partner-name-input"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="partner_birth_name">
+                    Legal Birth Name{" "}
+                    <span className="text-muted-foreground font-normal" aria-hidden="true">(for numerology, optional)</span>
+                  </Label>
+                  <Input
+                    id="partner_birth_name"
+                    value={formData.partner_birth_name}
+                    onChange={(e) => setFormData(prev => ({ ...prev, partner_birth_name: e.target.value }))}
+                    placeholder="As on birth certificate"
+                    className="mt-1 rounded-xl"
                   />
                 </div>
 
@@ -278,7 +336,7 @@ export default function CompatibilityPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="partner_birth_time">Birth Time (optional)</Label>
+                  <Label htmlFor="partner_birth_time">Birth Time <span className="text-muted-foreground font-normal">(optional)</span></Label>
                   <Input
                     id="partner_birth_time"
                     type="time"
@@ -313,7 +371,7 @@ export default function CompatibilityPage() {
                   <Button
                     type="submit"
                     disabled={analyzing}
-                    className="flex-1 rounded-xl bg-gradient-to-r from-rose-500 to-purple-500 hover:from-rose-600 hover:to-purple-600"
+                    className={`flex-1 rounded-xl bg-gradient-to-r ${REL_TYPES[formData.relationship_type]?.gradient || "from-rose-500 to-purple-500"}`}
                     data-testid="analyze-btn"
                   >
                     {analyzing ? (
@@ -378,7 +436,17 @@ export default function CompatibilityPage() {
             {selectedReport ? (
               <div className="space-y-6">
                 {/* Header Card */}
+                {(() => {
+                  const relCfg = REL_TYPES[selectedReport.relationship_type] || REL_TYPES.romantic;
+                  return (
                 <div className="glass-card rounded-2xl p-6">
+                  {/* Relationship type badge */}
+                  <div className="flex justify-center mb-4">
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r ${relCfg.gradient} text-white`}>
+                      <span>{relCfg.emoji}</span>
+                      <span>{relCfg.label} Analysis</span>
+                    </span>
+                  </div>
                   <div className="flex flex-col sm:flex-row items-center gap-6">
                     {/* You */}
                     <div className="text-center">
@@ -401,14 +469,16 @@ export default function CompatibilityPage() {
 
                     {/* Partner */}
                     <div className="text-center">
-                      <div className="w-20 h-20 rounded-full bg-gradient-to-br from-rose-500/20 to-purple-500/40 flex items-center justify-center mx-auto mb-2">
-                        <span className="font-serif text-2xl text-rose-500">{selectedReport.partner_name?.[0] || "P"}</span>
+                      <div className={`w-20 h-20 rounded-full bg-gradient-to-br ${relCfg.gradient} opacity-70 flex items-center justify-center mx-auto mb-2`}>
+                        <span className="font-serif text-2xl text-white">{selectedReport.partner_name?.[0] || "P"}</span>
                       </div>
                       <p className="font-medium text-foreground">{selectedReport.partner_name}</p>
                       <p className="text-sm text-muted-foreground">{selectedReport.partner_sun_sign} Sun</p>
                     </div>
                   </div>
                 </div>
+                  );
+                })()}
 
                 {/* Category Scores */}
                 <div className="glass-card rounded-2xl p-6">
@@ -533,20 +603,32 @@ export default function CompatibilityPage() {
               </div>
             ) : (
               <div className="glass-card rounded-2xl p-12 text-center">
-                <div className="w-20 h-20 rounded-full bg-rose-500/10 flex items-center justify-center mx-auto mb-6">
-                  <HeartHandshake className="w-10 h-10 text-rose-500" />
+                <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
+                  <HeartHandshake className="w-10 h-10 text-primary" />
                 </div>
                 <h3 className="font-serif text-2xl text-foreground mb-3">Discover Your Connection</h3>
                 <p className="text-muted-foreground max-w-md mx-auto mb-6">
-                  Uncover the cosmic blueprint of your relationship. Our AI-powered synastry analysis reveals
-                  the strengths, challenges, and growth opportunities in your connection.
+                  Analyse any relationship — romantic, friendship, family, or business. Our AI-powered synastry reveals the cosmic blueprint of your connection: strengths, challenges, and soul-level growth.
                 </p>
+                {/* Quick type picker in empty state */}
+                <div className="flex flex-wrap justify-center gap-2 mb-6">
+                  {Object.entries(REL_TYPES).map(([key, cfg]) => (
+                    <button
+                      key={key}
+                      onClick={() => { setFormData(prev => ({ ...prev, relationship_type: key })); setShowForm(true); }}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition-all hover:border-primary/50 bg-gradient-to-r ${cfg.gradient} text-white border-transparent`}
+                    >
+                      <span>{cfg.emoji}</span>
+                      <span>{cfg.label}</span>
+                    </button>
+                  ))}
+                </div>
                 <Button
                   onClick={() => setShowForm(true)}
                   size="lg"
-                  className="rounded-xl bg-gradient-to-r from-rose-500 to-purple-500 hover:from-rose-600 hover:to-purple-600"
+                  className="rounded-xl bg-primary text-primary-foreground"
                 >
-                  <Heart className="w-5 h-5 mr-2" />
+                  <Sparkles className="w-5 h-5 mr-2" />
                   Start Analysis
                 </Button>
               </div>
