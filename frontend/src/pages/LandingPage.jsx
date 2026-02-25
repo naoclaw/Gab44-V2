@@ -22,7 +22,9 @@ import {
   X,
   Mail,
   Send,
-  Heart
+  Heart,
+  Hash,
+  Lock
 } from "lucide-react";
 import {
   Accordion,
@@ -195,6 +197,21 @@ const HeroSection = () => {
   const [birthDate, setBirthDate] = useState("");
   const [sunSign, setSunSign] = useState(null);
 
+  const SUN_SIGN_TRAITS = {
+    Aries: ["Natural leader, fearless trailblazer", "Driven by passion and independence", "Thrives on challenge and new beginnings"],
+    Taurus: ["Grounded builder, sensory connoisseur", "Values stability, loyalty, and beauty", "Patient determination that moves mountains"],
+    Gemini: ["Quick-witted communicator, eternal student", "Thrives on variety and intellectual connection", "Adaptable mind that bridges worlds"],
+    Cancer: ["Intuitive nurturer, emotional depth", "Fierce protector of loved ones", "Deep connection to home and heritage"],
+    Leo: ["Radiant creator, natural performer", "Generous heart with magnetic presence", "Born to inspire and lead with warmth"],
+    Virgo: ["Precise analyst, devoted healer", "Eye for detail that others miss", "Service-oriented with quiet strength"],
+    Libra: ["Harmonizer, aesthetic visionary", "Seeks balance, justice, and beauty", "Natural diplomat with graceful charm"],
+    Scorpio: ["Intense transformer, truth-seeker", "Emotional depth that sees through surfaces", "Power through vulnerability and rebirth"],
+    Sagittarius: ["Adventurous philosopher, freedom-seeker", "Expansive vision that sees the big picture", "Natural teacher with infectious optimism"],
+    Capricorn: ["Strategic builder, patient achiever", "Quiet authority that commands respect", "Long-term vision with disciplined execution"],
+    Aquarius: ["Visionary rebel, humanitarian innovator", "Thinks decades ahead of the crowd", "Values authenticity and collective progress"],
+    Pisces: ["Empathic dreamer, spiritual antenna", "Boundless imagination and compassion", "Feels what others can't articulate"],
+  };
+
   const calculateSunSign = () => {
     if (!birthDate) return;
     const date = new Date(birthDate);
@@ -248,17 +265,17 @@ const HeroSection = () => {
 
       <div className="relative z-10 max-w-6xl mx-auto px-6 text-center">
         <p className="text-primary font-semibold mb-4 fade-in tracking-widest text-sm uppercase">
-          Advanced Astrology AI Coaching
+          Your Birth Chart. Decoded.
         </p>
         
         <h1 className="font-serif text-5xl md:text-7xl lg:text-8xl font-semibold text-foreground mb-6 fade-in fade-in-delay-1 hero-title">
-          Discover Your <br />
-          <span className="gradient-text">Truth</span>
+          The Stars Know You. <br />
+          <span className="gradient-text">Now You Can Know Them.</span>
         </h1>
         
         <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 fade-in fade-in-delay-2 leading-relaxed">
-          Align with your truest self through holistic astrology, gematria, and numerology. 
-          Experience accurate, non-judgmental AI coaching tailored to your unique cosmic blueprint.
+          Enter your birth details and receive a detailed, AI-interpreted chart covering your personality, 
+          relationships, career timing, and life purpose — calculated to astronomical precision.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16 fade-in fade-in-delay-3">
@@ -307,7 +324,24 @@ const HeroSection = () => {
           {sunSign && (
             <div className="mt-6 p-4 rounded-xl bg-primary/10 border border-primary/20">
               <p className="text-sm text-muted-foreground">Your Sun Sign</p>
-              <p className="font-serif text-2xl text-primary" data-testid="sun-sign-result">{sunSign}</p>
+              <p className="font-serif text-2xl text-primary mb-3" data-testid="sun-sign-result">{sunSign}</p>
+              <ul className="space-y-1.5 mb-4">
+                {(SUN_SIGN_TRAITS[sunSign] || []).map((trait, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <Star className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
+                    {trait}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-muted-foreground mb-2">Your full chart has 40+ more data points — planets, houses, aspects, numerology.</p>
+              <Button 
+                size="sm"
+                onClick={() => navigate("/auth?mode=register")}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg text-xs"
+              >
+                Get Your Full Chart Free
+                <ArrowRight className="ml-1 w-3.5 h-3.5" />
+              </Button>
             </div>
           )}
         </div>
@@ -316,15 +350,15 @@ const HeroSection = () => {
         <div className="flex flex-wrap justify-center gap-8 md:gap-16 mt-16 fade-in fade-in-delay-5">
           <div className="text-center">
             <p className="font-serif text-3xl md:text-4xl text-foreground stat-number">10k+</p>
-            <p className="text-sm text-muted-foreground">Users Guided</p>
+            <p className="text-sm text-muted-foreground">Charts Generated</p>
           </div>
           <div className="text-center">
-            <p className="font-serif text-3xl md:text-4xl text-foreground stat-number">99%</p>
-            <p className="text-sm text-muted-foreground">Accuracy</p>
+            <p className="font-serif text-3xl md:text-4xl text-foreground stat-number">40+</p>
+            <p className="text-sm text-muted-foreground">Data Points Per Chart</p>
           </div>
           <div className="text-center">
             <p className="font-serif text-3xl md:text-4xl text-foreground stat-number">24/7</p>
-            <p className="text-sm text-muted-foreground">AI Coaching</p>
+            <p className="text-sm text-muted-foreground">AI Companion</p>
           </div>
         </div>
       </div>
@@ -523,9 +557,9 @@ const ChatPreview = () => {
 const TestimonialsSection = () => {
   const testimonials = [
     {
-      name: "Anonymous User",
-      role: "Verified User",
-      initial: "A",
+      name: "David K.",
+      role: "Software Engineer",
+      initial: "D",
       content: "Gab44 helped me understand patterns in my life that I couldn't see before. The AI interpretations are surprisingly accurate and non-judgmental. It's like having a wise friend who truly understands your cosmic blueprint."
     },
     {
@@ -599,7 +633,7 @@ const PricingSection = () => {
     {
       name: "Enthusiast",
       tagline: "For daily guidance and deeper insights",
-      price: 19.99,
+      price: 9.99,
       features: [
         "Everything in Seeker",
         "Daily AI Coaching",
@@ -613,7 +647,7 @@ const PricingSection = () => {
     {
       name: "Advanced",
       tagline: "For serious practitioners and coaches",
-      price: 49.99,
+      price: 29.99,
       features: [
         "Everything in Enthusiast",
         "Advanced Predictive Tools",
@@ -745,10 +779,10 @@ const CTASection = () => {
       
       <div className="max-w-4xl mx-auto text-center relative z-10">
         <h2 className="font-serif text-foreground mb-6">
-          Ready to Align with Your Truth?
+          Your Chart Is Waiting
         </h2>
         <p className="text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed">
-          Join thousands of others who are discovering their sacred mission and living with greater purpose.
+          40+ data points about your personality, relationships, career, and purpose — calculated to astronomical precision with Swiss Ephemeris and interpreted by AI that actually understands you.
         </p>
         <Button 
           size="lg"
@@ -759,6 +793,10 @@ const CTASection = () => {
           Create Your Free Chart
           <ArrowRight className="ml-2 w-5 h-5" />
         </Button>
+        <div className="flex items-center justify-center gap-2 mt-4 text-xs text-muted-foreground">
+          <Lock className="w-3.5 h-3.5" />
+          <span>Your data is encrypted and never shared with third parties</span>
+        </div>
       </div>
     </section>
   );
@@ -791,7 +829,7 @@ const GematriaSection = () => {
       <div className="max-w-3xl mx-auto">
         <div className="text-center mb-10">
           <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 mx-auto mb-4">
-            <span className="text-xl">🔮</span>
+            <Hash className="w-6 h-6 text-primary" />
           </div>
           <h2 className="font-serif text-3xl lg:text-4xl text-foreground mb-3">Chaldean Gematria</h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
@@ -1027,9 +1065,9 @@ export default function LandingPage() {
     <div className="min-h-screen bg-background">
       <Navigation />
       <HeroSection />
+      <GematriaSection />
       <FeaturesSection />
       <ChatPreview />
-      <GematriaSection />
       <TestimonialsSection />
       <PricingSection />
       <FAQSection />
