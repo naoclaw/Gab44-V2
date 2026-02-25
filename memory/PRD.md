@@ -1,5 +1,11 @@
 # Gab44 V2 - Astrology AI Coaching Platform
 
+> **This is the feature inventory and API reference.** For the complete platform knowledge base, also read:
+> - `memory/ARCHITECTURE.md` — Website structure, navigation, routes, page logic, user flows
+> - `memory/DESIGN_SYSTEM.md` — CSS classes, colors, typography, effects, design rules
+> - `memory/BRAND_IDENTITY.md` — Brand personality, voice, dual personas, trust architecture
+> - `memory/DESIGN_ANALYTICS.md` — Deep design review with prioritized recommendations
+
 ## Architecture & Tech Stack
 - **Frontend**: React 19 + Tailwind CSS + Shadcn UI
 - **Backend**: FastAPI + Python 3.11
