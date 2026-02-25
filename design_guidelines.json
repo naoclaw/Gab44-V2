@@ -156,6 +156,6 @@
     "Examine existing components to understand the project's component patterns before creating new ones",
     "Components MUST use named exports (export const ComponentName = ...)",
     "Pages MUST use default exports (export default function PageName() {...})",
-    "Use sonner for toasts. Sonner component are located in /app/src/components/ui/sonner.tsx"
+    "Use sonner for toasts. Sonner component are located in src/components/ui/sonner.jsx"
   ]
 }

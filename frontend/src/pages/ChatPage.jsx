@@ -15,7 +15,9 @@ import {
   Clock,
   User,
   Sun,
-  Moon
+  Moon,
+  Menu,
+  X
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -28,6 +30,7 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [sessions, setSessions] = useState([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -103,21 +106,37 @@ export default function ChatPage() {
 
   return (
     <div className="min-h-screen bg-background flex">
-      {/* Sessions Sidebar */}
-      <aside className="w-72 bg-card/50 backdrop-blur-sm border-r border-border flex flex-col h-screen">
+      {/* Mobile Overlay */}
+      {sidebarOpen && (
+        <div 
+          className="md:hidden fixed inset-0 bg-black/50 z-40"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sessions Sidebar — hidden on mobile, slide-in when toggled */}
+      <aside className={`fixed md:relative top-0 left-0 h-screen w-72 bg-card/50 backdrop-blur-sm border-r border-border flex flex-col z-50 transform transition-transform duration-300 md:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="p-4 border-b border-border space-y-4">
           <div className="flex items-center justify-between">
             <Link to="/dashboard" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
               <ArrowLeft className="w-4 h-4" />
               <span className="text-sm">Dashboard</span>
             </Link>
-            <button
-              onClick={toggleTheme}
-              className="w-8 h-8 rounded-lg bg-muted/50 flex items-center justify-center"
-              aria-label="Toggle theme"
-            >
-              {theme === "dark" ? <Sun className="w-4 h-4 text-primary" /> : <Moon className="w-4 h-4" />}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={toggleTheme}
+                className="w-8 h-8 rounded-lg bg-muted/50 flex items-center justify-center"
+                aria-label="Toggle theme"
+              >
+                {theme === "dark" ? <Sun className="w-4 h-4 text-primary" /> : <Moon className="w-4 h-4" />}
+              </button>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="md:hidden w-8 h-8 rounded-lg bg-muted/50 flex items-center justify-center"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
           
           <Button 
@@ -168,6 +187,13 @@ export default function ChatPage() {
         {/* Header */}
         <header className="p-4 border-b border-border bg-card/30 backdrop-blur-sm">
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="md:hidden w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center"
+              data-testid="chat-mobile-menu-btn"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
               <Sparkles className="w-5 h-5 text-primary" />
             </div>

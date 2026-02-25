@@ -15,6 +15,8 @@ import TransitsPage from "@/pages/TransitsPage";
 import PricingPage from "@/pages/PricingPage";
 import SettingsPage from "@/pages/SettingsPage";
 import ShareChartPage from "@/pages/ShareChartPage";
+import NumerologyPage from "@/pages/NumerologyPage";
+import GematriaPage from "@/pages/GematriaPage";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
@@ -162,6 +164,22 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <ShareChartPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/numerology" 
+                element={
+                  <ProtectedRoute>
+                    <NumerologyPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/gematria" 
+                element={
+                  <ProtectedRoute>
+                    <GematriaPage />
                   </ProtectedRoute>
                 } 
               />

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Request, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -13,6 +13,19 @@ from datetime import datetime, timezone, timedelta
 import jwt
 import bcrypt
 from emergentintegrations.llm.chat import LlmChat, UserMessage
+from numerology import calculate_full_profile
+from gematria import calculate_all as calculate_gematria
+from cities import search_cities, find_city, geocode_search, geocode_lookup
+from astro_engine import calculate_natal_chart, calculate_current_transits
+from payments import (
+    is_configured as stripe_configured,
+    create_checkout_session,
+    create_billing_portal_session,
+    verify_webhook,
+    handle_checkout_completed,
+    handle_subscription_updated,
+    handle_subscription_deleted,
+)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -119,6 +132,9 @@ class DailyGuidance(BaseModel):
     action_items: List[str]
     transit_highlights: List[dict]
 
+class GematriaRequest(BaseModel):
+    text: str
+
 # ============== Auth Helpers ==============
 
 def hash_password(password: str) -> str:
@@ -222,11 +238,17 @@ async def get_ai_coach_response(user: dict, message: str, session_id: str) -> st
     
     system_message = f"""You are Gab44, an advanced astrology AI coach. Your mission is to help people live measurably better lives through truthful astrological guidance.
 
-USER PROFILE:
-- Name: {user.get('name', 'Seeker')}
+USER PROFILE (astrological data only):
 - Sun Sign: {sun_sign} ({element}, {modality})
 - Birth Date: {user.get('birth_date', 'Unknown')}
 - Birth Place: {user.get('birth_place', 'Unknown')}
+
+IMPORTANT — ANTI-BIAS RULES:
+- The user's name is intentionally withheld to prevent bias.
+- NEVER attempt to identify, research, or infer who the user is.
+- NEVER reference any public figure, celebrity, or real person's traits in your interpretation.
+- Base ALL guidance strictly on the astrological data above — signs, dates, planetary positions.
+- If the user mentions their own name or someone else's name, do NOT let that influence your astrological interpretation.
 
 YOUR PRINCIPLES:
 1. Every response must help the user make better decisions
@@ -281,6 +303,16 @@ async def register(user_data: UserCreate):
     
     # Create user
     user_id = str(uuid.uuid4())
+
+    # Auto-populate lat/lng from geocoding if not provided
+    lat = user_data.birth_latitude
+    lng = user_data.birth_longitude
+    if (lat is None or lng is None) and user_data.birth_place:
+        city = geocode_lookup(user_data.birth_place)
+        if city:
+            lat = city["latitude"]
+            lng = city["longitude"]
+
     user_doc = {
         "id": user_id,
         "email": user_data.email,
@@ -289,8 +321,8 @@ async def register(user_data: UserCreate):
         "birth_date": user_data.birth_date,
         "birth_time": user_data.birth_time,
         "birth_place": user_data.birth_place,
-        "birth_latitude": user_data.birth_latitude,
-        "birth_longitude": user_data.birth_longitude,
+        "birth_latitude": lat,
+        "birth_longitude": lng,
         "sun_sign": sun_sign,
         "subscription_tier": "seeker",
         "created_at": datetime.now(timezone.utc).isoformat()
@@ -379,113 +411,68 @@ async def get_chat_sessions(user: dict = Depends(get_current_user)):
 
 @api_router.get("/chart/me")
 async def get_my_chart(user: dict = Depends(get_current_user)):
-    """Get or generate the user's birth chart"""
+    """Get or generate the user's birth chart using Swiss Ephemeris"""
     chart = await db.birth_charts.find_one({"user_id": user["id"]}, {"_id": 0})
-    
+
     if not chart:
-        # Generate a basic chart (in production, use Swiss Ephemeris)
-        sun_sign = user.get("sun_sign", calculate_sun_sign(user.get("birth_date", "1990-01-01")))
-        
-        # Simulated chart data - in production, calculate with Swiss Ephemeris
+        # Calculate real chart using Swiss Ephemeris
+        birth_date = user.get("birth_date", "1990-01-01")
+        birth_time = user.get("birth_time")
+        lat = user.get("birth_latitude")
+        latitude = lat if lat is not None else 0.0
+        lng = user.get("birth_longitude")
+        longitude = lng if lng is not None else 0.0
+
+        computed = calculate_natal_chart(birth_date, birth_time, latitude, longitude)
+
         chart_doc = {
             "id": str(uuid.uuid4()),
             "user_id": user["id"],
-            "sun_sign": sun_sign,
-            "moon_sign": "Scorpio",  # Would be calculated
-            "rising_sign": "Leo",     # Would be calculated
-            "planets": {
-                "sun": {"sign": sun_sign, "degree": 15.5, "house": 10},
-                "moon": {"sign": "Scorpio", "degree": 22.3, "house": 4},
-                "mercury": {"sign": "Taurus", "degree": 8.7, "house": 10},
-                "venus": {"sign": "Gemini", "degree": 3.2, "house": 11},
-                "mars": {"sign": "Aries", "degree": 28.9, "house": 9},
-                "jupiter": {"sign": "Scorpio", "degree": 5.1, "house": 4},
-                "saturn": {"sign": "Pisces", "degree": 12.8, "house": 8},
-                "uranus": {"sign": "Capricorn", "degree": 25.4, "house": 6},
-                "neptune": {"sign": "Capricorn", "degree": 22.1, "house": 6},
-                "pluto": {"sign": "Scorpio", "degree": 27.6, "house": 4}
-            },
-            "houses": {
-                "1": "Leo", "2": "Virgo", "3": "Libra", "4": "Scorpio",
-                "5": "Sagittarius", "6": "Capricorn", "7": "Aquarius", "8": "Pisces",
-                "9": "Aries", "10": "Taurus", "11": "Gemini", "12": "Cancer"
-            },
-            "aspects": [
-                {"planet1": "sun", "planet2": "moon", "aspect": "opposition", "orb": 2.3},
-                {"planet1": "venus", "planet2": "mars", "aspect": "sextile", "orb": 1.5},
-                {"planet1": "jupiter", "planet2": "pluto", "aspect": "conjunction", "orb": 0.5}
-            ],
-            "patterns": ["T-Square", "Grand Trine (Water)"],
-            "created_at": datetime.now(timezone.utc).isoformat()
+            "sun_sign": computed["sun_sign"],
+            "moon_sign": computed["moon_sign"],
+            "rising_sign": computed["rising_sign"],
+            "planets": computed["planets"],
+            "houses": computed["houses"],
+            "aspects": computed["aspects"],
+            "patterns": computed["patterns"],
+            "has_birth_time": computed["has_birth_time"],
+            "has_birth_location": computed["has_birth_location"],
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
         await db.birth_charts.insert_one(chart_doc)
-        # Return the chart without _id (which MongoDB adds during insert)
         chart = {k: v for k, v in chart_doc.items() if k != "_id"}
-    
+
     return chart
 
 # ============== Transit Routes ==============
 
 @api_router.get("/transits/upcoming")
 async def get_upcoming_transits(user: dict = Depends(get_current_user)):
-    """Get upcoming transit activations for the user"""
-    # In production, these would be calculated based on current planetary positions
-    today = datetime.now(timezone.utc)
-    
-    transits = [
-        {
-            "id": str(uuid.uuid4()),
-            "transit_type": "Jupiter trine Sun",
-            "planet": "Jupiter",
-            "aspect": "trine",
-            "natal_planet": "Sun",
-            "start_date": today.isoformat(),
-            "peak_date": (today + timedelta(days=3)).isoformat(),
-            "end_date": (today + timedelta(days=7)).isoformat(),
-            "strength": 0.85,
-            "interpretation": "A period of expansion and opportunity. Your natural talents are highlighted and recognition may come your way.",
-            "action_items": [
-                "Take initiative on projects you've been postponing",
-                "Network and make new professional connections",
-                "Set intentions for long-term growth"
-            ]
-        },
-        {
-            "id": str(uuid.uuid4()),
-            "transit_type": "Mercury conjunct Venus",
-            "planet": "Mercury",
-            "aspect": "conjunction",
-            "natal_planet": "Venus",
-            "start_date": (today + timedelta(days=5)).isoformat(),
-            "peak_date": (today + timedelta(days=7)).isoformat(),
-            "end_date": (today + timedelta(days=10)).isoformat(),
-            "strength": 0.72,
-            "interpretation": "Excellent for communication in relationships. Express your feelings and have meaningful conversations.",
-            "action_items": [
-                "Have important conversations with loved ones",
-                "Write heartfelt messages or letters",
-                "Negotiate or discuss financial matters"
-            ]
-        },
-        {
-            "id": str(uuid.uuid4()),
-            "transit_type": "Saturn square Mars",
-            "planet": "Saturn",
-            "aspect": "square",
-            "natal_planet": "Mars",
-            "start_date": (today + timedelta(days=14)).isoformat(),
-            "peak_date": (today + timedelta(days=21)).isoformat(),
-            "end_date": (today + timedelta(days=28)).isoformat(),
-            "strength": 0.65,
-            "interpretation": "A testing period for your ambitions. Patience and strategic planning are key. Avoid forcing outcomes.",
-            "action_items": [
-                "Review and refine your action plans",
-                "Practice patience with delays",
-                "Focus on sustainable progress over quick wins"
-            ]
-        }
-    ]
-    
+    """Get current transit activations based on real planetary positions"""
+    # Get or compute the user's natal chart first
+    chart = await db.birth_charts.find_one({"user_id": user["id"]}, {"_id": 0})
+
+    if not chart:
+        # Calculate natal chart on the fly
+        birth_date = user.get("birth_date", "1990-01-01")
+        birth_time = user.get("birth_time")
+        lat = user.get("birth_latitude")
+        latitude = lat if lat is not None else 0.0
+        lng = user.get("birth_longitude")
+        longitude = lng if lng is not None else 0.0
+        computed = calculate_natal_chart(birth_date, birth_time, latitude, longitude)
+        natal_positions = computed["planets"]
+    else:
+        natal_positions = chart.get("planets", {})
+
+    # Calculate real current transits against natal positions
+    transits = calculate_current_transits(natal_positions)
+
+    # Add IDs and user_id for API compatibility
+    for t in transits:
+        t["id"] = str(uuid.uuid4())
+        t["user_id"] = user["id"]
+
     return transits
 
 # ============== Daily Guidance ==============
@@ -505,6 +492,9 @@ async def get_daily_guidance(user: dict = Depends(get_current_user)):
         return DailyGuidance(**cached)
     
     # Generate new guidance (in production, use AI with current transits)
+    # ANTI-BIAS: When this moves to AI generation, pass only astrological data
+    # (sun_sign, transits, birth_date) — never the user's name, to prevent
+    # the AI from injecting biased information about public figures.
     guidance = {
         "date": today,
         "overall_energy": f"The cosmic energies today support {sun_sign}'s natural strengths. Focus on clarity and intentional action.",
@@ -607,6 +597,144 @@ async def get_pricing():
             }
         ]
     }
+
+# ============== Numerology Routes ==============
+
+@api_router.get("/numerology/profile")
+async def get_numerology_profile(user: dict = Depends(get_current_user)):
+    """Get the user's full numerology profile"""
+    # Check cache
+    cached = await db.numerology_profiles.find_one(
+        {"user_id": user["id"]},
+        {"_id": 0}
+    )
+    if cached:
+        return cached
+
+    # Calculate fresh profile
+    full_name = user.get("name", "")
+    birth_date = user.get("birth_date", "")
+    if not full_name or not birth_date:
+        raise HTTPException(status_code=400, detail="Name and birth date are required for numerology")
+
+    profile = calculate_full_profile(full_name, birth_date)
+    profile_doc = {"user_id": user["id"], **profile}
+    await db.numerology_profiles.update_one(
+        {"user_id": user["id"]},
+        {"$set": profile_doc},
+        upsert=True
+    )
+
+    return profile_doc
+
+# ============== Gematria Routes ==============
+
+@api_router.post("/gematria/calculate")
+async def gematria_calculate(request: GematriaRequest):
+    """Calculate gematria for any text (public endpoint)"""
+    text = request.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Text is required")
+    if len(text) > 500:
+        raise HTTPException(status_code=400, detail="Text must be 500 characters or less")
+    return calculate_gematria(text)
+
+# ============== Payment Routes (Stripe) ==============
+
+class CheckoutRequest(BaseModel):
+    tier: str  # "enthusiast", "advanced", or "professional"
+
+@api_router.post("/payments/checkout")
+async def create_checkout(request: CheckoutRequest, user: dict = Depends(get_current_user)):
+    """Create a Stripe Checkout session for subscription upgrade"""
+    if not stripe_configured():
+        raise HTTPException(status_code=503, detail="Payment system not configured")
+
+    valid_tiers = ["enthusiast", "advanced", "professional"]
+    if request.tier not in valid_tiers:
+        raise HTTPException(status_code=400, detail=f"Invalid tier. Must be one of: {', '.join(valid_tiers)}")
+
+    if user.get("subscription_tier") == request.tier:
+        raise HTTPException(status_code=400, detail="You are already on this plan")
+
+    try:
+        result = create_checkout_session(
+            user_id=user["id"],
+            user_email=user["email"],
+            tier=request.tier,
+            stripe_customer_id=user.get("stripe_customer_id"),
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.post("/payments/portal")
+async def billing_portal(user: dict = Depends(get_current_user)):
+    """Create a Stripe Billing Portal session for managing subscription"""
+    if not stripe_configured():
+        raise HTTPException(status_code=503, detail="Payment system not configured")
+
+    customer_id = user.get("stripe_customer_id")
+    if not customer_id:
+        raise HTTPException(status_code=400, detail="No active subscription found")
+
+    try:
+        result = create_billing_portal_session(customer_id)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.post("/payments/webhook")
+async def stripe_webhook(request: Request, stripe_signature: str = Header(None)):
+    """Handle Stripe webhook events (subscription changes)"""
+    if not stripe_signature:
+        raise HTTPException(status_code=400, detail="Missing Stripe signature")
+
+    payload = await request.body()
+
+    try:
+        event = verify_webhook(payload, stripe_signature)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid webhook signature")
+
+    event_type = event.get("type", "")
+
+    if event_type == "checkout.session.completed":
+        data = handle_checkout_completed(event)
+        if data.get("user_id"):
+            update = {
+                "subscription_tier": data["tier"],
+                "stripe_customer_id": data["stripe_customer_id"],
+                "stripe_subscription_id": data["stripe_subscription_id"],
+            }
+            await db.users.update_one({"id": data["user_id"]}, {"$set": update})
+            logger.info(f"User {data['user_id']} upgraded to {data['tier']}")
+
+    elif event_type == "customer.subscription.updated":
+        data = handle_subscription_updated(event)
+        if data.get("stripe_customer_id"):
+            await db.users.update_one(
+                {"stripe_customer_id": data["stripe_customer_id"]},
+                {"$set": {"subscription_tier": data["tier"]}},
+            )
+
+    elif event_type == "customer.subscription.deleted":
+        data = handle_subscription_deleted(event)
+        if data.get("stripe_customer_id"):
+            await db.users.update_one(
+                {"stripe_customer_id": data["stripe_customer_id"]},
+                {"$set": {"subscription_tier": "seeker"}},
+            )
+
+    return {"status": "ok"}
+
+# ============== Cities (Geocoding) ==============
+
+@api_router.get("/cities")
+async def get_cities(q: str = ""):
+    """Search cities for birth location. Uses Mapbox API when available, static fallback otherwise."""
+    results = geocode_search(query=q, limit=20)
+    return results
 
 # ============== Health Check ==============
 

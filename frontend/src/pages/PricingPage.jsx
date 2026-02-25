@@ -1,17 +1,26 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useAuth, API } from "@/App";
 import { useTheme } from "@/context/ThemeContext";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { Sparkles, Check, ArrowLeft, Star, Sun, Moon } from "lucide-react";
 
 export default function PricingPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const { user, token } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [checkoutLoading, setCheckoutLoading] = useState(null);
+
+  useEffect(() => {
+    if (searchParams.get("upgrade") === "cancelled") {
+      toast.info("Upgrade cancelled. You can upgrade anytime.");
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const fetchPricing = async () => {
@@ -26,6 +35,36 @@ export default function PricingPage() {
     };
     fetchPricing();
   }, []);
+
+  const handleUpgrade = async (planId) => {
+    if (!user) {
+      navigate("/auth?mode=register");
+      return;
+    }
+    if (planId === "seeker") {
+      navigate("/dashboard");
+      return;
+    }
+    if (user.subscription_tier === planId) {
+      toast.info("You're already on this plan!");
+      return;
+    }
+
+    setCheckoutLoading(planId);
+    try {
+      const res = await axios.post(
+        `${API}/payments/checkout`,
+        { tier: planId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      // Redirect to Stripe Checkout
+      window.location.href = res.data.url;
+    } catch (error) {
+      const msg = error.response?.data?.detail || "Unable to start checkout";
+      toast.error(msg);
+      setCheckoutLoading(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -105,10 +144,20 @@ export default function PricingPage() {
 
               <Button 
                 className={`w-full rounded-xl ${plan.popular ? 'glow-button bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}
-                onClick={() => navigate(user ? "/dashboard" : "/auth?mode=register")}
+                onClick={() => handleUpgrade(plan.id)}
+                disabled={checkoutLoading === plan.id || (user && user.subscription_tier === plan.id)}
                 data-testid={`pricing-cta-${index}`}
               >
-                {plan.cta}
+                {checkoutLoading === plan.id ? (
+                  <span className="flex items-center gap-2">
+                    <span className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+                    Redirecting...
+                  </span>
+                ) : user && user.subscription_tier === plan.id ? (
+                  "Current Plan"
+                ) : (
+                  plan.cta
+                )}
               </Button>
             </div>
           ))}
