@@ -191,26 +191,26 @@ const Navigation = () => {
   );
 };
 
+const SUN_SIGN_TRAITS = {
+  Aries: ["Natural leader, fearless trailblazer", "Driven by passion and independence", "Thrives on challenge and new beginnings"],
+  Taurus: ["Grounded builder, sensory connoisseur", "Values stability, loyalty, and beauty", "Patient determination that moves mountains"],
+  Gemini: ["Quick-witted communicator, eternal student", "Thrives on variety and intellectual connection", "Adaptable mind that bridges worlds"],
+  Cancer: ["Intuitive nurturer, emotional depth", "Fierce protector of loved ones", "Deep connection to home and heritage"],
+  Leo: ["Radiant creator, natural performer", "Generous heart with magnetic presence", "Born to inspire and lead with warmth"],
+  Virgo: ["Precise analyst, devoted healer", "Eye for detail that others miss", "Service-oriented with quiet strength"],
+  Libra: ["Harmonizer, aesthetic visionary", "Seeks balance, justice, and beauty", "Natural diplomat with graceful charm"],
+  Scorpio: ["Intense transformer, truth-seeker", "Emotional depth that sees through surfaces", "Power through vulnerability and rebirth"],
+  Sagittarius: ["Adventurous philosopher, freedom-seeker", "Expansive vision that sees the big picture", "Natural teacher with infectious optimism"],
+  Capricorn: ["Strategic builder, patient achiever", "Quiet authority that commands respect", "Long-term vision with disciplined execution"],
+  Aquarius: ["Visionary rebel, humanitarian innovator", "Thinks decades ahead of the crowd", "Values authenticity and collective progress"],
+  Pisces: ["Empathic dreamer, spiritual antenna", "Boundless imagination and compassion", "Feels what others can't articulate"],
+};
+
 const HeroSection = () => {
   const navigate = useNavigate();
   const { theme } = useTheme();
   const [birthDate, setBirthDate] = useState("");
   const [sunSign, setSunSign] = useState(null);
-
-  const SUN_SIGN_TRAITS = {
-    Aries: ["Natural leader, fearless trailblazer", "Driven by passion and independence", "Thrives on challenge and new beginnings"],
-    Taurus: ["Grounded builder, sensory connoisseur", "Values stability, loyalty, and beauty", "Patient determination that moves mountains"],
-    Gemini: ["Quick-witted communicator, eternal student", "Thrives on variety and intellectual connection", "Adaptable mind that bridges worlds"],
-    Cancer: ["Intuitive nurturer, emotional depth", "Fierce protector of loved ones", "Deep connection to home and heritage"],
-    Leo: ["Radiant creator, natural performer", "Generous heart with magnetic presence", "Born to inspire and lead with warmth"],
-    Virgo: ["Precise analyst, devoted healer", "Eye for detail that others miss", "Service-oriented with quiet strength"],
-    Libra: ["Harmonizer, aesthetic visionary", "Seeks balance, justice, and beauty", "Natural diplomat with graceful charm"],
-    Scorpio: ["Intense transformer, truth-seeker", "Emotional depth that sees through surfaces", "Power through vulnerability and rebirth"],
-    Sagittarius: ["Adventurous philosopher, freedom-seeker", "Expansive vision that sees the big picture", "Natural teacher with infectious optimism"],
-    Capricorn: ["Strategic builder, patient achiever", "Quiet authority that commands respect", "Long-term vision with disciplined execution"],
-    Aquarius: ["Visionary rebel, humanitarian innovator", "Thinks decades ahead of the crowd", "Values authenticity and collective progress"],
-    Pisces: ["Empathic dreamer, spiritual antenna", "Boundless imagination and compassion", "Feels what others can't articulate"],
-  };
 
   const calculateSunSign = () => {
     if (!birthDate) return;

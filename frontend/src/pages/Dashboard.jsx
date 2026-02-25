@@ -231,16 +231,17 @@ const DashboardOverview = () => {
     );
   }
 
+  const greeting = (() => {
+    const hour = new Date().getHours();
+    return hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  })();
+
   return (
     <div className="space-y-6 lg:space-y-8">
       {/* Welcome Header */}
       <div>
         <h1 className="font-serif text-2xl lg:text-3xl text-foreground mb-2">
-          {(() => {
-            const hour = new Date().getHours();
-            const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-            return `${greeting}, ${user?.name?.split(" ")[0]}`;
-          })()}
+          {greeting}, {user?.name?.split(" ")[0]}
         </h1>
         <p className="text-muted-foreground text-sm lg:text-base">
           {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
