@@ -45,6 +45,11 @@ JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
 # LLM Configuration
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 
+# Birth chart cache schema version.
+# Increment this whenever the structure of the cached `planets` dict changes
+# so that stale documents are automatically recomputed and overwritten.
+BIRTH_CHART_SCHEMA_VERSION = 1
+
 app = FastAPI(title="Gab44 - Astrology AI Coaching Platform")
 api_router = APIRouter(prefix="/api")
 security = HTTPBearer()
@@ -446,14 +451,39 @@ async def get_my_chart(user: dict = Depends(get_current_user)):
 
 # ============== Transit Routes ==============
 
+def _is_valid_natal_cache(chart: dict) -> bool:
+    """Return True only when the cached chart matches the current schema version
+    and contains the longitude-keyed planet structure expected by
+    calculate_current_transits."""
+    if not chart:
+        return False
+    if chart.get("schema_version") != BIRTH_CHART_SCHEMA_VERSION:
+        return False
+    planets = chart.get("planets")
+    if not planets or not isinstance(planets, dict):
+        return False
+    # Every planet entry must carry a numeric 'longitude' key
+    for planet_data in planets.values():
+        if not isinstance(planet_data, dict) or "longitude" not in planet_data:
+            return False
+    return True
+
+
 @api_router.get("/transits/upcoming")
 async def get_upcoming_transits(user: dict = Depends(get_current_user)):
     """Get current transit activations based on real planetary positions"""
-    # Get or compute the user's natal chart first
     chart = await db.birth_charts.find_one({"user_id": user["id"]}, {"_id": 0})
 
-    if not chart:
-        # Calculate natal chart on the fly
+    if _is_valid_natal_cache(chart):
+        natal_positions = chart["planets"]
+    else:
+        if chart is not None:
+            logging.getLogger(__name__).info(
+                "Birth chart cache for user %s is invalid or outdated "
+                "(schema_version=%s). Recomputing.",
+                user["id"],
+                chart.get("schema_version"),
+            )
         birth_date = user.get("birth_date", "1990-01-01")
         birth_time = user.get("birth_time")
         lat = user.get("birth_latitude")
@@ -462,8 +492,19 @@ async def get_upcoming_transits(user: dict = Depends(get_current_user)):
         longitude = lng if lng is not None else 0.0
         computed = calculate_natal_chart(birth_date, birth_time, latitude, longitude)
         natal_positions = computed["planets"]
-    else:
-        natal_positions = chart.get("planets", {})
+        # Overwrite (or create) the cached record with the current schema version
+        await db.birth_charts.update_one(
+            {"user_id": user["id"]},
+            {
+                "$set": {
+                    "user_id": user["id"],
+                    "planets": natal_positions,
+                    "schema_version": BIRTH_CHART_SCHEMA_VERSION,
+                    "computed_at": datetime.now(timezone.utc).isoformat(),
+                }
+            },
+            upsert=True,
+        )
 
     # Calculate real current transits against natal positions
     transits = calculate_current_transits(natal_positions)
