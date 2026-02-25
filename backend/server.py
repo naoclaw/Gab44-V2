@@ -1,8 +1,13 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Request, BackgroundTasks
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Request, BackgroundTasks, Response
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import os
 import logging
 from pathlib import Path
@@ -99,6 +104,25 @@ CHAT_DAILY_LIMITS: dict[str, int] = {
 app = FastAPI(title="Gab44 - Astrology AI Coaching Platform")
 api_router = APIRouter(prefix="/api")
 security = HTTPBearer()
+
+# Rate limiter (uses client IP address)
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# ============== Security Headers Middleware ==============
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Add security-related HTTP response headers to every response."""
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
 
 # ============== Models ==============
 
@@ -934,7 +958,8 @@ TONE: Think of texting your closest friend. Short messages are fine. Long heartf
 # ============== Auth Routes ==============
 
 @api_router.post("/auth/register", response_model=TokenResponse)
-async def register(user_data: UserCreate):
+@limiter.limit("10/hour")
+async def register(request: Request, user_data: UserCreate):
     # Check if user exists
     existing = await db.users.find_one({"email": user_data.email})
     if existing:
@@ -985,7 +1010,8 @@ async def register(user_data: UserCreate):
     return TokenResponse(access_token=token, user=UserProfile(**user_profile))
 
 @api_router.post("/auth/login", response_model=TokenResponse)
-async def login(credentials: UserLogin):
+@limiter.limit("20/minute")
+async def login(request: Request, credentials: UserLogin):
     user = await db.users.find_one({"email": credentials.email})
     if not user or not verify_password(credentials.password, user["password"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -1037,7 +1063,8 @@ async def resend_verification(user: dict = Depends(get_current_user)):
     return {"sent": sent}
 
 @api_router.post("/auth/forgot-password")
-async def forgot_password(req: ForgotPasswordRequest):
+@limiter.limit("5/hour")
+async def forgot_password(request: Request, req: ForgotPasswordRequest):
     """Send a password-reset link to the given email address.
 
     Always returns 200 to prevent user enumeration.
@@ -1064,7 +1091,8 @@ async def forgot_password(req: ForgotPasswordRequest):
     return {"message": "If that email is registered, a reset link has been sent."}
 
 @api_router.post("/auth/reset-password")
-async def reset_password(req: ResetPasswordRequest):
+@limiter.limit("5/hour")
+async def reset_password(request: Request, req: ResetPasswordRequest):
     """Validate a reset token and set a new password."""
     user = await db.users.find_one({"password_reset_token": req.token})
     if not user:
@@ -2623,6 +2651,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+app.add_middleware(SecurityHeadersMiddleware)
 
 logging.basicConfig(
     level=logging.INFO,
