@@ -55,6 +55,11 @@ __pycache__/
 venv/
 .venv/
 
+# Test artifacts
+test_reports/
+*.xml
+!frontend/**/*.xml
+
 # Development tools
 chainlit.md
 .chainlit

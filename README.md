@@ -102,7 +102,7 @@ See **`backend/.env.example`** and **`frontend/.env.example`** for the full list
 ```
 Gab44-V2/
 ├── backend/
-│   ├── server.py            # FastAPI app — all routes
+│   ├── server.py            # FastAPI app — all routes (2,600+ lines)
 │   ├── astro_calculator.py  # Swiss Ephemeris + inline numerology + gematria
 │   ├── astro_engine.py      # Modular Swiss Ephemeris wrapper (natal charts + transits)
 │   ├── numerology.py        # Pythagorean numerology engine (6 numbers, master number support)
@@ -114,12 +114,13 @@ Gab44-V2/
 │   └── tests/
 │       ├── test_swiss_ephemeris.py
 │       ├── test_compatibility.py
-│       └── test_admin_rbac.py
+│       ├── test_admin_rbac.py
+│       └── test_api_integration.py
 ├── frontend/
 │   ├── public/index.html    # OneSignal SDK loaded here
 │   ├── src/
-│   │   ├── App.js           # Router + AuthContext
-│   │   ├── pages/           # One file per page
+│   │   ├── App.js           # Router + AuthContext (17 routes)
+│   │   ├── pages/           # One file per page (17 pages)
 │   │   │   ├── LandingPage.jsx
 │   │   │   ├── AuthPage.jsx
 │   │   │   ├── Dashboard.jsx
@@ -127,7 +128,7 @@ Gab44-V2/
 │   │   │   ├── TransitsPage.jsx
 │   │   │   ├── CompatibilityPage.jsx
 │   │   │   ├── ChatPage.jsx
-│   │   │   ├── FriendPage.jsx       # AI Friend
+│   │   │   ├── FriendPage.jsx       # AI Friend (Saoul)
 │   │   │   ├── NumerologyPage.jsx   # Full numerology profile
 │   │   │   ├── GematriaPage.jsx     # Gematria calculator
 │   │   │   ├── PricingPage.jsx
@@ -141,12 +142,15 @@ Gab44-V2/
 │   │       └── ThemeContext.jsx
 │   ├── .env.example
 │   └── package.json
-├── memory/
-│   ├── PRD.md               # Full product requirements document
+├── memory/                          # Platform knowledge base
+│   ├── PRD.md               # Product requirements + API reference
 │   ├── ARCHITECTURE.md      # Website structure, navigation, routes
 │   ├── DESIGN_SYSTEM.md     # CSS classes, colors, typography
 │   ├── BRAND_IDENTITY.md    # Brand personality, voice, trust
 │   └── DESIGN_ANALYTICS.md  # Deep design review
+├── design_guidelines.json   # Design system tokens & rules
+├── README.md                # This file
+└── *.pdf                    # V2 specs + V3 vision docs
 ```
 
 ---
