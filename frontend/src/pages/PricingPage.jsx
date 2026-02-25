@@ -63,7 +63,7 @@ export default function PricingPage() {
       // Redirect to Stripe Checkout
       window.location.href = response.data.checkout_url;
     } catch (error) {
-      const msg = error.response?.data?.detail || "Unable to start checkout. Please try again.";
+      const msg = error.response?.data?.detail || "Something went wrong starting checkout. No charge was made — try again in a moment.";
       toast.error(msg);
     } finally {
       setCheckoutLoading(null);

@@ -252,7 +252,7 @@ const HeroSection = () => {
       <div 
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{
-          backgroundImage: `url('https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?q=80&w=2000')`
+          backgroundImage: `url('https://images.unsplash.com/photo-1767188789485-54e0922d76a8?crop=entropy&cs=srgb&fm=jpg&q=85&w=2000')`
         }}
       />
       <div className={`absolute inset-0 ${theme === 'dark' ? 'hero-gradient-dark' : 'hero-gradient-light'}`} />

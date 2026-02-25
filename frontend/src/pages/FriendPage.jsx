@@ -86,7 +86,7 @@ export default function FriendPage() {
       if (sessionId === sid) startNewSession();
       toast.success("Conversation deleted");
     } catch {
-      toast.error("Failed to delete conversation");
+      toast.error("Couldn't remove that conversation. Try again in a moment.");
     }
   };
 
@@ -125,7 +125,7 @@ export default function FriendPage() {
           action: { label: "Upgrade", onClick: () => window.location.href = "/pricing" }
         });
       } else {
-        toast.error("Failed to get response. Please try again.");
+        toast.error("Something went wrong on our end. Your data is safe — try again in a moment.");
       }
     } finally {
       setLoading(false);

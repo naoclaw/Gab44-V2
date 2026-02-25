@@ -51,7 +51,7 @@ export default function AuthPage() {
       toast.success("If that email is registered, a reset link has been sent.");
       setIsForgot(false);
     } catch {
-      toast.error("Something went wrong. Please try again.");
+      toast.error("Something went wrong on our end. Your data is safe — please try again.");
     } finally {
       setLoading(false);
     }

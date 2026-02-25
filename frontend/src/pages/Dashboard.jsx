@@ -240,13 +240,18 @@ const DashboardOverview = () => {
     <div className="space-y-6 lg:space-y-8">
       {/* Welcome Header */}
       <div>
-        <h1 className="font-serif text-2xl lg:text-3xl text-foreground mb-2">
+        <h1 className="font-serif text-2xl lg:text-3xl text-foreground mb-1">
           {greeting}, {user?.name?.split(" ")[0]}
         </h1>
-        <p className="text-muted-foreground text-sm lg:text-base">
+        <p className="text-muted-foreground text-sm lg:text-base mb-1">
           {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
           {user?.sun_sign && ` · ${user.sun_sign} Sun`}
         </p>
+        {transits.length > 0 && (
+          <p className="text-muted-foreground/70 text-xs lg:text-sm italic">
+            {transits[0].type} is active in your chart — {transits[0].interpretation?.split('.')[0]?.toLowerCase() || 'a time for reflection'}.
+          </p>
+        )}
       </div>
 
       {/* Bento Grid Layout */}

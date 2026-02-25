@@ -85,7 +85,7 @@ export default function ChatPage() {
       if (sessionId === sid) startNewSession();
       toast.success("Conversation deleted");
     } catch {
-      toast.error("Failed to delete conversation");
+      toast.error("Couldn't remove that conversation. Try again in a moment.");
     }
   };
 
@@ -124,7 +124,7 @@ export default function ChatPage() {
           action: { label: "Upgrade", onClick: () => window.location.href = "/pricing" }
         });
       } else {
-        toast.error("Failed to get response. Please try again.");
+        toast.error("Something went wrong on our end. Your data is safe — try again in a moment.");
       }
     } finally {
       setLoading(false);
@@ -314,11 +314,11 @@ export default function ChatPage() {
                   <Sparkles className="w-8 h-8 text-primary" />
                 </div>
                 <h2 className="font-serif text-xl text-foreground mb-2">
-                  Hello, {user?.name?.split(" ")[0]} ✨
+                  Hello, {user?.name?.split(" ")[0]}
                 </h2>
                 <p className="text-muted-foreground mb-6 max-w-md mx-auto leading-relaxed">
-                  I'm your personal astrology AI coach — here whenever you need guidance.
-                  Ask me about your chart, transits, relationships, career timing, or anything on your mind.
+                  I know your chart — your planets, houses, aspects, and numerology.
+                  Ask me anything about your cosmic blueprint, and I'll give you honest, specific guidance.
                 </p>
                 <div className="flex flex-wrap justify-center gap-2">
                   {[

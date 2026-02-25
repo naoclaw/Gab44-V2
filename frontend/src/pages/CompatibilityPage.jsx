@@ -209,7 +209,7 @@ export default function CompatibilityPage() {
       toast.success("Compatibility analysis complete!");
     } catch (error) {
       console.error("Analysis error:", error);
-      toast.error("Failed to analyze compatibility");
+      toast.error("Something went wrong with the analysis. Your data is safe — try again in a moment.");
     } finally {
       setAnalyzing(false);
     }

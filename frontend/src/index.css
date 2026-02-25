@@ -170,14 +170,14 @@
 
 /* Light mode cosmic gradient - maintains mystical identity */
 :root .cosmic-gradient {
-  background: radial-gradient(ellipse at top, hsl(245 50% 60% / 0.06) 0%, transparent 50%),
-              radial-gradient(ellipse at bottom right, hsl(38 92% 50% / 0.04) 0%, transparent 40%);
+  background: radial-gradient(ellipse at top, hsl(245 50% 60% / 0.08) 0%, transparent 50%),
+              radial-gradient(ellipse at bottom right, hsl(38 92% 50% / 0.06) 0%, transparent 40%);
 }
 
 /* Subtle cosmic background for inner pages (dashboard, etc.) */
 .cosmic-page-bg {
-  background: radial-gradient(ellipse at top left, hsl(245 50% 60% / 0.04) 0%, transparent 40%),
-              radial-gradient(ellipse at bottom right, hsl(38 92% 50% / 0.03) 0%, transparent 40%);
+  background: radial-gradient(ellipse at top left, hsl(245 50% 60% / 0.07) 0%, transparent 45%),
+              radial-gradient(ellipse at bottom right, hsl(38 92% 50% / 0.05) 0%, transparent 45%);
 }
 
 .dark .cosmic-page-bg {

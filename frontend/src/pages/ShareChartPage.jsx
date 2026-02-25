@@ -183,7 +183,7 @@ export default function ShareChartPage() {
       });
       setShareToken(res.data.share_token);
     } catch {
-      toast.error("Could not generate share link. Please try again.");
+      toast.error("Couldn't create your share link. Your chart is safe — try again in a moment.");
     } finally {
       setGeneratingLink(false);
     }
@@ -206,7 +206,7 @@ export default function ShareChartPage() {
         tok = res.data.share_token;
         setShareToken(tok);
       } catch {
-        toast.error("Could not generate share link. Please try again.");
+        toast.error("Couldn't create your share link. Your chart is safe — try again in a moment.");
         setGeneratingLink(false);
         return;
       }
