@@ -22,6 +22,8 @@ import CompatibilityPage from "@/pages/CompatibilityPage";
 import VerifyEmailPage from "@/pages/VerifyEmailPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import PublicChartPage from "@/pages/PublicChartPage";
+import NumerologyPage from "@/pages/NumerologyPage";
+import GematriaPage from "@/pages/GematriaPage";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
@@ -218,6 +220,22 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <CompatibilityPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/numerology" 
+                element={
+                  <ProtectedRoute>
+                    <NumerologyPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/gematria" 
+                element={
+                  <ProtectedRoute>
+                    <GematriaPage />
                   </ProtectedRoute>
                 } 
               />

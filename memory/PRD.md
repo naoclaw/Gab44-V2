@@ -17,7 +17,11 @@
 - **Payments**: Stripe (Checkout, Webhooks, Customer Portal)
 - **Email**: SendGrid with 4 typed sender addresses
 - **Push Notifications**: OneSignal Web SDK
-- **Geocoding**: Static city dict + Nominatim (OpenStreetMap) fallback
+- **Geocoding**: 327-city static database + Mapbox API hybrid (via `backend/cities.py`)
+- **Numerology Engine**: Pythagorean method with master number preservation (via `backend/numerology.py`)
+- **Gematria Engine**: Chaldean + English Ordinal dual-system calculator (via `backend/gematria.py`)
+- **Astro Engine**: Swiss Ephemeris modular wrapper (via `backend/astro_engine.py`)
+- **Payments Module**: Stripe subscription management (via `backend/payments.py`)
 
 ## What's Implemented
 
@@ -176,9 +180,16 @@
 - DELETE /api/chart/share
 - GET  /api/chart/public/{share_token}
 - GET  /api/numerology/me
+- GET  /api/numerology/profile (full Pythagorean profile — 6 numbers with master number preservation)
 - GET  /api/transits/upcoming
 - GET  /api/guidance/daily
 - GET  /api/pricing
+
+### Gematria (from Gab44-vision merge)
+- POST /api/gematria/calculate (public — Chaldean + English Ordinal dual-system)
+
+### Cities / Geocoding (from Gab44-vision merge)
+- GET  /api/cities?q={query} (hybrid: Mapbox API when available, 327-city static fallback)
 
 ### Compatibility
 - POST /api/compatibility/analyze

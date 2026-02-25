@@ -29,6 +29,11 @@ from astro_calculator import (
     get_modality
 )
 
+# Modular engines (from Gab44-vision merge)
+from numerology import calculate_full_profile as numerology_full_profile
+from gematria import calculate_all as gematria_calculate_all
+from cities import geocode_search
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
@@ -1368,6 +1373,56 @@ async def get_my_numerology(user: dict = Depends(get_current_user)):
     if not name:
         return {}
     return calculate_numerology(name, birth_date)
+
+
+# ============== Numerology Full Profile (from Gab44-vision) ==============
+
+@api_router.get("/numerology/profile")
+async def get_numerology_profile(user: dict = Depends(get_current_user)):
+    """Return a comprehensive numerology profile using the modular numerology engine."""
+    # Check for cached profile first
+    cached = await db.numerology_profiles.find_one({"user_id": user["id"]}, {"_id": 0})
+    if cached:
+        return cached
+
+    full_name = (user.get("birth_name") or user.get("name") or "").strip()
+    birth_date = user.get("birth_date", "")
+    if not full_name or not birth_date:
+        raise HTTPException(status_code=400, detail="Name and birth date are required for numerology")
+
+    profile = numerology_full_profile(full_name, birth_date)
+    profile_doc = {"user_id": user["id"], **profile}
+    await db.numerology_profiles.update_one(
+        {"user_id": user["id"]},
+        {"$set": profile_doc},
+        upsert=True
+    )
+    return profile_doc
+
+
+# ============== Gematria (from Gab44-vision) ==============
+
+class GematriaRequest(BaseModel):
+    text: str
+
+@api_router.post("/gematria/calculate")
+async def gematria_calculate(request: GematriaRequest):
+    """Calculate gematria for any text (public endpoint)."""
+    text = request.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Text is required")
+    if len(text) > 500:
+        raise HTTPException(status_code=400, detail="Text must be 500 characters or less")
+    return gematria_calculate_all(text)
+
+
+# ============== Cities / Geocoding (from Gab44-vision) ==============
+
+@api_router.get("/cities")
+async def get_cities(q: str = ""):
+    """Search cities for birth location. Uses Mapbox API when available, static fallback otherwise."""
+    results = geocode_search(query=q, limit=20)
+    return results
 
 
 @api_router.post("/chart/share")
