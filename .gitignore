@@ -69,6 +69,9 @@ chainlit.md
 # Deployment
 .vercel
 
+# PR preview build folders (deployed to main by CI, not hand-committed)
+pr-*/
+
 # Data and databases
 agenthub/agents/youtube/db
 
