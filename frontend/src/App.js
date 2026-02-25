@@ -44,6 +44,37 @@ const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem("gab44_token"));
   const [loading, setLoading] = useState(true);
 
+  const logout = () => {
+    localStorage.removeItem("gab44_token");
+    setToken(null);
+    setUser(null);
+  };
+
+  // Global Axios interceptor: auto-logout when any API call returns 401
+  // (e.g. JWT expired mid-session). Runs once on mount.
+  useEffect(() => {
+    const interceptorId = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          const currentToken = localStorage.getItem("gab44_token");
+          // Only trigger if the user was actually logged in (avoid loop on the
+          // /auth/login or /auth/me calls that fire before session is set)
+          if (currentToken) {
+            localStorage.removeItem("gab44_token");
+            setToken(null);
+            setUser(null);
+            import("sonner").then(({ toast }) => {
+              toast.error("Your session has expired. Please sign in again.");
+            });
+          }
+        }
+        return Promise.reject(error);
+      }
+    );
+    return () => axios.interceptors.response.eject(interceptorId);
+  }, []);
+
   useEffect(() => {
     const verifyToken = async () => {
       if (token) {
@@ -79,12 +110,6 @@ const AuthProvider = ({ children }) => {
     setToken(access_token);
     setUser(newUser);
     return newUser;
-  };
-
-  const logout = () => {
-    localStorage.removeItem("gab44_token");
-    setToken(null);
-    setUser(null);
   };
 
   const updateUser = (updatedData) => {

@@ -437,18 +437,28 @@ export default function Dashboard() {
   const { token, updateUser } = useAuth();
 
   // Handle Stripe Checkout success redirect (?subscription=success&tier=...)
+  // Re-fetch the user from the server so the tier shown is always authoritative
+  // (never trust a URL param for subscription state).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("subscription") === "success") {
-      const tier = params.get("tier");
-      if (tier) updateUser({ subscription_tier: tier });
       // Remove query params from URL without reload
       window.history.replaceState({}, "", window.location.pathname);
-      import("sonner").then(({ toast }) => {
-        toast.success("Subscription activated! Welcome to your new plan.");
-      });
+      axios
+        .get(`${API}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
+        .then((res) => {
+          updateUser(res.data);
+          import("sonner").then(({ toast }) => {
+            toast.success("Subscription activated! Welcome to your new plan.");
+          });
+        })
+        .catch(() => {
+          import("sonner").then(({ toast }) => {
+            toast.success("Subscription activated! Welcome to your new plan.");
+          });
+        });
     }
-  }, [updateUser]);
+  }, [token, updateUser]);
 
   return (
     <div className="min-h-screen bg-background cosmic-page-bg">

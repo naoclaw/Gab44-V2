@@ -277,8 +277,8 @@ class NewsletterSubscription(BaseModel):
 class ContactMessage(BaseModel):
     name: str
     email: EmailStr
-    subject: str
-    message: str
+    subject: str = Field(..., max_length=200)
+    message: str = Field(..., min_length=10, max_length=5000)
 
 class EmailBlastRequest(BaseModel):
     subject: str
@@ -293,6 +293,11 @@ _SENSITIVE_USER_FIELDS = frozenset({
     "email_verification_token",
     "password_reset_token", "password_reset_expiry",
 })
+
+# Pre-computed dummy hash used during login when no user is found, so that the
+# bcrypt comparison cost is always paid and response time stays constant
+# (prevents user-enumeration via timing differences).
+_DUMMY_HASH: str = bcrypt.hashpw(b"gab44_timing_resist_dummy", bcrypt.gensalt()).decode()
 
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
@@ -999,7 +1004,11 @@ async def register(user_data: UserCreate):
 @api_router.post("/auth/login", response_model=TokenResponse)
 async def login(credentials: UserLogin):
     user = await db.users.find_one({"email": credentials.email})
-    if not user or not verify_password(credentials.password, user["password"]):
+    # Always run bcrypt so response time is constant whether or not the email
+    # exists — prevents user-enumeration via timing differences.
+    stored_hash = user["password"] if user else _DUMMY_HASH
+    password_ok = verify_password(credentials.password, stored_hash)
+    if not user or not password_ok:
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
     token = create_token(user["id"])
@@ -1893,9 +1902,13 @@ Respond ONLY with valid JSON matching this exact structure:
             ]
         }
     
-    # Cache for the day
+    # Cache for the day — upsert so concurrent requests don't cause a duplicate-key error
     guidance_doc = {"user_id": user["id"], **guidance}
-    await db.daily_guidance.insert_one(guidance_doc)
+    await db.daily_guidance.update_one(
+        {"user_id": user["id"], "date": today},
+        {"$set": guidance_doc},
+        upsert=True,
+    )
     
     return DailyGuidance(**guidance)
 
@@ -2651,6 +2664,7 @@ async def create_indexes():
     await db.users.create_index("email", unique=True)
     await db.users.create_index("id", unique=True)
     await db.users.create_index("stripe_customer_id", sparse=True)
+    await db.users.create_index("password_reset_token", sparse=True)
     # Chat messages
     await db.chat_messages.create_index("user_id")
     await db.chat_messages.create_index("session_id")
