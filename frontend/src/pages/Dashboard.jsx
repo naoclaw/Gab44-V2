@@ -24,7 +24,8 @@ import {
   Shield,
   Heart,
   Hash,
-  Coffee
+  Coffee,
+  Type
 } from "lucide-react";
 
 const Sidebar = ({ activeTab, setActiveTab, mobileOpen, setMobileOpen }) => {
@@ -37,6 +38,8 @@ const Sidebar = ({ activeTab, setActiveTab, mobileOpen, setMobileOpen }) => {
     { id: "chat", icon: MessageCircle, label: "AI Coach", href: "/chat" },
     { id: "friend", icon: Coffee, label: "AI Friend", href: "/friend" },
     { id: "chart", icon: Sun, label: "Birth Chart", href: "/chart" },
+    { id: "numerology", icon: Hash, label: "Numerology", href: "/numerology" },
+    { id: "gematria", icon: Type, label: "Gematria", href: "/gematria" },
     { id: "compatibility", icon: Heart, label: "Compatibility", href: "/compatibility" },
     { id: "transits", icon: Calendar, label: "Transits", href: "/transits" },
     { id: "share", icon: Share2, label: "Share Chart", href: "/share" },
@@ -410,10 +413,12 @@ const DashboardOverview = () => {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {[
-          { icon: MessageCircle, label: "Chat", href: "/chat", color: "text-blue-500" },
+          { icon: MessageCircle, label: "AI Coach", href: "/chat", color: "text-blue-500" },
           { icon: Sun, label: "Chart", href: "/chart", color: "text-amber-500" },
+          { icon: Hash, label: "Numerology", href: "/numerology", color: "text-pink-500" },
+          { icon: Type, label: "Gematria", href: "/gematria", color: "text-indigo-500" },
           { icon: Share2, label: "Share", href: "/share", color: "text-purple-500" },
           { icon: Settings, label: "Settings", href: "/settings", color: "text-slate-500" }
         ].map((action) => (
