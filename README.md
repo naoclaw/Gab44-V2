@@ -86,13 +86,18 @@ See **`backend/.env.example`** and **`frontend/.env.example`** for the full list
 | `OPENAI_API_KEY` | backend | GPT-4o for AI guidance, coach, compatibility |
 | `MAPBOX_ACCESS_TOKEN` | backend | Mapbox geocoding for birth city autocomplete (falls back to static 327-city database if not set) |
 | `SENDGRID_API_KEY` | backend | Transactional + marketing email |
-| `STRIPE_SECRET_KEY` | backend | Payments |
-| `STRIPE_PUBLISHABLE_KEY` | backend | Stripe frontend key |
+| `EMAIL_NOREPLY` | backend | "From" address for automated system emails |
+| `EMAIL_VERIFY` | backend | "From" address for sign-up / verification emails |
+| `EMAIL_SUPPORT` | backend | "From" address for support replies |
+| `EMAIL_MARKETING` | backend | "From" address for promotions & newsletters |
+| `STRIPE_SECRET_KEY` | backend | Payments — server-side Stripe key |
+| `STRIPE_PUBLISHABLE_KEY` | backend | Stripe frontend key (informational, unused server-side) |
 | `STRIPE_WEBHOOK_SECRET` | backend | Stripe webhook signature verification |
 | `ONESIGNAL_APP_ID` | backend | Push notifications App ID |
-| `ONESIGNAL_API_KEY` | backend | Push notifications API key |
+| `ONESIGNAL_API_KEY` | backend | Push notifications REST API key |
+| `REACT_APP_ONESIGNAL_APP_ID` | frontend | Same OneSignal App ID — injected into `index.html` at build time |
 | `ADMIN_EMAILS` | backend | Comma-separated emails granted admin access |
-| `FRONTEND_URL` | backend | Full URL of the frontend (used in emails) |
+| `FRONTEND_URL` | backend | Full URL of the frontend (used in email links) |
 | `CORS_ORIGINS` | backend | Comma-separated allowed origins (default: `*`) |
 
 ---

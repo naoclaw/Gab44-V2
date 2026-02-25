@@ -287,6 +287,13 @@ class EmailBlastRequest(BaseModel):
 
 # ============== Auth Helpers ==============
 
+# Fields that must never appear in API responses
+_SENSITIVE_USER_FIELDS = frozenset({
+    "_id", "password",
+    "email_verification_token",
+    "password_reset_token", "password_reset_expiry",
+})
+
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
@@ -305,7 +312,12 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token")
         
-        user = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
+        user = await db.users.find_one(
+            {"id": user_id},
+            {"_id": 0, "password": 0,
+             "email_verification_token": 0,
+             "password_reset_token": 0, "password_reset_expiry": 0}
+        )
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
         
@@ -978,7 +990,7 @@ async def register(user_data: UserCreate):
     )
     
     token = create_token(user_id)
-    user_profile = {k: v for k, v in user_doc.items() if k != "password" and k != "_id" and k != "email_verification_token"}
+    user_profile = {k: v for k, v in user_doc.items() if k not in _SENSITIVE_USER_FIELDS}
     user_email = user_data.email.lower()
     user_profile["is_admin"] = user_email in ADMIN_EMAILS
     
@@ -991,7 +1003,7 @@ async def login(credentials: UserLogin):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
     token = create_token(user["id"])
-    user_profile = {k: v for k, v in user.items() if k != "password" and k != "_id" and k != "email_verification_token"}
+    user_profile = {k: v for k, v in user.items() if k not in _SENSITIVE_USER_FIELDS}
     user_email = user.get("email", "").lower()
     is_admin_by_role = user.get("role") == "admin"
     is_admin_by_env = user_email in ADMIN_EMAILS
@@ -1090,8 +1102,7 @@ async def reset_password(req: ResetPasswordRequest):
 
 @api_router.get("/auth/me")
 async def get_me(user: dict = Depends(get_current_user)):
-    # Exclude internal token from response
-    response = {k: v for k, v in user.items() if k != "email_verification_token"}
+    response = {k: v for k, v in user.items() if k not in _SENSITIVE_USER_FIELDS}
     return response
 
 @api_router.put("/auth/me", response_model=UserProfile)
@@ -1109,7 +1120,10 @@ async def update_me(update_data: UserUpdate, user: dict = Depends(get_current_us
     await db.users.update_one({"id": user["id"]}, {"$set": updates})
     
     updated_user = await db.users.find_one(
-        {"id": user["id"]}, {"_id": 0, "password": 0, "email_verification_token": 0}
+        {"id": user["id"]},
+        {"_id": 0, "password": 0,
+         "email_verification_token": 0,
+         "password_reset_token": 0, "password_reset_expiry": 0}
     )
     if not updated_user:
         raise HTTPException(status_code=404, detail="User not found")
