@@ -84,6 +84,7 @@ See **`backend/.env.example`** and **`frontend/.env.example`** for the full list
 | Variable | Where | Description |
 |----------|-------|-------------|
 | `OPENAI_API_KEY` | backend | GPT-4o for AI guidance, coach, compatibility |
+| `MAPBOX_ACCESS_TOKEN` | backend | Mapbox geocoding for birth city autocomplete (falls back to static 327-city database if not set) |
 | `SENDGRID_API_KEY` | backend | Transactional + marketing email |
 | `STRIPE_SECRET_KEY` | backend | Payments |
 | `STRIPE_PUBLISHABLE_KEY` | backend | Stripe frontend key |
@@ -102,7 +103,12 @@ See **`backend/.env.example`** and **`frontend/.env.example`** for the full list
 Gab44-V2/
 ├── backend/
 │   ├── server.py            # FastAPI app — all routes
-│   ├── astro_calculator.py  # Swiss Ephemeris + numerology + gematria
+│   ├── astro_calculator.py  # Swiss Ephemeris + inline numerology + gematria
+│   ├── astro_engine.py      # Modular Swiss Ephemeris wrapper (natal charts + transits)
+│   ├── numerology.py        # Pythagorean numerology engine (6 numbers, master number support)
+│   ├── gematria.py          # Chaldean + English Ordinal gematria calculator
+│   ├── cities.py            # 327-city geocoding database + Mapbox API hybrid
+│   ├── payments.py          # Modular Stripe subscription management
 │   ├── requirements.txt
 │   ├── .env.example
 │   └── tests/
@@ -121,6 +127,9 @@ Gab44-V2/
 │   │   │   ├── TransitsPage.jsx
 │   │   │   ├── CompatibilityPage.jsx
 │   │   │   ├── ChatPage.jsx
+│   │   │   ├── FriendPage.jsx       # AI Friend
+│   │   │   ├── NumerologyPage.jsx   # Full numerology profile
+│   │   │   ├── GematriaPage.jsx     # Gematria calculator
 │   │   │   ├── PricingPage.jsx
 │   │   │   ├── SettingsPage.jsx
 │   │   │   ├── AdminPage.jsx
@@ -132,8 +141,12 @@ Gab44-V2/
 │   │       └── ThemeContext.jsx
 │   ├── .env.example
 │   └── package.json
-└── memory/
-    └── PRD.md               # Full product requirements document
+├── memory/
+│   ├── PRD.md               # Full product requirements document
+│   ├── ARCHITECTURE.md      # Website structure, navigation, routes
+│   ├── DESIGN_SYSTEM.md     # CSS classes, colors, typography
+│   ├── BRAND_IDENTITY.md    # Brand personality, voice, trust
+│   └── DESIGN_ANALYTICS.md  # Deep design review
 ```
 
 ---
@@ -145,6 +158,7 @@ Gab44-V2/
 - **Gematria** — Chaldean (Babylonian, A=1..Z=8) + English Ordinal; interactive live demo on landing page
 - **Daily AI Guidance** — OpenAI GPT-4o personalised to current transits, numerology Personal Year, and natal chart; 24-hour cache; graceful fallback
 - **AI Cosmic Coach** — Conversational chat with full chart context injected; session history; tier-based daily message limits
+- **AI Friend** — Warm, supportive cosmic companion with distinct personality; separate session management
 - **Relationship Compatibility** — 5 relationship types (romantic, friendship, family, business, colleague); weighted scoring per type; partner numerology comparison; AI-generated interpretation
 - **Transit Tracker** — Upcoming transits with real progress bars; 45-entry interpretation library
 - **Stripe Payments** — Checkout, webhook, Customer Portal (manage/cancel); seeker/enthusiast/advanced/professional tiers
