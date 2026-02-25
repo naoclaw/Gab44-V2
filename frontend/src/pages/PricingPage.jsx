@@ -72,14 +72,14 @@ export default function PricingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background cosmic-page-bg flex items-center justify-center">
         <div className="animate-pulse-glow w-16 h-16 rounded-full bg-primary/20" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background p-8">
+    <div className="min-h-screen bg-background cosmic-page-bg p-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-12">

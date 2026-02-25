@@ -132,7 +132,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background cosmic-page-bg flex">
       {/* Sessions Sidebar */}
       <aside className="w-72 bg-card/50 backdrop-blur-sm border-r border-border flex flex-col h-screen">
         <div className="p-4 border-b border-border space-y-4">
@@ -314,11 +314,11 @@ export default function ChatPage() {
                   <Sparkles className="w-8 h-8 text-primary" />
                 </div>
                 <h2 className="font-serif text-xl text-foreground mb-2">
-                  Hello, {user?.name?.split(" ")[0]}
+                  Hello, {user?.name?.split(" ")[0]} ✨
                 </h2>
                 <p className="text-muted-foreground mb-6 max-w-md mx-auto leading-relaxed">
-                  I'm your personal astrology AI coach. Ask me anything about your chart, 
-                  transits, relationships, career timing, or life guidance.
+                  I'm your personal astrology AI coach — here whenever you need guidance.
+                  Ask me about your chart, transits, relationships, career timing, or anything on your mind.
                 </p>
                 <div className="flex flex-wrap justify-center gap-2">
                   {[

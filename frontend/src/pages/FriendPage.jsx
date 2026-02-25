@@ -135,7 +135,7 @@ export default function FriendPage() {
   const firstName = user?.name?.trim().split(" ")[0] || "friend";
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background cosmic-page-bg flex">
       {/* Sessions Sidebar — warm tones */}
       <aside className="w-72 bg-card/50 backdrop-blur-sm border-r border-border flex flex-col h-screen">
         <div className="p-4 border-b border-border space-y-4">

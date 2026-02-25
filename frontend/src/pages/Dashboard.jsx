@@ -439,7 +439,7 @@ export default function Dashboard() {
       // Remove query params from URL without reload
       window.history.replaceState({}, "", window.location.pathname);
       import("sonner").then(({ toast }) => {
-        toast.success("🎉 Subscription activated! Welcome to your new plan.");
+        toast.success("Subscription activated! Welcome to your new plan.");
       });
     }
   }, [updateUser]);

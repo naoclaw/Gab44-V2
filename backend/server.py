@@ -2038,7 +2038,7 @@ async def get_pricing():
                 "id": "enthusiast",
                 "name": "Enthusiast",
                 "tagline": "For daily guidance and deeper insights",
-                "price": 19.99,
+                "price": 9.99,
                 "period": "month",
                 "popular": True,
                 "features": [
@@ -2054,7 +2054,7 @@ async def get_pricing():
                 "id": "advanced",
                 "name": "Advanced",
                 "tagline": "For serious practitioners and coaches",
-                "price": 49.99,
+                "price": 29.99,
                 "period": "month",
                 "features": [
                     "Everything in Enthusiast",

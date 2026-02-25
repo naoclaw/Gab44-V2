@@ -34,11 +34,11 @@ import {
 
 // Relationship type config — icon, label, gradient, "connection" category label
 const REL_TYPES = {
-  romantic:   { icon: Heart,        emoji: "💕", label: "Romantic",   gradient: "from-rose-500 to-purple-500",   connection: "Romance",    description: "Partner / lover" },
-  friendship: { icon: Users,        emoji: "🤝", label: "Friendship", gradient: "from-cyan-500 to-blue-500",     connection: "Affinity",   description: "Friend / companion" },
-  family:     { icon: Home,         emoji: "👨‍👩‍👧", label: "Family",    gradient: "from-amber-500 to-orange-500",  connection: "Bond",       description: "Family member" },
-  business:   { icon: Briefcase,    emoji: "💼", label: "Business",   gradient: "from-emerald-500 to-teal-500",  connection: "Vision",     description: "Business partner" },
-  colleague:  { icon: UserCheck,    emoji: "🧑‍💻", label: "Colleague",  gradient: "from-violet-500 to-indigo-500", connection: "Synergy",    description: "Co-worker / colleague" },
+  romantic:   { icon: Heart,        label: "Romantic",   gradient: "from-rose-500 to-purple-500",   connection: "Romance",    description: "Partner / lover" },
+  friendship: { icon: Users,        label: "Friendship", gradient: "from-cyan-500 to-blue-500",     connection: "Affinity",   description: "Friend / companion" },
+  family:     { icon: Home,         label: "Family",    gradient: "from-amber-500 to-orange-500",  connection: "Bond",       description: "Family member" },
+  business:   { icon: Briefcase,    label: "Business",   gradient: "from-emerald-500 to-teal-500",  connection: "Vision",     description: "Business partner" },
+  colleague:  { icon: UserCheck,    label: "Colleague",  gradient: "from-violet-500 to-indigo-500", connection: "Synergy",    description: "Co-worker / colleague" },
 };
 
 const CATEGORY_CONFIG = {
@@ -47,6 +47,11 @@ const CATEGORY_CONFIG = {
   communication: { icon: MessageCircle, color: "text-blue-500", bg: "bg-blue-500/10", label: "Communication" },
   stability: { icon: Shield,       color: "text-emerald-500", bg: "bg-emerald-500/10", label: "Stability" },
   karmic:    { icon: Sparkles,     color: "text-purple-500",  bg: "bg-purple-500/10",  label: "Karmic" }
+};
+
+const RelTypeIcon = ({ type, className, fallback: Fallback = Heart }) => {
+  const Icon = REL_TYPES[type]?.icon || Fallback;
+  return <Icon className={className} />;
 };
 
 const ScoreRing = ({ score, size = 120, label }) => {
@@ -133,7 +138,7 @@ const ReportCard = ({ report, onClick }) => {
         <div className="flex-1 min-w-0">
           <h3 className="font-medium text-foreground truncate">{report.partner_name}</h3>
           <p className="text-sm text-muted-foreground flex items-center gap-1">
-            <span>{rel.emoji}</span>
+            <Icon className="w-3.5 h-3.5" />
             <span>{rel.label}</span>
             {report.partner_sun_sign && <span className="text-muted-foreground/50">· {report.partner_sun_sign}</span>}
           </p>
@@ -212,7 +217,7 @@ export default function CompatibilityPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background cosmic-page-bg flex items-center justify-center">
         <div className="animate-pulse-glow w-16 h-16 rounded-full bg-rose-500/20 flex items-center justify-center">
           <Heart className="w-8 h-8 text-rose-500 animate-pulse" />
         </div>
@@ -221,7 +226,7 @@ export default function CompatibilityPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background cosmic-page-bg">
       {/* Header */}
       <header className="sticky top-0 z-50 glass-header border-b border-border/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -265,7 +270,7 @@ export default function CompatibilityPage() {
               {/* Header */}
               <div className="flex items-center gap-3 mb-5">
                 <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${REL_TYPES[formData.relationship_type]?.gradient || "from-rose-500 to-purple-500"} opacity-25 flex items-center justify-center`}>
-                  <span className="text-2xl">{REL_TYPES[formData.relationship_type]?.emoji || "💕"}</span>
+                  <RelTypeIcon type={formData.relationship_type} className="w-6 h-6 text-white" />
                 </div>
                 <div>
                   <h2 className="font-serif text-xl text-foreground">New Compatibility Analysis</h2>
@@ -289,7 +294,7 @@ export default function CompatibilityPage() {
                       }`}
                       data-testid={`rel-type-${key}`}
                     >
-                      <span className="text-base leading-none">{cfg.emoji}</span>
+                      <RelTypeIcon type={key} className="w-4 h-4" />
                       <span className="leading-none">{cfg.label}</span>
                     </button>
                   ))}
@@ -443,7 +448,7 @@ export default function CompatibilityPage() {
                   {/* Relationship type badge */}
                   <div className="flex justify-center mb-4">
                     <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r ${relCfg.gradient} text-white`}>
-                      <span>{relCfg.emoji}</span>
+                      <RelTypeIcon type={selectedReport.relationship_type} className="w-3.5 h-3.5" />
                       <span>{relCfg.label} Analysis</span>
                     </span>
                   </div>
@@ -618,7 +623,7 @@ export default function CompatibilityPage() {
                       onClick={() => { setFormData(prev => ({ ...prev, relationship_type: key })); setShowForm(true); }}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition-all hover:border-primary/50 bg-gradient-to-r ${cfg.gradient} text-white border-transparent`}
                     >
-                      <span>{cfg.emoji}</span>
+                      <RelTypeIcon type={key} className="w-4 h-4" />
                       <span>{cfg.label}</span>
                     </button>
                   ))}

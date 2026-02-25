@@ -85,7 +85,7 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex bg-background">
+    <div className="min-h-screen flex bg-background cosmic-page-bg">
       {/* Left Side - Form */}
       <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 md:px-16 lg:px-24 py-12">
         <div className="flex items-center justify-between mb-12">
@@ -148,12 +148,12 @@ export default function AuthPage() {
         {!isForgot && (
         <>
         <h1 className="font-serif text-3xl md:text-4xl text-foreground mb-2">
-          {isRegister ? "Create Your Account" : "Welcome Back"}
+          {isRegister ? "Begin Your Journey" : "Welcome Home"}
         </h1>
         <p className="text-muted-foreground mb-8 leading-relaxed">
           {isRegister 
             ? "Enter your birth details to unlock your cosmic blueprint" 
-            : "Sign in to continue your cosmic journey"
+            : "We've been waiting for you — let's pick up where you left off"
           }
         </p>
 
