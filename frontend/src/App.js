@@ -11,6 +11,7 @@ import LandingPage from "@/pages/LandingPage";
 import AuthPage from "@/pages/AuthPage";
 import Dashboard from "@/pages/Dashboard";
 import ChatPage from "@/pages/ChatPage";
+import FriendPage from "@/pages/FriendPage";
 import ChartPage from "@/pages/ChartPage";
 import TransitsPage from "@/pages/TransitsPage";
 import PricingPage from "@/pages/PricingPage";
@@ -169,6 +170,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <ChatPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/friend" 
+                element={
+                  <ProtectedRoute>
+                    <FriendPage />
                   </ProtectedRoute>
                 } 
               />

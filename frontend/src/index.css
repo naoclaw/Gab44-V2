@@ -5,25 +5,25 @@
 /* Gab44 Elevated Design System - Light & Dark Themes */
 @layer base {
   :root {
-    /* Light Theme - Warm, comfortable, easy on eyes */
-    --background: 40 30% 98%;
+    /* Light Theme - Warm parchment, mystical, not clinical */
+    --background: 35 40% 95%;
     --foreground: 240 10% 15%;
-    --card: 0 0% 100%;
+    --card: 36 35% 98%;
     --card-foreground: 240 10% 15%;
-    --popover: 0 0% 100%;
+    --popover: 36 35% 98%;
     --popover-foreground: 240 10% 15%;
     --primary: 38 92% 50%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 40 20% 94%;
+    --secondary: 35 25% 91%;
     --secondary-foreground: 240 10% 20%;
-    --muted: 40 20% 94%;
+    --muted: 35 25% 91%;
     --muted-foreground: 240 5% 45%;
-    --accent: 38 92% 95%;
-    --accent-foreground: 38 92% 35%;
+    --accent: 245 50% 95%;
+    --accent-foreground: 245 50% 40%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 40 20% 88%;
-    --input: 40 20% 88%;
+    --border: 35 20% 85%;
+    --input: 35 20% 85%;
     --ring: 38 92% 50%;
     --radius: 0.75rem;
     --chart-1: 38 92% 50%;
@@ -77,13 +77,12 @@
 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Cinzel', serif;
-    @apply tracking-tight;
     line-height: 1.2;
   }
 
-  h1 { @apply text-4xl md:text-5xl lg:text-6xl; }
-  h2 { @apply text-3xl md:text-4xl; }
-  h3 { @apply text-xl md:text-2xl; }
+  h1 { @apply text-4xl md:text-5xl lg:text-6xl tracking-normal; }
+  h2 { @apply text-3xl md:text-4xl tracking-normal; }
+  h3 { @apply text-xl md:text-2xl tracking-tight; }
 
   p {
     @apply leading-relaxed;
@@ -100,7 +99,7 @@
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid hsl(var(--border) / 0.5);
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .glass-header.scrolled {
@@ -119,7 +118,7 @@
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid hsl(var(--border) / 0.5);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
-  transition: all 0.3s ease;
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
 }
 
 .dark .glass-card {
@@ -138,7 +137,7 @@
 /* Primary Button Glow */
 .glow-button {
   box-shadow: 0 4px 20px hsl(var(--primary) / 0.25);
-  transition: all 0.3s ease;
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
 }
 
 .glow-button:hover {
@@ -167,6 +166,23 @@
 .cosmic-gradient {
   background: radial-gradient(ellipse at top, hsl(240 60% 20% / 0.15) 0%, transparent 50%),
               radial-gradient(ellipse at bottom right, hsl(38 92% 50% / 0.08) 0%, transparent 40%);
+}
+
+/* Light mode cosmic gradient - maintains mystical identity */
+:root .cosmic-gradient {
+  background: radial-gradient(ellipse at top, hsl(245 50% 60% / 0.08) 0%, transparent 50%),
+              radial-gradient(ellipse at bottom right, hsl(38 92% 50% / 0.06) 0%, transparent 40%);
+}
+
+/* Subtle cosmic background for inner pages (dashboard, etc.) */
+.cosmic-page-bg {
+  background: radial-gradient(ellipse at top left, hsl(245 50% 60% / 0.07) 0%, transparent 45%),
+              radial-gradient(ellipse at bottom right, hsl(38 92% 50% / 0.05) 0%, transparent 45%);
+}
+
+.dark .cosmic-page-bg {
+  background: radial-gradient(ellipse at top left, hsl(240 60% 20% / 0.1) 0%, transparent 40%),
+              radial-gradient(ellipse at bottom right, hsl(38 92% 50% / 0.06) 0%, transparent 40%);
 }
 
 /* Subtle noise overlay */
@@ -271,7 +287,7 @@
 /* Zodiac badge */
 .zodiac-badge {
   @apply bg-primary/10 border border-primary/20 text-primary;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease;
 }
 
 .zodiac-badge:hover {
@@ -285,6 +301,27 @@
 
 .chat-bubble-assistant {
   @apply bg-muted border border-border;
+}
+
+/* Friend (Saoul) chat bubble — warmer, rose-tinted */
+.chat-bubble-friend {
+  @apply bg-muted border border-border;
+  border-color: hsl(350 60% 50% / 0.15);
+  background: hsl(350 60% 50% / 0.06);
+}
+
+.dark .chat-bubble-friend {
+  border-color: hsl(350 60% 60% / 0.15);
+  background: hsl(350 60% 60% / 0.08);
+}
+
+/* Friend preview card on landing page */
+.friend-preview-card {
+  border-color: hsl(350 60% 50% / 0.15);
+}
+
+.dark .friend-preview-card {
+  border-color: hsl(350 60% 60% / 0.15);
 }
 
 /* Transit card */
@@ -305,7 +342,7 @@
 /* Feature card */
 .feature-card {
   @apply bg-card/50 border border-border/50;
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .feature-card:hover {
@@ -314,7 +351,7 @@
 
 /* Sidebar */
 .sidebar-link {
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, padding-left 0.2s ease, color 0.2s ease;
 }
 
 .sidebar-link:hover {
@@ -360,7 +397,7 @@
 /* Theme toggle button */
 .theme-toggle {
   @apply relative w-14 h-8 rounded-full bg-muted border border-border;
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .theme-toggle::after {

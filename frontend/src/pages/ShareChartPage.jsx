@@ -183,7 +183,7 @@ export default function ShareChartPage() {
       });
       setShareToken(res.data.share_token);
     } catch {
-      toast.error("Could not generate share link. Please try again.");
+      toast.error("Couldn't create your share link. Your chart is safe — try again in a moment.");
     } finally {
       setGeneratingLink(false);
     }
@@ -206,7 +206,7 @@ export default function ShareChartPage() {
         tok = res.data.share_token;
         setShareToken(tok);
       } catch {
-        toast.error("Could not generate share link. Please try again.");
+        toast.error("Couldn't create your share link. Your chart is safe — try again in a moment.");
         setGeneratingLink(false);
         return;
       }
@@ -263,14 +263,14 @@ export default function ShareChartPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background cosmic-page-bg flex items-center justify-center">
         <div className="animate-pulse-glow w-16 h-16 rounded-full bg-primary/20" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background p-8">
+    <div className="min-h-screen bg-background cosmic-page-bg p-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">

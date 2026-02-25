@@ -23,7 +23,8 @@ import {
   X,
   Shield,
   Heart,
-  Hash
+  Hash,
+  Coffee
 } from "lucide-react";
 
 const Sidebar = ({ activeTab, setActiveTab, mobileOpen, setMobileOpen }) => {
@@ -34,6 +35,7 @@ const Sidebar = ({ activeTab, setActiveTab, mobileOpen, setMobileOpen }) => {
   const baseNavItems = [
     { id: "overview", icon: BarChart3, label: "Overview" },
     { id: "chat", icon: MessageCircle, label: "AI Coach", href: "/chat" },
+    { id: "friend", icon: Coffee, label: "AI Friend", href: "/friend" },
     { id: "chart", icon: Sun, label: "Birth Chart", href: "/chart" },
     { id: "compatibility", icon: Heart, label: "Compatibility", href: "/compatibility" },
     { id: "transits", icon: Calendar, label: "Transits", href: "/transits" },
@@ -229,16 +231,27 @@ const DashboardOverview = () => {
     );
   }
 
+  const greeting = (() => {
+    const hour = new Date().getHours();
+    return hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  })();
+
   return (
     <div className="space-y-6 lg:space-y-8">
       {/* Welcome Header */}
       <div>
-        <h1 className="font-serif text-2xl lg:text-3xl text-foreground mb-2">
-          Welcome back, {user?.name?.split(" ")[0]}
+        <h1 className="font-serif text-2xl lg:text-3xl text-foreground mb-1">
+          {greeting}, {user?.name?.split(" ")[0]}
         </h1>
-        <p className="text-muted-foreground text-sm lg:text-base">
+        <p className="text-muted-foreground text-sm lg:text-base mb-1">
           {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          {user?.sun_sign && ` · ${user.sun_sign} Sun`}
         </p>
+        {transits.length > 0 && (
+          <p className="text-muted-foreground/70 text-xs lg:text-sm italic">
+            {transits[0].type} is active in your chart — {transits[0].interpretation?.split('.')[0]?.toLowerCase() || 'a time for reflection'}.
+          </p>
+        )}
       </div>
 
       {/* Bento Grid Layout */}
@@ -325,17 +338,19 @@ const DashboardOverview = () => {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
-                { key: "life_path",     label: "Life Path",     icon: "🌟", desc: "Core life mission" },
-                { key: "personal_year", label: "Personal Year", icon: "📅", desc: "Your theme this year" },
-                { key: "soul_urge",     label: "Soul Urge",     icon: "💜", desc: "What you truly desire" },
-                { key: "expression",    label: "Expression",    icon: "📢", desc: "How you manifest" },
-              ].map(({ key, label, icon, desc }) => {
+                { key: "life_path",     label: "Life Path",     icon: Star, desc: "Core life mission" },
+                { key: "personal_year", label: "Personal Year", icon: Calendar, desc: "Your theme this year" },
+                { key: "soul_urge",     label: "Soul Urge",     icon: Heart, desc: "What you truly desire" },
+                { key: "expression",    label: "Expression",    icon: Zap, desc: "How you manifest" },
+              ].map(({ key, label, icon: Icon, desc }) => {
                 const entry = numerology[key];
                 if (!entry?.number) return null;
                 const isMaster = [11, 22, 33].includes(entry.number);
                 return (
                   <div key={key} className="p-4 rounded-xl bg-muted/30 text-center">
-                    <div className="text-xl mb-1">{icon}</div>
+                    <div className="flex justify-center mb-1">
+                      <Icon className="w-5 h-5 text-primary" />
+                    </div>
                     <div className={`text-2xl font-bold mb-0.5 font-serif ${isMaster ? "text-yellow-400" : "text-primary"}`}>
                       {entry.number}{isMaster && <span className="text-xs ml-0.5">✦</span>}
                     </div>
@@ -430,13 +445,13 @@ export default function Dashboard() {
       // Remove query params from URL without reload
       window.history.replaceState({}, "", window.location.pathname);
       import("sonner").then(({ toast }) => {
-        toast.success("🎉 Subscription activated! Welcome to your new plan.");
+        toast.success("Subscription activated! Welcome to your new plan.");
       });
     }
   }, [updateUser]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background cosmic-page-bg">
       <MobileHeader setMobileOpen={setMobileOpen} />
       <Sidebar 
         activeTab={activeTab} 

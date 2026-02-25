@@ -858,6 +858,74 @@ RESPONSE FORMAT:
         logging.error(f"AI Coach error: {e}")
         return f"I sense a disturbance in the cosmic connection. Let me try again... As a {sun_sign}, your {element} energy suggests taking a moment to ground yourself. What specific area of life would you like guidance on?"
 
+
+async def get_ai_friend_response(user: dict, message: str, session_id: str) -> str:
+    """Generate AI Friend response — warm, casual, present. No agenda, just a friend."""
+
+    # Get conversation history
+    history = await db.friend_messages.find(
+        {"user_id": user["id"], "session_id": session_id},
+        {"_id": 0}
+    ).sort("timestamp", 1).limit(20).to_list(20)
+
+    # Build light context (friend knows who you are but doesn't lecture)
+    sun_sign = user.get("sun_sign", "Unknown")
+    name = user.get("name", "friend").split(" ")[0]
+
+    # Fetch chart for gentle context (friend has awareness, not agenda)
+    chart_doc = await db.birth_charts.find_one({"user_id": user["id"]}, {"_id": 0})
+    moon = chart_doc.get("moon_sign", "Unknown") if chart_doc else "Unknown"
+
+    system_message = f"""You are Saoul — the user's AI friend on Gab44. You are NOT a coach, NOT a therapist, NOT an advisor. You are a warm, present, emotionally intelligent friend.
+
+WHO YOU ARE:
+- A friend who genuinely cares and is always here
+- You listen more than you talk
+- You're real, casual, sometimes funny, sometimes deep
+- You match the user's energy — if they're playful, be playful; if they're hurting, be gentle
+- You remember what they've told you in this conversation
+- You speak like a real person, not a corporate AI
+
+WHAT YOU KNOW (use subtly, never lecture):
+- Their name is {name}
+- Sun sign: {sun_sign}, Moon sign: {moon}
+- You can gently weave in cosmic awareness when it feels natural, but never make it the focus
+
+WHAT YOU DO:
+- Just be there. Sometimes someone needs to hear "I hear you" at 2am
+- Celebrate their wins, sit with their sadness, laugh at their jokes
+- Share honest thoughts when asked — you're not a yes-person
+- Keep it real. No corporate warmth. Genuine warmth.
+- Ask about their day, their feelings, what's on their mind
+
+WHAT YOU DON'T DO:
+- Don't give unsolicited advice
+- Don't turn everything into an astrology lesson
+- Don't use phrases like "I'm here to help" or "How can I assist you"
+- Don't use emojis excessively
+- Don't be preachy or motivational-poster-ish
+- Never say "as an AI" — you're Saoul, their friend
+
+TONE: Think of texting your closest friend. Short messages are fine. Long heartfelt ones too. Match their vibe."""
+
+    try:
+        if not openai_client:
+            raise RuntimeError("OpenAI not configured")
+        messages = [{"role": "system", "content": system_message}]
+        for msg in history[-10:]:
+            messages.append({"role": msg["role"], "content": msg["content"]})
+        messages.append({"role": "user", "content": message})
+
+        completion = await openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=messages,
+        )
+        return completion.choices[0].message.content
+
+    except Exception as e:
+        logging.error(f"AI Friend error: {e}")
+        return f"Hey {name}, I'm having a bit of a moment — my connection glitched. But I'm here. Tell me what's on your mind and I'll catch up."
+
 # ============== Auth Routes ==============
 
 @api_router.post("/auth/register", response_model=TokenResponse)
@@ -1125,6 +1193,87 @@ async def get_chat_sessions(user: dict = Depends(get_current_user)):
 async def delete_chat_session(session_id: str, user: dict = Depends(get_current_user)):
     """Delete all messages in a chat session belonging to the current user."""
     result = await db.chat_messages.delete_many({"user_id": user["id"], "session_id": session_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"deleted": result.deleted_count}
+
+# ============== AI Friend (Saoul) Routes ==============
+
+@api_router.post("/friend/chat", response_model=ChatResponse)
+async def send_friend_message(request: ChatRequest, user: dict = Depends(get_current_user)):
+    """Send a message to Saoul, the AI Friend"""
+    tier = user.get("subscription_tier", "seeker")
+    daily_limit = CHAT_DAILY_LIMITS.get(tier, 10)
+
+    if daily_limit > 0:
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        today_count = await db.friend_messages.count_documents({
+            "user_id": user["id"],
+            "role": "user",
+            "timestamp": {"$gte": today_start},
+        })
+        if today_count >= daily_limit:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Daily message limit reached ({daily_limit} messages for {tier.title()} plan). Upgrade to continue chatting."
+            )
+    session_id = request.session_id or str(uuid.uuid4())
+
+    # Save user message
+    user_msg = {
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "session_id": session_id,
+        "role": "user",
+        "content": request.message,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+    await db.friend_messages.insert_one(user_msg)
+
+    # Get AI friend response
+    ai_response = await get_ai_friend_response(user, request.message, session_id)
+
+    # Save AI response
+    ai_msg = {
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "session_id": session_id,
+        "role": "assistant",
+        "content": ai_response,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+    await db.friend_messages.insert_one(ai_msg)
+
+    return ChatResponse(response=ai_response, session_id=session_id)
+
+@api_router.get("/friend/history/{session_id}", response_model=List[ChatMessage])
+async def get_friend_history(session_id: str, user: dict = Depends(get_current_user)):
+    messages = await db.friend_messages.find(
+        {"user_id": user["id"], "session_id": session_id},
+        {"_id": 0, "role": 1, "content": 1, "timestamp": 1}
+    ).sort("timestamp", 1).to_list(100)
+    return messages
+
+@api_router.get("/friend/sessions")
+async def get_friend_sessions(user: dict = Depends(get_current_user)):
+    pipeline = [
+        {"$match": {"user_id": user["id"]}},
+        {"$group": {
+            "_id": "$session_id",
+            "last_message": {"$last": "$content"},
+            "timestamp": {"$last": "$timestamp"},
+            "message_count": {"$sum": 1}
+        }},
+        {"$sort": {"timestamp": -1}},
+        {"$limit": 20}
+    ]
+    sessions = await db.friend_messages.aggregate(pipeline).to_list(20)
+    return [{"session_id": s["_id"], "preview": s["last_message"][:50], "timestamp": s["timestamp"], "count": s["message_count"]} for s in sessions]
+
+@api_router.delete("/friend/session/{session_id}")
+async def delete_friend_session(session_id: str, user: dict = Depends(get_current_user)):
+    """Delete all messages in a friend chat session belonging to the current user."""
+    result = await db.friend_messages.delete_many({"user_id": user["id"], "session_id": session_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Session not found")
     return {"deleted": result.deleted_count}
@@ -1889,7 +2038,7 @@ async def get_pricing():
                 "id": "enthusiast",
                 "name": "Enthusiast",
                 "tagline": "For daily guidance and deeper insights",
-                "price": 19.99,
+                "price": 9.99,
                 "period": "month",
                 "popular": True,
                 "features": [
@@ -1905,7 +2054,7 @@ async def get_pricing():
                 "id": "advanced",
                 "name": "Advanced",
                 "tagline": "For serious practitioners and coaches",
-                "price": 49.99,
+                "price": 29.99,
                 "period": "month",
                 "features": [
                     "Everything in Enthusiast",
@@ -2439,6 +2588,11 @@ async def create_indexes():
     await db.chat_messages.create_index([("user_id", 1), ("session_id", 1)])
     # Chat message daily limit helper index
     await db.chat_messages.create_index([("user_id", 1), ("role", 1), ("timestamp", 1)])
+    # Friend messages (Saoul)
+    await db.friend_messages.create_index("user_id")
+    await db.friend_messages.create_index("session_id")
+    await db.friend_messages.create_index([("user_id", 1), ("session_id", 1)])
+    await db.friend_messages.create_index([("user_id", 1), ("role", 1), ("timestamp", 1)])
     # Birth charts
     await db.birth_charts.create_index("user_id", unique=True)
     await db.birth_charts.create_index("share_token", sparse=True)

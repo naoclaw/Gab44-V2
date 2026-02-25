@@ -29,7 +29,7 @@ export default function PublicChartPage() {
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background cosmic-page-bg flex items-center justify-center">
         <Loader2 className="w-10 h-10 text-primary animate-spin" />
       </div>
     );
@@ -37,7 +37,7 @@ export default function PublicChartPage() {
 
   if (status === "error") {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-8">
+      <div className="min-h-screen bg-background cosmic-page-bg flex items-center justify-center p-8">
         <div className="glass-card rounded-2xl p-10 max-w-sm w-full text-center space-y-4">
           <XCircle className="w-12 h-12 text-destructive mx-auto" />
           <h1 className="font-serif text-2xl text-foreground">Chart Not Found</h1>
@@ -49,7 +49,7 @@ export default function PublicChartPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background py-12 px-4">
+    <div className="min-h-screen bg-background cosmic-page-bg py-12 px-4">
       {/* Header */}
       <div className="max-w-xl mx-auto mb-8 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">

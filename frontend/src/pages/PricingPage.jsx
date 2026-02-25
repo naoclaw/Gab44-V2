@@ -63,7 +63,7 @@ export default function PricingPage() {
       // Redirect to Stripe Checkout
       window.location.href = response.data.checkout_url;
     } catch (error) {
-      const msg = error.response?.data?.detail || "Unable to start checkout. Please try again.";
+      const msg = error.response?.data?.detail || "Something went wrong starting checkout. No charge was made — try again in a moment.";
       toast.error(msg);
     } finally {
       setCheckoutLoading(null);
@@ -72,14 +72,14 @@ export default function PricingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background cosmic-page-bg flex items-center justify-center">
         <div className="animate-pulse-glow w-16 h-16 rounded-full bg-primary/20" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background p-8">
+    <div className="min-h-screen bg-background cosmic-page-bg p-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-12">

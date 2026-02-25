@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
-  Sparkles, 
+  Heart, 
   Send, 
   ArrowLeft,
   MessageCircle,
@@ -21,11 +21,12 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
-  Trash2
+  Trash2,
+  Coffee
 } from "lucide-react";
 import { toast } from "sonner";
 
-export default function ChatPage() {
+export default function FriendPage() {
   const { user, token } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { readingMode, toggleReadingMode, fontSize, increaseFontSize, decreaseFontSize, resetFontSize } = useReadingMode();
@@ -49,7 +50,7 @@ export default function ChatPage() {
 
   const fetchSessions = async () => {
     try {
-      const response = await axios.get(`${API}/chat/sessions`, {
+      const response = await axios.get(`${API}/friend/sessions`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSessions(response.data);
@@ -60,7 +61,7 @@ export default function ChatPage() {
 
   const loadSession = async (sid) => {
     try {
-      const response = await axios.get(`${API}/chat/history/${sid}`, {
+      const response = await axios.get(`${API}/friend/history/${sid}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setMessages(response.data);
@@ -76,9 +77,9 @@ export default function ChatPage() {
   };
 
   const deleteSession = async (e, sid) => {
-    e.stopPropagation(); // don't trigger loadSession
+    e.stopPropagation();
     try {
-      await axios.delete(`${API}/chat/session/${sid}`, {
+      await axios.delete(`${API}/friend/session/${sid}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSessions(prev => prev.filter(s => s.session_id !== sid));
@@ -100,7 +101,7 @@ export default function ChatPage() {
 
     try {
       const response = await axios.post(
-        `${API}/chat`,
+        `${API}/friend/chat`,
         { message: userMessage, session_id: sessionId },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -131,9 +132,11 @@ export default function ChatPage() {
     }
   };
 
+  const firstName = user?.name?.trim().split(" ")[0] || "friend";
+
   return (
     <div className="min-h-screen bg-background cosmic-page-bg flex">
-      {/* Sessions Sidebar */}
+      {/* Sessions Sidebar — warm tones */}
       <aside className="w-72 bg-card/50 backdrop-blur-sm border-r border-border flex flex-col h-screen">
         <div className="p-4 border-b border-border space-y-4">
           <div className="flex items-center justify-between">
@@ -151,9 +154,9 @@ export default function ChatPage() {
           </div>
           
           <Button 
-            className="w-full bg-primary/10 text-primary hover:bg-primary/20 rounded-xl"
+            className="w-full bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20 rounded-xl"
             onClick={startNewSession}
-            data-testid="new-chat-btn"
+            data-testid="friend-new-chat-btn"
           >
             <Plus className="w-4 h-4 mr-2" />
             New Conversation
@@ -168,10 +171,10 @@ export default function ChatPage() {
                   onClick={() => loadSession(session.session_id)}
                   className={`w-full text-left p-3 rounded-xl transition-all ${
                     sessionId === session.session_id 
-                      ? 'bg-primary/10 border border-primary/20' 
+                      ? 'bg-rose-500/10 border border-rose-500/20' 
                       : 'hover:bg-muted'
                   }`}
-                  data-testid={`session-${session.session_id}`}
+                  data-testid={`friend-session-${session.session_id}`}
                 >
                   <p className="text-sm text-foreground truncate mb-1 pr-6">
                     {session.preview}...
@@ -193,8 +196,9 @@ export default function ChatPage() {
             
             {sessions.length === 0 && (
               <div className="text-center py-8">
-                <MessageCircle className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                <Coffee className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">No conversations yet</p>
+                <p className="text-xs text-muted-foreground mt-1">Start one — Saoul's here</p>
               </div>
             )}
           </div>
@@ -203,18 +207,18 @@ export default function ChatPage() {
 
       {/* Chat Area */}
       <main className="flex-1 flex flex-col h-screen">
-        {/* Header */}
+        {/* Header — warmer identity */}
         <header className="p-4 border-b border-border bg-card/30 backdrop-blur-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
-                <Sparkles className="w-5 h-5 text-primary" />
+              <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center border border-rose-500/20">
+                <Heart className="w-5 h-5 text-rose-400" />
               </div>
               <div>
-                <h1 className="font-medium text-foreground">Gab44 AI Coach</h1>
-                <p className="text-xs text-green-500 flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-green-500" />
-                  Online - Ready to guide you
+                <h1 className="font-medium text-foreground">Saoul</h1>
+                <p className="text-xs text-rose-400 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-rose-400" />
+                  Always here for you
                 </p>
               </div>
             </div>
@@ -228,10 +232,10 @@ export default function ChatPage() {
                   onClick={() => setShowReadingControls(!showReadingControls)}
                   className={`h-9 px-3 rounded-xl transition-colors ${
                     readingMode 
-                      ? 'bg-primary/10 text-primary border border-primary/20' 
+                      ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' 
                       : 'hover:bg-muted'
                   }`}
-                  data-testid="reading-mode-btn"
+                  data-testid="friend-reading-mode-btn"
                 >
                   <BookOpen className="w-4 h-4 mr-2" />
                   Reading Mode
@@ -245,9 +249,9 @@ export default function ChatPage() {
                         <button
                           onClick={toggleReadingMode}
                           className={`w-12 h-6 rounded-full transition-colors ${
-                            readingMode ? 'bg-primary' : 'bg-muted'
+                            readingMode ? 'bg-rose-400' : 'bg-muted'
                           }`}
-                          data-testid="reading-mode-toggle"
+                          data-testid="friend-reading-mode-toggle"
                         >
                           <span className={`block w-5 h-5 rounded-full bg-white shadow transform transition-transform ${
                             readingMode ? 'translate-x-6' : 'translate-x-0.5'
@@ -263,13 +267,12 @@ export default function ChatPage() {
                             size="sm"
                             onClick={decreaseFontSize}
                             className="h-8 w-8 p-0 rounded-lg"
-                            data-testid="decrease-font-btn"
                           >
                             <ZoomOut className="w-4 h-4" />
                           </Button>
                           <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                             <div 
-                              className="h-full bg-primary rounded-full transition-all"
+                              className="h-full bg-rose-400 rounded-full transition-all"
                               style={{ width: `${((fontSize - 12) / 12) * 100}%` }}
                             />
                           </div>
@@ -278,7 +281,6 @@ export default function ChatPage() {
                             size="sm"
                             onClick={increaseFontSize}
                             className="h-8 w-8 p-0 rounded-lg"
-                            data-testid="increase-font-btn"
                           >
                             <ZoomIn className="w-4 h-4" />
                           </Button>
@@ -287,7 +289,6 @@ export default function ChatPage() {
                             size="sm"
                             onClick={resetFontSize}
                             className="h-8 w-8 p-0 rounded-lg"
-                            data-testid="reset-font-btn"
                           >
                             <RotateCcw className="w-4 h-4" />
                           </Button>
@@ -310,29 +311,29 @@ export default function ChatPage() {
           <div className="max-w-3xl mx-auto space-y-6">
             {messages.length === 0 && (
               <div className="text-center py-16">
-                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4 border border-primary/20">
-                  <Sparkles className="w-8 h-8 text-primary" />
+                <div className="w-16 h-16 rounded-2xl bg-rose-500/10 flex items-center justify-center mx-auto mb-4 border border-rose-500/20">
+                  <Heart className="w-8 h-8 text-rose-400" />
                 </div>
                 <h2 className="font-serif text-xl text-foreground mb-2">
-                  Hello, {user?.name?.split(" ")[0]}
+                  Hey, {firstName}
                 </h2>
                 <p className="text-muted-foreground mb-6 max-w-md mx-auto leading-relaxed">
-                  I know your chart — your planets, houses, aspects, and numerology.
-                  Ask me anything about your cosmic blueprint, and I'll give you honest, specific guidance.
+                  I'm Saoul — not a coach, not a therapist. Just a friend who's always here. 
+                  Talk to me about anything — your day, your feelings, the things you can't say out loud.
                 </p>
                 <div className="flex flex-wrap justify-center gap-2">
                   {[
-                    "What should I focus on today?",
-                    "Tell me about my career path",
-                    "What's happening in my chart?",
-                    "Relationship guidance"
+                    "I just need someone to talk to",
+                    "Tell me something good",
+                    "I had a weird day",
+                    "I'm feeling lonely"
                   ].map((prompt) => (
                     <Button
                       key={prompt}
                       variant="outline"
-                      className="border-border text-sm rounded-xl"
+                      className="border-rose-500/20 text-sm rounded-xl hover:bg-rose-500/10 hover:border-rose-500/30"
                       onClick={() => setInput(prompt)}
-                      data-testid={`prompt-${prompt.replace(/\s+/g, '-').toLowerCase()}`}
+                      data-testid={`friend-prompt-${prompt.replace(/\s+/g, '-').toLowerCase()}`}
                     >
                       {prompt}
                     </Button>
@@ -347,8 +348,8 @@ export default function ChatPage() {
                 className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 {message.role === 'assistant' && (
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 border border-primary/20">
-                    <Sparkles className="w-4 h-4 text-primary" />
+                  <div className="w-8 h-8 rounded-lg bg-rose-500/10 flex items-center justify-center flex-shrink-0 border border-rose-500/20">
+                    <Heart className="w-4 h-4 text-rose-400" />
                   </div>
                 )}
                 
@@ -356,9 +357,9 @@ export default function ChatPage() {
                   className={`max-w-xl rounded-2xl p-4 ${
                     message.role === 'user' 
                       ? 'chat-bubble-user rounded-tr-sm' 
-                      : 'chat-bubble-assistant rounded-tl-sm'
+                      : 'chat-bubble-friend rounded-tl-sm'
                   }`}
-                  data-testid={`message-${index}`}
+                  data-testid={`friend-message-${index}`}
                 >
                   <p 
                     className={`text-foreground whitespace-pre-wrap ${
@@ -382,14 +383,14 @@ export default function ChatPage() {
 
             {loading && (
               <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20">
-                  <Sparkles className="w-4 h-4 text-primary animate-pulse" />
+                <div className="w-8 h-8 rounded-lg bg-rose-500/10 flex items-center justify-center border border-rose-500/20">
+                  <Heart className="w-4 h-4 text-rose-400 animate-pulse" />
                 </div>
-                <div className="chat-bubble-assistant rounded-2xl rounded-tl-sm p-4">
+                <div className="chat-bubble-friend rounded-2xl rounded-tl-sm p-4">
                   <div className="flex gap-1">
-                    <span className="w-2 h-2 bg-primary/50 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="w-2 h-2 bg-primary/50 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="w-2 h-2 bg-primary/50 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <span className="w-2 h-2 bg-rose-400/50 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-2 h-2 bg-rose-400/50 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-2 h-2 bg-rose-400/50 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
                 </div>
               </div>
@@ -405,16 +406,16 @@ export default function ChatPage() {
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask your AI coach anything..."
-              className="flex-1 bg-muted/30 border-border h-12 rounded-xl focus-glow"
+              placeholder="Talk to Saoul..."
+              className="flex-1 bg-muted/30 border-border h-12 rounded-xl focus:border-rose-500/50 focus:ring-rose-500/20"
               disabled={loading}
-              data-testid="chat-input"
+              data-testid="friend-chat-input"
             />
             <Button 
               type="submit" 
-              className="bg-primary text-primary-foreground h-12 px-6 rounded-xl"
+              className="bg-rose-500 hover:bg-rose-600 text-white h-12 px-6 rounded-xl"
               disabled={loading || !input.trim()}
-              data-testid="send-btn"
+              data-testid="friend-send-btn"
             >
               <Send className="w-5 h-5" />
             </Button>
