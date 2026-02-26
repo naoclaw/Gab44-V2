@@ -1,0 +1,6 @@
+[phases.setup]
+# build-essential provides gcc/g++ for C-extension packages (e.g. pyswisseph)
+aptPkgs = ["build-essential", "python3-dev"]
+
+[phases.install]
+cmds = ["pip install --upgrade pip", "pip install -r requirements.txt"]

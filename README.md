@@ -197,6 +197,48 @@ pytest tests/ -v
 
 ---
 
+## Railway Deployment
+
+This repo is structured as a **monorepo** — deploy each service separately in Railway.
+
+### Backend service
+
+1. In Railway, create a new service → **Deploy from GitHub repo** → pick this repository.
+2. Set **Root Directory** → `backend`.
+3. Railway will use `backend/railway.toml` (start command, health-check) and `backend/nixpacks.toml` (build deps) automatically.
+4. Add the following environment variables in the Railway dashboard:
+
+| Variable | Description |
+|----------|-------------|
+| `MONGO_URL` | MongoDB connection string (e.g. from Railway's MongoDB add-on) |
+| `DB_NAME` | Database name (`gab44`) |
+| `JWT_SECRET` | Long random secret — generate with `python -c "import secrets; print(secrets.token_hex(32))"` |
+| `FRONTEND_URL` | Full URL of the deployed frontend (e.g. `https://gab44.up.railway.app`) |
+| `CORS_ORIGINS` | Same as `FRONTEND_URL` |
+| `OPENAI_API_KEY` | GPT-4o key |
+| `SENDGRID_API_KEY` | SendGrid key |
+| `EMAIL_NOREPLY` / `EMAIL_VERIFY` / `EMAIL_SUPPORT` / `EMAIL_MARKETING` | Verified SendGrid senders |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PUBLISHABLE_KEY` | Stripe keys |
+| `ONESIGNAL_APP_ID` / `ONESIGNAL_API_KEY` | OneSignal keys (optional) |
+
+### Frontend service
+
+1. In Railway, create a second service → **Deploy from GitHub repo** → same repository.
+2. Set **Root Directory** → `frontend`.
+3. Railway will use `frontend/railway.toml` automatically.
+4. Add environment variables:
+
+| Variable | Description |
+|----------|-------------|
+| `REACT_APP_BACKEND_URL` | Public URL of the deployed backend service |
+| `REACT_APP_ONESIGNAL_APP_ID` | OneSignal App ID (optional) |
+
+### MongoDB
+
+Add Railway's **MongoDB** plugin (or use MongoDB Atlas) and copy the connection string into `MONGO_URL`.
+
+---
+
 ## License
 
 Private / proprietary. All rights reserved.
