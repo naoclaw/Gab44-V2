@@ -201,41 +201,70 @@ pytest tests/ -v
 
 This repo is structured as a **monorepo** — deploy each service separately in Railway.
 
-### Backend service
+> **First time on Railway? Follow the steps in order — the backend won't start
+> until MongoDB is provisioned and all required env vars are set.**
 
-1. In Railway, create a new service → **Deploy from GitHub repo** → pick this repository.
+### Step 1 — Add MongoDB to your Railway project
+
+Before deploying the backend, add a database:
+
+1. In your Railway **project**, click **+ New** → **Database** → **Add MongoDB**.
+2. Railway provisions a MongoDB instance and automatically makes a `MONGO_URL`
+   variable available to any service in the same project.
+3. You still need to set `DB_NAME = gab44` manually (see Step 2 below).
+
+Alternatively, use **MongoDB Atlas**: create a free M0 cluster, copy the
+connection string, and set it as `MONGO_URL` in the backend service variables.
+
+---
+
+### Step 2 — Deploy the backend service
+
+1. In Railway, click **+ New** → **GitHub Repo** → pick this repository.
 2. Set **Root Directory** → `backend`.
-3. Railway will use `backend/railway.toml` (start command, health-check) and `backend/nixpacks.toml` (build deps) automatically.
-4. Add the following environment variables in the Railway dashboard:
+3. Railway will use `backend/railway.toml` (start command, health-check) and
+   `backend/nixpacks.toml` (Python 3.11, build deps) automatically.
+4. Add the following **service variables** (Settings → Variables):
 
-| Variable | Description |
-|----------|-------------|
-| `MONGO_URL` | MongoDB connection string (e.g. from Railway's MongoDB add-on) |
-| `DB_NAME` | Database name (`gab44`) |
-| `JWT_SECRET` | Long random secret — generate with `python -c "import secrets; print(secrets.token_hex(32))"` |
-| `FRONTEND_URL` | Full URL of the deployed frontend (e.g. `https://gab44.up.railway.app`) |
-| `CORS_ORIGINS` | Same as `FRONTEND_URL` |
-| `OPENAI_API_KEY` | GPT-4o key |
-| `SENDGRID_API_KEY` | SendGrid key |
-| `EMAIL_NOREPLY` / `EMAIL_VERIFY` / `EMAIL_SUPPORT` / `EMAIL_MARKETING` | Verified SendGrid senders |
-| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PUBLISHABLE_KEY` | Stripe keys |
-| `ONESIGNAL_APP_ID` / `ONESIGNAL_API_KEY` | OneSignal keys (optional) |
+| Variable | Required | Value / Description |
+|----------|----------|---------------------|
+| `MONGO_URL` | ✅ | Injected automatically if you added Railway MongoDB; otherwise paste your Atlas URI |
+| `DB_NAME` | ✅ | `gab44` |
+| `JWT_SECRET` | ✅ | Long random secret — run `python -c "import secrets; print(secrets.token_hex(32))"` |
+| `FRONTEND_URL` | ✅ | Full URL of the deployed frontend (e.g. `https://gab44.up.railway.app`) |
+| `CORS_ORIGINS` | ✅ | Same as `FRONTEND_URL` |
+| `OPENAI_API_KEY` | optional | GPT-4o key |
+| `SENDGRID_API_KEY` | optional | SendGrid key |
+| `EMAIL_NOREPLY` / `EMAIL_VERIFY` / `EMAIL_SUPPORT` / `EMAIL_MARKETING` | optional | Verified SendGrid senders |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PUBLISHABLE_KEY` | optional | Stripe keys |
+| `ONESIGNAL_APP_ID` / `ONESIGNAL_API_KEY` | optional | OneSignal keys |
 
-### Frontend service
+5. Click **Deploy**. Check the deploy logs — if any required variable is missing
+   you will see a clear error message listing exactly which ones to add.
 
-1. In Railway, create a second service → **Deploy from GitHub repo** → same repository.
+---
+
+### Step 3 — Deploy the frontend service
+
+1. In Railway, click **+ New** → **GitHub Repo** → same repository.
 2. Set **Root Directory** → `frontend`.
 3. Railway will use `frontend/railway.toml` automatically.
-4. Add environment variables:
+4. Add service variables:
 
-| Variable | Description |
-|----------|-------------|
-| `REACT_APP_BACKEND_URL` | Public URL of the deployed backend service |
-| `REACT_APP_ONESIGNAL_APP_ID` | OneSignal App ID (optional) |
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `REACT_APP_BACKEND_URL` | ✅ | Public URL of the deployed backend service (no trailing slash) |
+| `REACT_APP_ONESIGNAL_APP_ID` | optional | OneSignal App ID |
 
-### MongoDB
+---
 
-Add Railway's **MongoDB** plugin (or use MongoDB Atlas) and copy the connection string into `MONGO_URL`.
+### Troubleshooting
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Backend deploy fails with `EnvironmentError: Missing required environment variables` | `MONGO_URL`, `DB_NAME`, or `JWT_SECRET` not set | Set them in the backend service variables (Step 2) |
+| `MONGO_URL` is not injected automatically | MongoDB database not added to the Railway project | Add it via **+ New → Database → MongoDB** first |
+| Frontend shows network errors / can't reach API | `REACT_APP_BACKEND_URL` wrong or not set | Set it to the public URL of your backend Railway service |
 
 ---
 

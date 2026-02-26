@@ -1,3 +1,7 @@
+[variables]
+# Pin Python version — must match the version used in local development
+NIXPACKS_PYTHON_VERSION = "3.11"
+
 [phases.setup]
 # build-essential provides gcc/g++ for C-extension packages (e.g. pyswisseph)
 aptPkgs = ["build-essential", "python3-dev"]
