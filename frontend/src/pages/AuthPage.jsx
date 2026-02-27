@@ -332,7 +332,7 @@ export default function AuthPage() {
                 className="w-full glow-button bg-primary text-primary-foreground h-12 text-base rounded-xl"
                 data-testid="submit-btn"
               >
-                Create Account &amp; Continue
+                Create Account & Continue
               </Button>
             </form>
             <p className="text-sm text-muted-foreground mt-4 text-center max-w-sm">
