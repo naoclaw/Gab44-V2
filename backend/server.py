@@ -42,15 +42,49 @@ from cities import geocode_search
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
+# ── Startup environment validation ───────────────────────────────────────────
+_REQUIRED_ENV_VARS = {
+    'MONGO_URL': (
+        'MongoDB connection string. '
+        'On Railway: add a MongoDB database to your project and Railway will '
+        'inject this automatically, OR set it manually in the service variables.'
+    ),
+    'DB_NAME': (
+        'MongoDB database name (e.g. "gab44"). '
+        'Set this in the Railway service variables.'
+    ),
+    'JWT_SECRET': (
+        "Long random secret for JWT signing. "
+        "Generate one with: python -c 'import secrets; print(secrets.token_hex(32))'"
+    ),
+}
+_missing_vars = [var for var in _REQUIRED_ENV_VARS if not os.environ.get(var)]
+if _missing_vars:
+    lines = [
+        '',
+        '=' * 70,
+        'STARTUP ERROR — Missing required environment variables:',
+        '',
+    ]
+    for var in _missing_vars:
+        lines.append(f'  {var}')
+        lines.append(f'    → {_REQUIRED_ENV_VARS[var]}')
+        lines.append('')
+    lines += [
+        'Set these variables in your Railway service dashboard before deploying.',
+        'See the README "Railway Deployment" section for the full setup guide.',
+        '=' * 70,
+        '',
+    ]
+    raise EnvironmentError('\n'.join(lines))
+
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 # JWT Configuration
-JWT_SECRET = os.environ.get('JWT_SECRET')
-if not JWT_SECRET:
-    raise ValueError("JWT_SECRET environment variable is required")
+JWT_SECRET = os.environ['JWT_SECRET']
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
 

@@ -207,13 +207,13 @@ const DashboardOverview = () => {
           }),
           axios.get(`${API}/transits/upcoming`, {
             headers: { Authorization: `Bearer ${token}` }
-          }),
+          }).catch((err) => { console.warn("Transits fetch failed:", err); return { data: [] }; }),
           axios.get(`${API}/numerology/me`, {
             headers: { Authorization: `Bearer ${token}` }
           }).catch((err) => { console.warn("Numerology fetch failed:", err); return { data: null }; })
         ]);
         setDailyGuidance(guidanceRes.data);
-        setTransits(transitsRes.data.slice(0, 3));
+        setTransits(Array.isArray(transitsRes.data) ? transitsRes.data.slice(0, 3) : []);
         setNumerology(numerologyRes.data);
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -252,7 +252,7 @@ const DashboardOverview = () => {
         </p>
         {transits.length > 0 && (
           <p className="text-muted-foreground/70 text-xs lg:text-sm italic">
-            {transits[0].type} is active in your chart — {transits[0].interpretation?.split('.')[0]?.toLowerCase() || 'a time for reflection'}.
+            {transits[0].transit_type} is active in your chart — {transits[0].interpretation?.split('.')[0]?.toLowerCase() || 'a time for reflection'}.
           </p>
         )}
       </div>
