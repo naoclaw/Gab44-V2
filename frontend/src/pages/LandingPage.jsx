@@ -477,8 +477,8 @@ const PricingSection = () => {
     {
       name: "Seeker",
       tagline: "For those just starting their journey",
-      price: "Free",
-      period: "",
+      price: 0,
+      period: null,
       features: ["Basic Chart Overview", "Daily Short Guidance", "1 Compatibility Reading", "Educational Library"],
       cta: "Create Your Free Chart",
       popular: false,
@@ -486,7 +486,7 @@ const PricingSection = () => {
     {
       name: "Enthusiast",
       tagline: "For daily guidance and deeper insights",
-      price: "$9.99",
+      price: 9.99,
       period: "/month",
       features: ["Everything in Seeker", "Daily AI Coaching", "Monthly Detailed Reports", "Unlimited Compatibility", "30-Day Transit Forecasts"],
       cta: "Start Free Trial",
@@ -495,7 +495,7 @@ const PricingSection = () => {
     {
       name: "Advanced",
       tagline: "For serious practitioners and coaches",
-      price: "$29.99",
+      price: 29.99,
       period: "/month",
       features: ["Everything in Enthusiast", "Advanced Predictive Tools", "90-Day Transit Forecasts", "Chart Pattern Analysis", "Export to PDF"],
       cta: "Upgrade Now",
@@ -524,8 +524,10 @@ const PricingSection = () => {
               <h3 className="font-serif text-xl text-foreground mb-1">{plan.name}</h3>
               <p className="text-sm text-muted-foreground mb-6">{plan.tagline}</p>
               <div className="mb-6">
-                <span className="font-serif text-4xl text-foreground">{plan.price}</span>
-                <span className="text-muted-foreground">{plan.period}</span>
+                <span className="font-serif text-4xl text-foreground">
+                  {plan.price === 0 ? "Free" : `$${plan.price}`}
+                </span>
+                {plan.period && <span className="text-muted-foreground">{plan.period}</span>}
               </div>
               <ul className="space-y-3 mb-6">
                 {plan.features.map((feature, i) => (

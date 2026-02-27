@@ -405,10 +405,10 @@ const DashboardOverview = () => {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
-                { key: "life_path",     label: "Life Path",     icon: Star,     desc: "Core life mission" },
-                { key: "personal_year", label: "Personal Year", icon: Calendar, desc: "Your theme this year" },
-                { key: "soul_urge",     label: "Soul Urge",     icon: Heart,    desc: "What you truly desire" },
-                { key: "expression",    label: "Expression",    icon: Zap,      desc: "How you manifest" },
+                { key: "life_path",     label: "Life Path",     icon: Star },
+                { key: "personal_year", label: "Personal Year", icon: Calendar },
+                { key: "soul_urge",     label: "Soul Urge",     icon: Heart },
+                { key: "expression",    label: "Expression",    icon: Zap },
               ].map(({ key, label, icon: Icon }) => {
                 const entry = numerology[key];
                 if (!entry?.number) return null;
