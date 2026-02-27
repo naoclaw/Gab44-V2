@@ -8,21 +8,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Sparkles, ArrowLeft, Eye, EyeOff, MapPin, Calendar, Clock, Sun, Moon, Mail } from "lucide-react";
+import { Sparkles, ArrowLeft, Eye, EyeOff, MapPin, Calendar, Clock, Sun, Moon } from "lucide-react";
 
 export default function AuthPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, login, register } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  
+
   const [isRegister, setIsRegister] = useState(searchParams.get("mode") === "register");
   const [isForgot, setIsForgot] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [registeredEmail, setRegisteredEmail] = useState(null);
   const [forgotEmail, setForgotEmail] = useState("");
-  
+
+  // Progressive registration: step 1 = name/email/password, step 2 = birth details
+  const [regStep, setRegStep] = useState(1);
+
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -30,13 +32,11 @@ export default function AuthPage() {
     birth_name: "",
     birth_date: "",
     birth_time: "",
-    birth_place: ""
+    birth_place: "",
   });
 
   useEffect(() => {
-    if (user) {
-      navigate("/dashboard");
-    }
+    if (user) navigate("/dashboard");
   }, [user, navigate]);
 
   const handleChange = (e) => {
@@ -57,26 +57,65 @@ export default function AuthPage() {
     }
   };
 
-  const handleSubmit = async (e) => {
+  // Step 1 submit: validate and advance to step 2
+  const handleStep1Submit = (e) => {
+    e.preventDefault();
+    if (!formData.name.trim() || !formData.email.trim() || !formData.password.trim()) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+    if (formData.password.length < 8) {
+      toast.error("Password must be at least 8 characters");
+      return;
+    }
+    setRegStep(2);
+  };
+
+  // Step 2: complete setup (with birth details)
+  const handleCompleteSetup = async (e) => {
     e.preventDefault();
     setLoading(true);
-
     try {
-      if (isRegister) {
-        if (!formData.name || !formData.birth_date || !formData.birth_place) {
-          toast.error("Please fill in all required fields");
-          setLoading(false);
-          return;
-        }
-        await register(formData);
-        setRegisteredEmail(formData.email);
-        toast.success("Welcome to Gab44! Check your inbox to verify your email.");
-        navigate("/dashboard");
-      } else {
-        await login(formData.email, formData.password);
-        toast.success("Welcome back! The stars have been waiting.");
-        navigate("/dashboard");
-      }
+      await register(formData);
+      toast.success("Welcome to Gab44! Check your inbox to verify your email.");
+      navigate("/dashboard");
+    } catch (error) {
+      toast.error(parseApiError(error));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Step 2: skip birth details — submit with only name/email/password
+  const handleSkip = async () => {
+    setLoading(true);
+    try {
+      await register({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        birth_name: "",
+        birth_date: "",
+        birth_time: "",
+        birth_place: "",
+      });
+      toast.success("Welcome to Gab44! Check your inbox to verify your email.");
+      navigate("/dashboard");
+    } catch (error) {
+      toast.error(parseApiError(error));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Login submit
+  const handleLoginSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await login(formData.email, formData.password);
+      toast.success("Welcome back! The stars have been waiting.");
+      navigate("/dashboard");
     } catch (error) {
       toast.error(parseApiError(error));
     } finally {
@@ -88,17 +127,16 @@ export default function AuthPage() {
     <div className="min-h-screen flex bg-background cosmic-page-bg">
       {/* Left Side - Form */}
       <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 md:px-16 lg:px-24 py-12">
+        {/* Top bar */}
         <div className="flex items-center justify-between mb-12">
-          <button 
-            onClick={() => { setIsForgot(false); navigate("/"); }}
+          <button
+            onClick={() => { setIsForgot(false); setRegStep(1); navigate("/"); }}
             className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
             data-testid="back-to-home"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Home
           </button>
-
-          {/* Theme Toggle */}
           <button
             onClick={toggleTheme}
             className="w-10 h-10 rounded-xl bg-muted/50 hover:bg-muted flex items-center justify-center transition-colors border border-border/50"
@@ -108,6 +146,7 @@ export default function AuthPage() {
           </button>
         </div>
 
+        {/* Logo */}
         <div className="flex items-center gap-3 mb-8">
           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
             <Sparkles className="w-5 h-5 text-primary" />
@@ -134,7 +173,12 @@ export default function AuthPage() {
                 />
               </div>
               <Button type="submit" disabled={loading} className="w-full glow-button bg-primary text-primary-foreground h-12 text-base rounded-xl">
-                {loading ? <span className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />Sending...</span> : "Send Reset Link"}
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                    Sending...
+                  </span>
+                ) : "Send Reset Link"}
               </Button>
             </form>
             <p className="text-sm text-muted-foreground mt-6 text-center">
@@ -145,21 +189,92 @@ export default function AuthPage() {
           </div>
         )}
 
-        {!isForgot && (
-        <>
-        <h1 className="font-serif text-3xl md:text-4xl text-foreground mb-2">
-          {isRegister ? "Begin Your Journey" : "Welcome Home"}
-        </h1>
-        <p className="text-muted-foreground mb-8 leading-relaxed">
-          {isRegister 
-            ? "Enter your birth details to unlock your cosmic blueprint" 
-            : "We've been waiting for you — let's pick up where you left off"
-          }
-        </p>
+        {/* ── Login Panel ── */}
+        {!isForgot && !isRegister && (
+          <>
+            <h1 className="font-serif text-3xl md:text-4xl text-foreground mb-2">Welcome Home</h1>
+            <p className="text-muted-foreground mb-8 leading-relaxed">
+              We've been waiting for you — let's pick up where you left off
+            </p>
+            <form onSubmit={handleLoginSubmit} className="space-y-5 max-w-sm">
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-foreground">Email Address</Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="your@email.com"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="bg-muted/30 border-border h-12 rounded-xl focus-glow"
+                  data-testid="email-input"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-foreground">Password</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={formData.password}
+                    onChange={handleChange}
+                    className="bg-muted/30 border-border h-12 rounded-xl pr-10 focus-glow"
+                    data-testid="password-input"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+              <Button
+                type="submit"
+                className="w-full glow-button bg-primary text-primary-foreground h-12 text-base rounded-xl"
+                disabled={loading}
+                data-testid="submit-btn"
+              >
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                    Signing In...
+                  </span>
+                ) : "Sign In"}
+              </Button>
+            </form>
+            <p className="text-sm text-muted-foreground mt-3 text-center max-w-sm">
+              <button
+                onClick={() => { setIsForgot(true); setForgotEmail(formData.email); }}
+                className="text-primary hover:underline font-medium"
+              >
+                Forgot your password?
+              </button>
+            </p>
+            <p className="text-sm text-muted-foreground mt-4 text-center max-w-sm">
+              Don't have an account?{" "}
+              <button
+                onClick={() => { setIsRegister(true); setRegStep(1); }}
+                className="text-primary hover:underline font-medium"
+                data-testid="toggle-auth-mode"
+              >
+                Create One
+              </button>
+            </p>
+          </>
+        )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {isRegister && (
-            <>
+        {/* ── Register Step 1: Name / Email / Password ── */}
+        {!isForgot && isRegister && regStep === 1 && (
+          <>
+            <h1 className="font-serif text-3xl md:text-4xl text-foreground mb-2">Begin Your Journey</h1>
+            <p className="text-muted-foreground mb-8 leading-relaxed">Create your free account in seconds</p>
+            <form onSubmit={handleStep1Submit} className="space-y-5 max-w-sm">
               <div className="space-y-2">
                 <Label htmlFor="name" className="text-foreground">Full Name *</Label>
                 <Input
@@ -174,24 +289,78 @@ export default function AuthPage() {
                   required
                 />
               </div>
-
               <div className="space-y-2">
-                <Label htmlFor="birth_name" className="text-foreground flex items-center gap-2">
-                  Legal Birth Name
-                  <span className="text-xs text-muted-foreground font-normal">(optional — used for numerology)</span>
-                </Label>
+                <Label htmlFor="email" className="text-foreground">Email Address *</Label>
                 <Input
-                  id="birth_name"
-                  name="birth_name"
-                  type="text"
-                  placeholder="As on your birth certificate"
-                  value={formData.birth_name}
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="your@email.com"
+                  value={formData.email}
                   onChange={handleChange}
                   className="bg-muted/30 border-border h-12 rounded-xl focus-glow"
-                  data-testid="birth-name-input"
+                  data-testid="email-input"
+                  required
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-foreground">Password *</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={formData.password}
+                    onChange={handleChange}
+                    className="bg-muted/30 border-border h-12 rounded-xl pr-10 focus-glow"
+                    data-testid="password-input"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">Min. 8 characters, must include a letter and a digit or special character.</p>
+              </div>
+              <Button
+                type="submit"
+                className="w-full glow-button bg-primary text-primary-foreground h-12 text-base rounded-xl"
+                data-testid="submit-btn"
+              >
+                Create Account &amp; Continue
+              </Button>
+            </form>
+            <p className="text-sm text-muted-foreground mt-4 text-center max-w-sm">
+              Already have an account?{" "}
+              <button
+                onClick={() => setIsRegister(false)}
+                className="text-primary hover:underline font-medium"
+                data-testid="toggle-auth-mode"
+              >
+                Sign In
+              </button>
+            </p>
+          </>
+        )}
 
+        {/* ── Register Step 2: Birth Details ── */}
+        {!isForgot && isRegister && regStep === 2 && (
+          <>
+            <div className="mb-6">
+              <h1 className="font-serif text-2xl md:text-3xl text-foreground mb-2">
+                One last step — unlock your cosmic blueprint
+              </h1>
+              <p className="text-muted-foreground leading-relaxed max-w-sm">
+                Your birth details let us calculate your natal chart with astronomical precision.
+                Don't have your birth time? No problem — we'll use solar calculations.
+              </p>
+            </div>
+            <form onSubmit={handleCompleteSetup} className="space-y-5 max-w-sm">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="birth_date" className="flex items-center gap-2 text-foreground">
@@ -213,6 +382,7 @@ export default function AuthPage() {
                   <Label htmlFor="birth_time" className="flex items-center gap-2 text-foreground">
                     <Clock className="w-4 h-4 text-muted-foreground" />
                     Birth Time
+                    <span className="text-xs text-muted-foreground font-normal">(optional)</span>
                   </Label>
                   <Input
                     id="birth_time"
@@ -222,11 +392,10 @@ export default function AuthPage() {
                     onChange={handleChange}
                     className="bg-muted/30 border-border h-12 rounded-xl focus-glow"
                     data-testid="birth-time-input"
-                    placeholder="Optional"
+                    placeholder="Don't know? Leave empty"
                   />
                 </div>
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="birth_place" className="flex items-center gap-2 text-foreground">
                   <MapPin className="w-4 h-4 text-muted-foreground" />
@@ -244,103 +413,61 @@ export default function AuthPage() {
                   required
                 />
               </div>
-            </>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor="email" className="text-foreground">Email Address</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              placeholder="your@email.com"
-              value={formData.email}
-              onChange={handleChange}
-              className="bg-muted/30 border-border h-12 rounded-xl focus-glow"
-              data-testid="email-input"
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="password" className="text-foreground">Password</Label>
-            <div className="relative">
-              <Input
-                id="password"
-                name="password"
-                type={showPassword ? "text" : "password"}
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={handleChange}
-                className="bg-muted/30 border-border h-12 rounded-xl pr-10 focus-glow"
-                data-testid="password-input"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
-            </div>
-            {isRegister && (
-              <p className="text-xs text-muted-foreground">
-                Min. 8 characters, must include a letter and a digit or special character.
+              <div className="space-y-2">
+                <Label htmlFor="birth_name" className="text-foreground flex items-center gap-2">
+                  Legal Birth Name
+                  <span className="text-xs text-muted-foreground font-normal">(optional — for numerology accuracy)</span>
+                </Label>
+                <Input
+                  id="birth_name"
+                  name="birth_name"
+                  type="text"
+                  placeholder="As on your birth certificate"
+                  value={formData.birth_name}
+                  onChange={handleChange}
+                  className="bg-muted/30 border-border h-12 rounded-xl focus-glow"
+                  data-testid="birth-name-input"
+                />
+              </div>
+              <div className="flex flex-col gap-3">
+                <Button
+                  type="submit"
+                  className="w-full glow-button bg-primary text-primary-foreground h-12 text-base rounded-xl"
+                  disabled={loading}
+                  data-testid="complete-setup-btn"
+                >
+                  {loading ? (
+                    <span className="flex items-center gap-2">
+                      <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                      Creating Your Chart...
+                    </span>
+                  ) : "Complete Setup →"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full h-12 text-muted-foreground hover:text-foreground"
+                  disabled={loading}
+                  onClick={handleSkip}
+                  data-testid="skip-setup-btn"
+                >
+                  Skip for now →
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground text-center">
+                You can always add your birth details later in Settings.
               </p>
-            )}
-          </div>
-
-          <Button 
-            type="submit" 
-            className="w-full glow-button bg-primary text-primary-foreground h-12 text-base rounded-xl"
-            disabled={loading}
-            data-testid="submit-btn"
-          >
-            {loading ? (
-              <span className="flex items-center gap-2">
-                <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                {isRegister ? "Creating Your Chart..." : "Signing In..."}
-              </span>
-            ) : (
-              isRegister ? "Create Your Free Chart" : "Sign In"
-            )}
-          </Button>
-        </form>
-
-        {!isRegister && (
-          <p className="text-sm text-muted-foreground mt-3 text-center">
-            <button
-              onClick={() => { setIsForgot(true); setForgotEmail(formData.email); }}
-              className="text-primary hover:underline font-medium"
-            >
-              Forgot your password?
-            </button>
-          </p>
-        )}
-
-        <p className="text-sm text-muted-foreground mt-4 text-center">
-          {isRegister ? "Already have an account?" : "Don't have an account?"}{" "}
-          <button
-            onClick={() => setIsRegister(!isRegister)}
-            className="text-primary hover:underline font-medium"
-            data-testid="toggle-auth-mode"
-          >
-            {isRegister ? "Sign In" : "Create One"}
-          </button>
-        </p>
-        </>
+            </form>
+          </>
         )}
       </div>
 
       {/* Right Side - Image */}
-      <div 
+      <div
         className="hidden lg:block lg:w-1/2 bg-cover bg-center relative"
-        style={{
-          backgroundImage: `url('https://images.unsplash.com/photo-1465101162946-4377e57745c3?q=80&w=1200')`
-        }}
+        style={{ backgroundImage: `url('https://images.unsplash.com/photo-1465101162946-4377e57745c3?q=80&w=1200')` }}
       >
-        <div className={`absolute inset-0 ${theme === 'dark' ? 'bg-gradient-to-r from-background via-background/80 to-transparent' : 'bg-gradient-to-r from-background via-background/90 to-background/30'}`} />
+        <div className={`absolute inset-0 ${theme === "dark" ? "bg-gradient-to-r from-background via-background/80 to-transparent" : "bg-gradient-to-r from-background via-background/90 to-background/30"}`} />
         <div className="absolute bottom-12 left-12 right-12">
           <blockquote className="text-lg text-foreground italic leading-relaxed">
             "The cosmos is within us. We are made of star-stuff. We are a way for the universe to know itself."

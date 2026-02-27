@@ -314,24 +314,44 @@ export default function ChatPage() {
                   <Sparkles className="w-8 h-8 text-primary" />
                 </div>
                 <h2 className="font-serif text-xl text-foreground mb-2">
-                  Hello, {user?.name?.split(" ")[0]}
+                  Your AI Coach
                 </h2>
-                <p className="text-muted-foreground mb-6 max-w-md mx-auto leading-relaxed">
-                  I know your chart — your planets, houses, aspects, and numerology.
-                  Ask me anything about your cosmic blueprint, and I'll give you honest, specific guidance.
+                <p className="text-muted-foreground mb-2 max-w-md mx-auto leading-relaxed">
+                  I have your complete birth chart — every planet, house, and aspect. Ask me about a current transit, a life decision, or what any part of your chart means.
+                </p>
+                <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+                  Each conversation remembers its context. Start a new session to change topics.
                 </p>
                 <div className="flex flex-wrap justify-center gap-2">
                   {[
-                    "What should I focus on today?",
-                    "Tell me about my career path",
-                    "What's happening in my chart?",
-                    "Relationship guidance"
+                    "What do my transits mean today?",
+                    "Explain my rising sign",
+                    "Career guidance from my chart"
                   ].map((prompt) => (
                     <Button
                       key={prompt}
                       variant="outline"
                       className="border-border text-sm rounded-xl"
-                      onClick={() => setInput(prompt)}
+                      onClick={async () => {
+                        setInput("");
+                        const userMessage = prompt;
+                        setMessages(prev => [...prev, { role: "user", content: userMessage, timestamp: new Date().toISOString() }]);
+                        setLoading(true);
+                        try {
+                          const response = await axios.post(
+                            `${API}/chat`,
+                            { message: userMessage, session_id: sessionId },
+                            { headers: { Authorization: `Bearer ${token}` } }
+                          );
+                          setMessages(prev => [...prev, { role: "assistant", content: response.data.response, timestamp: new Date().toISOString() }]);
+                          if (!sessionId) { setSessionId(response.data.session_id); fetchSessions(); }
+                        } catch (error) {
+                          const status = error.response?.status;
+                          const detail = error.response?.data?.detail;
+                          if (status === 429) { toast.error(detail || "Daily message limit reached.", { action: { label: "Upgrade", onClick: () => window.location.href = "/pricing" } }); }
+                          else { toast.error("Something went wrong — try again in a moment."); }
+                        } finally { setLoading(false); }
+                      }}
                       data-testid={`prompt-${prompt.replace(/\s+/g, '-').toLowerCase()}`}
                     >
                       {prompt}

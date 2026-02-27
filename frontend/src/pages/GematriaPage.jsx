@@ -11,7 +11,8 @@ import {
   Moon,
   Hash,
   Sparkles,
-  Search
+  Search,
+  ChevronRight
 } from "lucide-react";
 
 const LetterGrid = ({ letters, label }) => {
@@ -209,6 +210,18 @@ export default function GematriaPage() {
 
             <SystemResult data={result.chaldean} color="text-primary" />
             <SystemResult data={result.english_ordinal} color="text-chart-2" />
+
+            {/* Link to numerology */}
+            <div className="text-center pt-2">
+              <Link
+                to="/numerology"
+                className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
+                data-testid="gematria-numerology-link"
+              >
+                Want to see how your name's vibration connects to your numerology numbers?
+                <ChevronRight className="w-4 h-4" />
+              </Link>
+            </div>
           </div>
         )}
 

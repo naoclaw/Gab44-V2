@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth, API } from "@/App";
 import { useTheme } from "@/context/ThemeContext";
 import axios from "axios";
@@ -158,6 +158,7 @@ const ReportCard = ({ report, onClick }) => {
 export default function CompatibilityPage() {
   const { token, user } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
   const [reports, setReports] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -176,6 +177,7 @@ export default function CompatibilityPage() {
 
   useEffect(() => {
     fetchReports();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchReports = async () => {
@@ -605,6 +607,19 @@ export default function CompatibilityPage() {
                     </div>
                   </div>
                 )}
+
+                {/* AI Coach CTA */}
+                <div className="flex justify-center pt-2">
+                  <Button
+                    onClick={() => navigate("/chat")}
+                    variant="outline"
+                    className="rounded-xl"
+                    data-testid="compatibility-ai-coach-btn"
+                  >
+                    <MessageCircle className="w-4 h-4 mr-2" />
+                    Discuss with AI Coach
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="glass-card rounded-2xl p-12 text-center">

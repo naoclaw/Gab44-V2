@@ -6,6 +6,8 @@
 **Sources**: All 17 frontend pages, App.js routing, ARCHITECTURE.md, BRAND_IDENTITY.md, DESIGN_ANALYTICS.md  
 **Methodology**: Code-only analysis — no code was changed, only observed
 
+**Status**: Implemented in frontend rebuild (Feb 2026)
+
 ---
 
 ## Executive Summary
@@ -519,7 +521,7 @@ The shareable chart link (`/chart/public/{token}`) works without auth. Revocatio
 
 These are navigation-only recommendations — no design changes, only step/flow adjustments.
 
-### Priority 1 — Fix the Pricing page back navigation for logged-in users (5 min)
+### ✅ Priority 1 — Fix the Pricing page back navigation for logged-in users (5 min)
 
 `/pricing` sends all users to `/` (landing page) regardless of where they came from. A logged-in user who arrives at `/pricing` from the Settings "Upgrade" CTA gets sent to the landing page on back — not to their dashboard.
 
@@ -536,7 +538,7 @@ These are navigation-only recommendations — no design changes, only step/flow 
 </Link>
 ```
 
-### Priority 2 — Add a "Start Here" first-login onboarding step
+### ✅ Priority 2 — Add a "Start Here" first-login onboarding step
 
 New accounts should see a one-time welcome state on the dashboard instead of the full data grid. The welcome step answers: **"What should I do first?"**
 
@@ -555,7 +557,7 @@ ELSE (returning user):
 
 This is controlled by whether `birth_chart` exists in MongoDB for this user. The API already returns chart data — if it's empty/null on first load, the dashboard can show this simpler state.
 
-### Priority 3 — Group and reduce the sidebar
+### ✅ Priority 3 — Group and reduce the sidebar
 
 Replace the flat 10-item list with a grouped structure:
 
@@ -582,7 +584,7 @@ Remove from sidebar:
 
 This reduces 10 items to 7, with clear grouping. The 3 removed items are NOT removed from the app — they're accessible from within their parent contexts. Users who know they want numerology will still find it in the chart.
 
-### Priority 4 — Complete inter-page contextual links
+### ✅ Priority 4 — Complete inter-page contextual links
 
 Some contextual cross-links already exist:
 
@@ -603,7 +605,7 @@ Missing contextual links worth adding:
 | `/compatibility` | "Ask your AI Coach about this relationship →" `/chat` | Natural follow-up after reading a compatibility report |
 | `/gematria` | "See your name in your numerology profile →" `/numerology` | Gematria and numerology are complementary systems |
 
-### Priority 5 — Clarify AI Coach vs. AI Friend on entry
+### ✅ Priority 5 — Clarify AI Coach vs. AI Friend on entry
 
 Both `/chat` and `/friend` should show a brief one-line persona reminder at the top of the empty state before any messages are sent:
 
@@ -619,7 +621,7 @@ Both `/chat` and `/friend` should show a brief one-line persona reminder at the 
 
 The distinction should be visible before the user types anything.
 
-### Priority 6 — Reduce registration friction
+### ✅ Priority 6 — Reduce registration friction
 
 Consider a **Progressive Disclosure** approach for registration:
 
@@ -640,7 +642,7 @@ This means users can sign up in 3 fields and see the dashboard immediately. They
 
 If birth details are skipped, the dashboard shows an empty-state card: "Add your birth details to unlock your cosmic blueprint" with a single CTA to the Settings page where they can add them.
 
-### Priority 7 — Landing page: single scroll to conversion
+### ✅ Priority 7 — Landing page: single scroll to conversion
 
 The landing page's job is to get users to click "Get Started." The current 11-section journey creates too many exit opportunities.
 

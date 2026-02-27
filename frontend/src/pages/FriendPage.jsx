@@ -315,24 +315,44 @@ export default function FriendPage() {
                   <Heart className="w-8 h-8 text-rose-400" />
                 </div>
                 <h2 className="font-serif text-xl text-foreground mb-2">
-                  Hey, {firstName}
+                  Saoul
                 </h2>
-                <p className="text-muted-foreground mb-6 max-w-md mx-auto leading-relaxed">
-                  I'm Saoul — not a coach, not a therapist. Just a friend who's always here. 
-                  Talk to me about anything — your day, your feelings, the things you can't say out loud.
+                <p className="text-muted-foreground mb-2 max-w-md mx-auto leading-relaxed">
+                  No agenda, no lectures. Just a warm presence who happens to know your stars. Talk about anything — your day, a relationship, how you're feeling.
+                </p>
+                <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+                  Saoul won't give unsolicited advice. But ask, and the stars will speak.
                 </p>
                 <div className="flex flex-wrap justify-center gap-2">
                   {[
-                    "I just need someone to talk to",
-                    "Tell me something good",
-                    "I had a weird day",
-                    "I'm feeling lonely"
+                    "How's my energy today?",
+                    "I need to talk about something",
+                    "What does my chart say about relationships?"
                   ].map((prompt) => (
                     <Button
                       key={prompt}
                       variant="outline"
                       className="border-rose-500/20 text-sm rounded-xl hover:bg-rose-500/10 hover:border-rose-500/30"
-                      onClick={() => setInput(prompt)}
+                      onClick={async () => {
+                        setInput("");
+                        const userMessage = prompt;
+                        setMessages(prev => [...prev, { role: "user", content: userMessage, timestamp: new Date().toISOString() }]);
+                        setLoading(true);
+                        try {
+                          const response = await axios.post(
+                            `${API}/friend/chat`,
+                            { message: userMessage, session_id: sessionId },
+                            { headers: { Authorization: `Bearer ${token}` } }
+                          );
+                          setMessages(prev => [...prev, { role: "assistant", content: response.data.response, timestamp: new Date().toISOString() }]);
+                          if (!sessionId) { setSessionId(response.data.session_id); fetchSessions(); }
+                        } catch (error) {
+                          const status = error.response?.status;
+                          const detail = error.response?.data?.detail;
+                          if (status === 429) { toast.error(detail || "Daily message limit reached.", { action: { label: "Upgrade", onClick: () => window.location.href = "/pricing" } }); }
+                          else { toast.error("Something went wrong — try again in a moment."); }
+                        } finally { setLoading(false); }
+                      }}
                       data-testid={`friend-prompt-${prompt.replace(/\s+/g, '-').toLowerCase()}`}
                     >
                       {prompt}

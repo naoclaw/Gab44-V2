@@ -109,6 +109,7 @@ export default function ChartPage() {
       }
     };
     fetchChart();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   if (loading) {
