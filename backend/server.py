@@ -93,6 +93,10 @@ EMAIL_MARKETING = os.environ.get('EMAIL_MARKETING', 'hello@gab44.com')      # pr
 EMAIL_VERIFY_EXPIRY_HOURS = 48
 PASSWORD_RESET_EXPIRY_HOURS = 1
 
+# Birth chart cache schema version — increment when the planets structure changes
+# so that stale cached documents are automatically refreshed.
+BIRTH_CHART_SCHEMA_VERSION = 1
+
 # Chat message limits per subscription tier (per calendar day, UTC)
 CHAT_DAILY_LIMITS: dict[str, int] = {
     "seeker":       10,
@@ -1518,24 +1522,74 @@ async def get_public_chart(share_token: str):
 
 # ============== Transit Routes ==============
 
+def _is_natal_cache_valid(chart: dict | None) -> bool:
+    """Return True only when *chart* has a compatible schema for transit calculations.
+
+    A valid cache entry must:
+    - Exist (not None)
+    - Contain a non-empty ``planets`` mapping
+    - Carry a ``schema_version`` that matches :data:`BIRTH_CHART_SCHEMA_VERSION`
+    """
+    if not chart:
+        return False
+    if not chart.get("planets"):
+        return False
+    if chart.get("schema_version") != BIRTH_CHART_SCHEMA_VERSION:
+        return False
+    return True
+
+
 @api_router.get("/transits/upcoming")
 async def get_upcoming_transits(user: dict = Depends(get_current_user)):
     """Get upcoming transit activations for the user using Swiss Ephemeris"""
-    
-    # Get user's natal chart
+
+    # Attempt to use a schema-compatible cached natal chart.
     chart = await db.birth_charts.find_one({"user_id": user["id"]}, {"_id": 0})
-    
-    if not chart or "planets" not in chart:
-        # Generate chart first if doesn't exist
-        birth_date = user.get("birth_date", "1990-01-01")
+
+    if _is_natal_cache_valid(chart):
+        natal_positions = chart["planets"]
+    else:
+        # Cache is missing, lacks planets, or has an outdated schema — recompute.
+        logging.info(
+            "Transit endpoint: recomputing natal chart for user %s "
+            "(cache missing=%s, schema_version=%s, expected=%s)",
+            user.get("id"),
+            chart is None,
+            chart.get("schema_version") if chart else "N/A",
+            BIRTH_CHART_SCHEMA_VERSION,
+        )
+
+        birth_date = user.get("birth_date")
+        if not birth_date:
+            raise HTTPException(
+                status_code=422,
+                detail="User profile is missing birth_date; cannot compute natal chart.",
+            )
         birth_time = user.get("birth_time")
-        birth_place = user.get("birth_place", "")
-        latitude, longitude = get_coordinates(birth_place) if birth_place else (0.0, 0.0)
-        
+        lat = user.get("birth_latitude")
+        latitude = lat if lat is not None else 0.0
+        lng = user.get("birth_longitude")
+        longitude = lng if lng is not None else 0.0
+
+        # Fall back to geocoding birth_place if stored coordinates are absent.
+        if latitude == 0.0 and longitude == 0.0:
+            birth_place = user.get("birth_place", "")
+            if birth_place:
+                latitude, longitude = get_coordinates(birth_place)
+
         chart_data = calculate_natal_chart(birth_date, birth_time, latitude, longitude)
         natal_positions = chart_data.get("planets", {})
-    else:
-        natal_positions = chart.get("planets", {})
+
+        # Upsert the cache with the new schema version so subsequent calls are fast.
+        await db.birth_charts.update_one(
+            {"user_id": user["id"]},
+            {"$set": {
+                "planets": natal_positions,
+                "schema_version": BIRTH_CHART_SCHEMA_VERSION,
+                "computed_at": datetime.now(timezone.utc).isoformat(),
+            }},
+            upsert=True,
+        )
     
     # Calculate current transits to natal chart
     current_transits = calculate_current_transits(natal_positions)
