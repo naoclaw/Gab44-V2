@@ -1,0 +1,147 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # ─── Backend → Amazon ECS Fargate (Docker) ────────────────────────────────
+  #
+  # Why ECS over Lambda?
+  #   • AI chat + Swiss Ephemeris calls routinely exceed Lambda's 29 s timeout.
+  #   • pyswisseph is a C extension — trivial in Docker, painful to package for Lambda.
+  #   • Motor keeps MongoDB connections warm across requests in a long-running container.
+  #   • Gunicorn + uvicorn workers give multi-core scaling inside a single task.
+  #
+  deploy-backend:
+    name: Backend → ECS Fargate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run backend tests
+        working-directory: backend
+        env:
+          MONGO_URL: ${{ secrets.MONGO_URL }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        run: pytest tests/ -v --tb=short
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push Docker image to ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t "$ECR_REGISTRY/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG" backend/
+          docker push "$ECR_REGISTRY/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG"
+          echo "image=$ECR_REGISTRY/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Download current ECS task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "${{ secrets.ECS_TASK_DEFINITION }}" \
+            --query taskDefinition \
+            > task-definition.json
+
+      - name: Render new task definition with updated image
+        id: render-task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ secrets.CONTAINER_NAME }}
+          image: ${{ steps.build-image.outputs.image }}
+
+      - name: Deploy updated task definition to ECS service
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-task-def.outputs.task-definition }}
+          service: ${{ secrets.ECS_SERVICE }}
+          cluster: ${{ secrets.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+  # ─── Frontend → AWS S3 + CloudFront ───────────────────────────────────────
+  deploy-frontend:
+    name: Frontend → S3 + CloudFront
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: yarn install --frozen-lockfile
+
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          REACT_APP_BACKEND_URL: ${{ secrets.REACT_APP_BACKEND_URL }}
+          REACT_APP_ONESIGNAL_APP_ID: ${{ secrets.REACT_APP_ONESIGNAL_APP_ID }}
+          CI: false
+        run: yarn build
+
+      - name: Sync static assets to S3 (long-lived cache)
+        run: |
+          aws s3 sync frontend/build/ "s3://${{ secrets.FRONTEND_S3_BUCKET }}/" \
+            --delete \
+            --exclude "index.html" \
+            --exclude "service-worker.js" \
+            --cache-control "public, max-age=31536000, immutable"
+
+      - name: Upload index.html and service-worker to S3 (no-cache)
+        run: |
+          for filename in index.html service-worker.js; do
+            if [ -f "frontend/build/${filename}" ]; then
+              aws s3 cp "frontend/build/${filename}" \
+                "s3://${{ secrets.FRONTEND_S3_BUCKET }}/${filename}" \
+                --cache-control "no-cache, no-store, must-revalidate"
+            fi
+          done
+
+      - name: Invalidate CloudFront distribution
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}" \
+            --paths "/*"

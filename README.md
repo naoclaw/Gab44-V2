@@ -187,9 +187,101 @@ pytest tests/ -v
 
 ---
 
+## AWS Deployment
+
+The CI/CD pipeline in `.github/workflows/deploy-aws.yml` automatically deploys the application to AWS on every push to `main`:
+
+- **Frontend** → S3 static website + CloudFront CDN
+- **Backend** → Amazon ECS Fargate (Docker container)
+
+### Why ECS over Lambda?
+
+| Concern | ECS Fargate ✅ | Lambda ❌ |
+|---------|---------------|----------|
+| AI chat + Swiss Ephemeris response time | No timeout (gunicorn `--timeout 120`) | 29 s API Gateway hard limit |
+| `pyswisseph` C extension | Bundled in Docker image — zero friction | Requires custom Lambda layer with compiled binary |
+| MongoDB Motor connection reuse | Connections stay warm across requests | Cold start reconnects on every invocation |
+| Multi-core scaling | Gunicorn workers use all task vCPUs | Single-threaded Lambda concurrency |
+
+### Architecture
+
+```
+Browser → CloudFront (CDN) → S3 (React SPA)
+Browser → ALB → ECS Fargate (FastAPI / gunicorn+uvicorn) → MongoDB Atlas
+```
+
+### Prerequisites
+
+| AWS Resource | Description |
+|---|---|
+| ECR repository | Stores Docker images for the backend. |
+| ECS cluster | Fargate cluster that runs the backend tasks. |
+| ECS task definition | Defines the container, CPU/memory, env vars, and log group. Set `containerPort` to `8001`. |
+| ECS service | Keeps the desired number of Fargate tasks running behind an ALB target group. |
+| ALB (Application Load Balancer) | Routes HTTPS traffic to the ECS service. Add a listener rule forwarding `/*` to the ECS target group. |
+| S3 bucket (frontend) | Hosts the built React static files. Static website hosting must be enabled. |
+| CloudFront distribution | CDN in front of the frontend S3 bucket. Set the default root object to `index.html` and add a custom error response 403/404 → `/index.html` (200) for client-side routing. |
+| IAM user / role | Needs `ecr:*` on the repository, `ecs:RegisterTaskDefinition` + `ecs:UpdateService` on the cluster, `s3:*` on the frontend bucket, and `cloudfront:CreateInvalidation`. |
+
+### GitHub Secrets
+
+Add the following secrets in **Settings → Secrets and variables → Actions**:
+
+| Secret | Description |
+|--------|-------------|
+| `AWS_ACCESS_KEY_ID` | IAM user access key |
+| `AWS_SECRET_ACCESS_KEY` | IAM user secret key |
+| `AWS_REGION` | AWS region (e.g. `us-east-1`) |
+| `ECR_REPOSITORY` | ECR repository name (e.g. `gab44-backend`) |
+| `ECS_CLUSTER` | ECS cluster name (e.g. `gab44`) |
+| `ECS_SERVICE` | ECS service name (e.g. `gab44-backend`) |
+| `ECS_TASK_DEFINITION` | Task definition family name (e.g. `gab44-backend`) |
+| `CONTAINER_NAME` | Container name inside the task definition (e.g. `gab44-backend`) |
+| `FRONTEND_S3_BUCKET` | S3 bucket name for the React static build |
+| `CLOUDFRONT_DISTRIBUTION_ID` | CloudFront distribution ID |
+| `REACT_APP_BACKEND_URL` | Public ALB/domain URL of the backend (no trailing slash) |
+| `REACT_APP_ONESIGNAL_APP_ID` | OneSignal App ID (optional) |
+| `MONGO_URL` | MongoDB Atlas connection string (used by CI tests) |
+| `DB_NAME` | MongoDB database name (used by CI tests) |
+| `JWT_SECRET` | JWT signing secret (used by CI tests) |
+
+### ECS task definition environment variables
+
+In the ECS task definition (or AWS Secrets Manager), set the variables from `backend/.env.example`. At minimum:
+
+```
+MONGO_URL=mongodb+srv://...
+DB_NAME=gab44
+JWT_SECRET=<64-char random hex>
+FRONTEND_URL=https://yourdomain.com
+CORS_ORIGINS=https://yourdomain.com
+```
+
+### Gunicorn worker count
+
+The `backend/Dockerfile` starts gunicorn with `--workers 2` by default (suitable for a `0.5 vCPU` Fargate task). Scale workers to `(vCPU × 2 + 1)` for larger task sizes by overriding the container command in the ECS task definition.
+
+### Stripe webhook
+
+After the ECS service is running, register the ALB URL in Stripe:
+
+1. Stripe Dashboard → Developers → Webhooks → **Add endpoint**: `https://api.yourdomain.com/api/payments/webhook`
+2. Copy the Signing Secret and set `STRIPE_WEBHOOK_SECRET` in the ECS task definition environment.
+
+### Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| ECS task exits on startup | Check CloudWatch Logs — `MONGO_URL`, `DB_NAME`, `JWT_SECRET` must be set in the task definition |
+| Frontend routing returns 403 | Add a CloudFront custom error response: 403 → `/index.html` (200) |
+| CORS errors in the browser | Set `CORS_ORIGINS` in the task definition to the CloudFront domain (no trailing slash) |
+| Stripe webhooks rejected | Verify `STRIPE_WEBHOOK_SECRET` matches the Stripe signing secret |
+
+---
+
 ## Deployment Notes
 
-1. Set all env vars in your hosting platform (Railway, Render, Fly.io, etc.)
+1. Set all env vars in your hosting platform (Railway, Render, Fly.io, AWS, etc.)
 2. For Stripe webhooks: point `https://yourdomain.com/api/payments/webhook` to the FastAPI backend and set `STRIPE_WEBHOOK_SECRET`
 3. For email verification links to work: set `FRONTEND_URL=https://yourdomain.com`
 4. CORS: set `CORS_ORIGINS=https://yourdomain.com` (remove the `*` default in production)
