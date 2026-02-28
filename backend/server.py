@@ -2759,10 +2759,19 @@ async def get_contact_messages(admin: dict = Depends(require_admin)):
 # Include router and setup middleware
 app.include_router(api_router)
 
+# CORS: combining allow_credentials=True with allow_origins=["*"] is invalid per
+# the CORS spec — browsers reject responses where Access-Control-Allow-Origin is
+# the literal wildcard "*" and Access-Control-Allow-Credentials is "true".
+# When the operator sets CORS_ORIGINS=* (the default for local dev), we use
+# allow_origin_regex=".*" instead, which makes Starlette reflect the actual
+# request Origin header in the response, satisfying the browser requirement.
+_cors_origins = os.environ.get('CORS_ORIGINS', '*').split(',')
+_cors_wildcard = '*' in _cors_origins
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=[] if _cors_wildcard else _cors_origins,
+    allow_origin_regex='.*' if _cors_wildcard else None,
     allow_methods=["*"],
     allow_headers=["*"],
 )
