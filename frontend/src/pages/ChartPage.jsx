@@ -14,7 +14,8 @@ import {
   ChevronRight,
   Share2,
   Printer,
-  Search
+  Search,
+  RefreshCw
 } from "lucide-react";
 import {
   Tooltip,
@@ -86,11 +87,14 @@ export default function ChartPage() {
   const navigate = useNavigate();
   const [chart, setChart] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [chartError, setChartError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [gematriaInput, setGematriaInput] = useState("");
   const [gematriaResult, setGematriaResult] = useState(null);
 
   useEffect(() => {
     const fetchChart = async () => {
+      setChartError(null);
       try {
         const response = await axios.get(`${API}/chart/me`, {
           headers: { Authorization: `Bearer ${token}` }
@@ -104,19 +108,37 @@ export default function ChartPage() {
         }
       } catch (error) {
         console.error("Error fetching chart:", error);
+        setChartError("Could not load your birth chart. Please try again.");
       } finally {
         setLoading(false);
       }
     };
     fetchChart();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, retryCount]);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-background cosmic-page-bg flex items-center justify-center">
         <div className="animate-pulse-glow w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
           <div className="w-8 h-8 rounded-full bg-primary/40" />
+        </div>
+      </div>
+    );
+  }
+
+  if (chartError) {
+    return (
+      <div className="min-h-screen bg-background cosmic-page-bg flex items-center justify-center">
+        <div className="text-center max-w-sm mx-auto px-4">
+          <p className="text-muted-foreground mb-6">{chartError}</p>
+          <Button
+            onClick={() => { setLoading(true); setChartError(null); setRetryCount(c => c + 1); }}
+            className="gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Try again
+          </Button>
         </div>
       </div>
     );

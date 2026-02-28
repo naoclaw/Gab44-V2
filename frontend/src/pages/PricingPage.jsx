@@ -5,7 +5,7 @@ import { useTheme } from "@/context/ThemeContext";
 import axios from "axios";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Check, ArrowLeft, Star, Sun, Moon, Loader2 } from "lucide-react";
+import { Sparkles, Check, ArrowLeft, Star, Sun, Moon, Loader2, RefreshCw } from "lucide-react";
 
 
 const PAID_TIERS = ["enthusiast", "advanced", "professional"];
@@ -17,20 +17,24 @@ export default function PricingPage() {
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [checkoutLoading, setCheckoutLoading] = useState(null); // tier being checked out
+  const [pricingError, setPricingError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     const fetchPricing = async () => {
+      setPricingError(null);
       try {
         const response = await axios.get(`${API}/pricing`);
         setPlans(response.data.plans);
       } catch (error) {
         console.error("Error fetching pricing:", error);
+        setPricingError("Could not load pricing plans. Please try again.");
       } finally {
         setLoading(false);
       }
     };
     fetchPricing();
-  }, []);
+  }, [retryCount]);
 
   const handlePlanClick = async (plan) => {
     // Free plan — just go to register/dashboard
@@ -75,6 +79,23 @@ export default function PricingPage() {
     return (
       <div className="min-h-screen bg-background cosmic-page-bg flex items-center justify-center">
         <div className="animate-pulse-glow w-16 h-16 rounded-full bg-primary/20" />
+      </div>
+    );
+  }
+
+  if (pricingError) {
+    return (
+      <div className="min-h-screen bg-background cosmic-page-bg flex items-center justify-center">
+        <div className="text-center max-w-sm mx-auto px-4">
+          <p className="text-muted-foreground mb-6">{pricingError}</p>
+          <Button
+            onClick={() => { setLoading(true); setPricingError(null); setRetryCount(c => c + 1); }}
+            className="gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Try again
+          </Button>
+        </div>
       </div>
     );
   }

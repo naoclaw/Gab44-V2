@@ -12,7 +12,8 @@ import {
   Target,
   CheckCircle,
   Sun,
-  Moon
+  Moon,
+  RefreshCw
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
@@ -31,9 +32,12 @@ export default function TransitsPage() {
   const [transits, setTransits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
+  const [transitsError, setTransitsError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     const fetchTransits = async () => {
+      setTransitsError(null);
       try {
         const response = await axios.get(`${API}/transits/upcoming`, {
           headers: { Authorization: `Bearer ${token}` }
@@ -41,12 +45,13 @@ export default function TransitsPage() {
         setTransits(response.data);
       } catch (error) {
         console.error("Error fetching transits:", error);
+        setTransitsError("Could not load your transits. Please try again.");
       } finally {
         setLoading(false);
       }
     };
     fetchTransits();
-  }, [token]);
+  }, [token, retryCount]);
 
   const filteredTransits = filter === "all" 
     ? transits 
@@ -56,6 +61,23 @@ export default function TransitsPage() {
     return (
       <div className="min-h-screen bg-background cosmic-page-bg flex items-center justify-center">
         <div className="animate-pulse-glow w-16 h-16 rounded-full bg-primary/20" />
+      </div>
+    );
+  }
+
+  if (transitsError) {
+    return (
+      <div className="min-h-screen bg-background cosmic-page-bg flex items-center justify-center">
+        <div className="text-center max-w-sm mx-auto px-4">
+          <p className="text-muted-foreground mb-6">{transitsError}</p>
+          <Button
+            onClick={() => { setLoading(true); setTransitsError(null); setRetryCount(c => c + 1); }}
+            className="gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Try again
+          </Button>
+        </div>
       </div>
     );
   }

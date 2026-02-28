@@ -103,18 +103,21 @@ export default function GematriaPage() {
   const [input, setInput] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [calcError, setCalcError] = useState(null);
 
   const handleCalculate = async (e) => {
     e?.preventDefault();
     const text = input.trim();
     if (!text) return;
 
+    setCalcError(null);
     setLoading(true);
     try {
       const response = await axios.post(`${API}/gematria/calculate`, { text });
       setResult(response.data);
     } catch (error) {
       console.error("Error calculating gematria:", error);
+      setCalcError("Calculation failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -180,6 +183,10 @@ export default function GematriaPage() {
               )}
             </Button>
           </form>
+
+          {calcError && (
+            <p className="text-sm text-destructive mt-3">{calcError}</p>
+          )}
 
           {/* Quick examples */}
           <div className="flex flex-wrap gap-2 mt-4">

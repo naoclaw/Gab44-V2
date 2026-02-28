@@ -29,7 +29,8 @@ import {
   Target,
   Briefcase,
   UserCheck,
-  Home
+  Home,
+  RefreshCw
 } from "lucide-react";
 
 // Relationship type config — icon, label, gradient, "connection" category label
@@ -164,6 +165,7 @@ export default function CompatibilityPage() {
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [reportsError, setReportsError] = useState(null);
   const [formData, setFormData] = useState({
     partner_name: "",
     partner_birth_date: "",
@@ -181,6 +183,7 @@ export default function CompatibilityPage() {
   }, []);
 
   const fetchReports = async () => {
+    setReportsError(null);
     try {
       const res = await axios.get(`${API}/compatibility/reports`, authHeaders);
       setReports(res.data);
@@ -189,6 +192,7 @@ export default function CompatibilityPage() {
       }
     } catch (error) {
       console.error("Error fetching reports:", error);
+      setReportsError("Could not load your compatibility reports. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -222,6 +226,23 @@ export default function CompatibilityPage() {
       <div className="min-h-screen bg-background cosmic-page-bg flex items-center justify-center">
         <div className="animate-pulse-glow w-16 h-16 rounded-full bg-rose-500/20 flex items-center justify-center">
           <Heart className="w-8 h-8 text-rose-500 animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
+  if (reportsError) {
+    return (
+      <div className="min-h-screen bg-background cosmic-page-bg flex items-center justify-center">
+        <div className="text-center max-w-sm mx-auto px-4">
+          <p className="text-muted-foreground mb-6">{reportsError}</p>
+          <Button
+            onClick={() => { setLoading(true); fetchReports(); }}
+            className="gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Try again
+          </Button>
         </div>
       </div>
     );

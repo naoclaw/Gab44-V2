@@ -14,7 +14,8 @@ import {
   Cake,
   CalendarDays,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  RefreshCw
 } from "lucide-react";
 
 const NUMBER_ICONS = {
@@ -96,9 +97,12 @@ export default function NumerologyPage() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
+  const [profileError, setProfileError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     const fetchProfile = async () => {
+      setProfileError(null);
       try {
         const response = await axios.get(`${API}/numerology/profile`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -106,18 +110,36 @@ export default function NumerologyPage() {
         setProfile(response.data);
       } catch (error) {
         console.error("Error fetching numerology profile:", error);
+        setProfileError("Could not load your numerology profile. Please try again.");
       } finally {
         setLoading(false);
       }
     };
     if (token) fetchProfile();
-  }, [token]);
+  }, [token, retryCount]);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-pulse-glow w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
           <div className="w-8 h-8 rounded-full bg-primary/40" />
+        </div>
+      </div>
+    );
+  }
+
+  if (profileError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center max-w-sm mx-auto px-4">
+          <p className="text-muted-foreground mb-6">{profileError}</p>
+          <Button
+            onClick={() => { setLoading(true); setProfileError(null); setRetryCount(c => c + 1); }}
+            className="gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Try again
+          </Button>
         </div>
       </div>
     );

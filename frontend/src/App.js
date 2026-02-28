@@ -67,6 +67,12 @@ const AuthProvider = ({ children }) => {
             import("sonner").then(({ toast }) => {
               toast.error("Your session has expired. Please sign in again.");
             });
+            // Redirect to auth after a brief delay so the toast is visible first
+            setTimeout(() => {
+              if (!window.location.pathname.startsWith("/auth")) {
+                window.location.href = "/auth";
+              }
+            }, 1500);
           }
         }
         return Promise.reject(error);

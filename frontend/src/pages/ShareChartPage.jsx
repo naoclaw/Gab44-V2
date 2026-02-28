@@ -17,7 +17,8 @@ import {
   Sun,
   Moon,
   Star,
-  ArrowLeft
+  ArrowLeft,
+  RefreshCw
 } from "lucide-react";
 
 const SIGN_SYMBOLS = {
@@ -152,10 +153,13 @@ export default function ShareChartPage() {
   const [copied, setCopied] = useState(false);
   const [shareToken, setShareToken] = useState(null);
   const [generatingLink, setGeneratingLink] = useState(false);
+  const [chartError, setChartError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
   const cardRef = useRef(null);
 
   useEffect(() => {
     const fetchChart = async () => {
+      setChartError(null);
       try {
         const response = await axios.get(`${API}/chart/me`, {
           headers: { Authorization: `Bearer ${token}` }
@@ -167,12 +171,13 @@ export default function ShareChartPage() {
         }
       } catch (error) {
         console.error("Error fetching chart:", error);
+        setChartError("Could not load your chart. Please try again.");
       } finally {
         setLoading(false);
       }
     };
     if (token) fetchChart();
-  }, [token]);
+  }, [token, retryCount]);
 
   const generateShareLink = async () => {
     if (shareToken) return; // already generated
@@ -265,6 +270,23 @@ export default function ShareChartPage() {
     return (
       <div className="min-h-screen bg-background cosmic-page-bg flex items-center justify-center">
         <div className="animate-pulse-glow w-16 h-16 rounded-full bg-primary/20" />
+      </div>
+    );
+  }
+
+  if (chartError) {
+    return (
+      <div className="min-h-screen bg-background cosmic-page-bg flex items-center justify-center">
+        <div className="text-center max-w-sm mx-auto px-4">
+          <p className="text-muted-foreground mb-6">{chartError}</p>
+          <Button
+            onClick={() => { setLoading(true); setChartError(null); setRetryCount(c => c + 1); }}
+            className="gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Try again
+          </Button>
+        </div>
       </div>
     );
   }

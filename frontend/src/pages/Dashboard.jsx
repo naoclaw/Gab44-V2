@@ -224,24 +224,31 @@ const DashboardOverview = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      try {
-        const [guidanceRes, transitsRes, numerologyRes] = await Promise.all([
-          axios.get(`${API}/guidance/daily`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios
-            .get(`${API}/transits/upcoming`, { headers: { Authorization: `Bearer ${token}` } })
-            .catch((err) => { console.warn("Transits fetch failed:", err); return { data: [] }; }),
-          axios
-            .get(`${API}/numerology/me`, { headers: { Authorization: `Bearer ${token}` } })
-            .catch((err) => { console.warn("Numerology fetch failed:", err); return { data: null }; }),
-        ]);
-        setDailyGuidance(guidanceRes.data);
-        setTransits(Array.isArray(transitsRes.data) ? transitsRes.data.slice(0, 3) : []);
-        setNumerology(numerologyRes.data);
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-      } finally {
-        setLoading(false);
+      const [guidanceSettled, transitsSettled, numerologySettled] = await Promise.allSettled([
+        axios.get(`${API}/guidance/daily`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`${API}/transits/upcoming`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`${API}/numerology/me`, { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+
+      if (guidanceSettled.status === "fulfilled") {
+        setDailyGuidance(guidanceSettled.value.data);
+      } else {
+        console.warn("Daily guidance fetch failed:", guidanceSettled.reason);
       }
+
+      if (transitsSettled.status === "fulfilled") {
+        setTransits(Array.isArray(transitsSettled.value.data) ? transitsSettled.value.data.slice(0, 3) : []);
+      } else {
+        console.warn("Transits fetch failed:", transitsSettled.reason);
+      }
+
+      if (numerologySettled.status === "fulfilled") {
+        setNumerology(numerologySettled.value.data);
+      } else {
+        console.warn("Numerology fetch failed:", numerologySettled.reason);
+      }
+
+      setLoading(false);
     };
     fetchData();
   }, [token]);
