@@ -19,6 +19,7 @@ import stripe
 import requests as _requests
 from typing import List, Optional, Dict, Any
 import uuid
+import secrets
 from datetime import datetime, timezone, timedelta
 import jwt
 import bcrypt
@@ -81,7 +82,7 @@ if _missing_vars:
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
+client = AsyncIOMotorClient(mongo_url, maxPoolSize=50, minPoolSize=5)
 db = client[os.environ['DB_NAME']]
 
 # JWT Configuration
@@ -1025,7 +1026,7 @@ async def register(request: Request, user_data: UserCreate):
     sun_sign = calculate_sun_sign(user_data.birth_date)
 
     # Generate email verification token
-    email_verification_token = str(uuid.uuid4())
+    email_verification_token = secrets.token_urlsafe(32)
     
     # Create user
     user_id = str(uuid.uuid4())
@@ -1110,7 +1111,7 @@ async def resend_verification(user: dict = Depends(get_current_user)):
     """Resend the email verification link to the current user."""
     if user.get("email_verified"):
         return {"sent": False, "message": "Email is already verified"}
-    token = str(uuid.uuid4())
+    token = secrets.token_urlsafe(32)
     await db.users.update_one({"id": user["id"]}, {"$set": {"email_verification_token": token}})
     frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
     verify_url = f"{frontend_url}/verify-email?token={token}"
@@ -1131,7 +1132,7 @@ async def forgot_password(request: Request, req: ForgotPasswordRequest):
     """
     user = await db.users.find_one({"email": req.email})
     if user:
-        reset_token = str(uuid.uuid4())
+        reset_token = secrets.token_urlsafe(32)
         expiry = datetime.now(timezone.utc) + timedelta(hours=PASSWORD_RESET_EXPIRY_HOURS)
         await db.users.update_one(
             {"id": user["id"]},
@@ -1214,7 +1215,8 @@ async def update_me(update_data: UserUpdate, user: dict = Depends(get_current_us
 # ============== Chat Routes ==============
 
 @api_router.post("/chat", response_model=ChatResponse)
-async def send_chat_message(request: ChatRequest, user: dict = Depends(get_current_user)):
+@limiter.limit("60/minute")
+async def send_chat_message(request: Request, chat_request: ChatRequest, user: dict = Depends(get_current_user)):
     tier = user.get("subscription_tier", "seeker")
     daily_limit = CHAT_DAILY_LIMITS.get(tier, 10)
 
@@ -1231,7 +1233,7 @@ async def send_chat_message(request: ChatRequest, user: dict = Depends(get_curre
                 status_code=429,
                 detail=f"Daily message limit reached ({daily_limit} messages for {tier.title()} plan). Upgrade to continue chatting."
             )
-    session_id = request.session_id or str(uuid.uuid4())
+    session_id = chat_request.session_id or str(uuid.uuid4())
     
     # Save user message
     user_msg = {
@@ -1239,13 +1241,13 @@ async def send_chat_message(request: ChatRequest, user: dict = Depends(get_curre
         "user_id": user["id"],
         "session_id": session_id,
         "role": "user",
-        "content": request.message,
+        "content": chat_request.message,
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
     await db.chat_messages.insert_one(user_msg)
     
     # Get AI response
-    ai_response = await get_ai_coach_response(user, request.message, session_id)
+    ai_response = await get_ai_coach_response(user, chat_request.message, session_id)
     
     # Save AI response
     ai_msg = {
@@ -1295,7 +1297,8 @@ async def delete_chat_session(session_id: str, user: dict = Depends(get_current_
 # ============== AI Friend (Saoul) Routes ==============
 
 @api_router.post("/friend/chat", response_model=ChatResponse)
-async def send_friend_message(request: ChatRequest, user: dict = Depends(get_current_user)):
+@limiter.limit("60/minute")
+async def send_friend_message(request: Request, chat_request: ChatRequest, user: dict = Depends(get_current_user)):
     """Send a message to Saoul, the AI Friend"""
     tier = user.get("subscription_tier", "seeker")
     daily_limit = CHAT_DAILY_LIMITS.get(tier, 10)
@@ -1312,7 +1315,7 @@ async def send_friend_message(request: ChatRequest, user: dict = Depends(get_cur
                 status_code=429,
                 detail=f"Daily message limit reached ({daily_limit} messages for {tier.title()} plan). Upgrade to continue chatting."
             )
-    session_id = request.session_id or str(uuid.uuid4())
+    session_id = chat_request.session_id or str(uuid.uuid4())
 
     # Save user message
     user_msg = {
@@ -1320,13 +1323,13 @@ async def send_friend_message(request: ChatRequest, user: dict = Depends(get_cur
         "user_id": user["id"],
         "session_id": session_id,
         "role": "user",
-        "content": request.message,
+        "content": chat_request.message,
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
     await db.friend_messages.insert_one(user_msg)
 
     # Get AI friend response
-    ai_response = await get_ai_friend_response(user, request.message, session_id)
+    ai_response = await get_ai_friend_response(user, chat_request.message, session_id)
 
     # Save AI response
     ai_msg = {
@@ -1541,7 +1544,7 @@ async def generate_share_token(user: dict = Depends(get_current_user)):
     if chart.get("share_token"):
         return {"share_token": chart["share_token"]}
 
-    share_token = str(uuid.uuid4())
+    share_token = secrets.token_urlsafe(32)
     await db.birth_charts.update_one(
         {"user_id": user["id"]},
         {"$set": {"share_token": share_token}},
@@ -1558,7 +1561,7 @@ async def revoke_share_token(user: dict = Depends(get_current_user)):
     return {"revoked": True}
 
 @api_router.get("/chart/public/{share_token}")
-async def get_public_chart(share_token: str):
+async def get_public_chart(share_token: str, response: Response):
     """Public endpoint — returns a sanitized chart by share token (no auth required)."""
     chart = await db.birth_charts.find_one({"share_token": share_token}, {"_id": 0})
     if not chart:
@@ -1568,6 +1571,7 @@ async def get_public_chart(share_token: str):
         k: v for k, v in chart.items()
         if k not in ("user_id", "share_token")
     }
+    response.headers["Cache-Control"] = "public, max-age=3600"
     return public_fields
 
 # ============== Transit Routes ==============
@@ -2244,8 +2248,9 @@ async def get_compatibility_report(report_id: str, user: dict = Depends(get_curr
 # ============== Pricing/Subscription Info ==============
 
 @api_router.get("/pricing")
-async def get_pricing():
+async def get_pricing(response: Response):
     """Get pricing plans"""
+    response.headers["Cache-Control"] = "public, max-age=3600"
     return {
         "plans": [
             {
@@ -2671,6 +2676,7 @@ async def get_admin_stats(admin: dict = Depends(require_admin)):
 @api_router.get("/admin/users")
 async def get_all_users(skip: int = 0, limit: int = 50, admin: dict = Depends(require_admin)):
     """Get all users for admin dashboard"""
+    limit = min(limit, 100)  # enforce maximum page size
     users = await db.users.find(
         {},
         {"_id": 0, "password": 0}
@@ -2830,6 +2836,14 @@ async def global_exception_handler(request: Request, exc: Exception):
 # request Origin header in the response, satisfying the browser requirement.
 _cors_origins = os.environ.get('CORS_ORIGINS', '*').split(',')
 _cors_wildcard = '*' in _cors_origins
+if _cors_wildcard:
+    _frontend_url = os.environ.get('FRONTEND_URL', '')
+    if _frontend_url.startswith('https://'):
+        logging.warning(
+            'SECURITY WARNING: CORS_ORIGINS is set to wildcard (*) but FRONTEND_URL '
+            'suggests a production environment (%s). Set CORS_ORIGINS to your actual '
+            'frontend domain(s) before going live.', _frontend_url
+        )
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
