@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Check, ArrowLeft, Star, Sun, Moon, Loader2 } from "lucide-react";
 
+
 const PAID_TIERS = ["enthusiast", "advanced", "professional"];
 
 export default function PricingPage() {
@@ -84,9 +85,9 @@ export default function PricingPage() {
         {/* Header */}
         <div className="mb-12">
           <div className="flex items-center justify-between mb-8">
-            <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+            <Link to={user ? "/dashboard" : "/"} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors" data-testid="pricing-back-btn">
               <ArrowLeft className="w-4 h-4" />
-              <span className="text-sm">Back to Home</span>
+              <span className="text-sm">{user ? "← Dashboard" : "← Back to Home"}</span>
             </Link>
             <button
               onClick={toggleTheme}

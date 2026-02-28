@@ -1,161 +1,149 @@
 {
   "identity": {
-    "name": "E1",
-    "role": "Creative Designer",
-    "mission": "Design a world-class, mission-driven Astrology AI platform with a dark cosmic aesthetic.",
+    "name": "Gab44",
+    "role": "Astrology AI Platform",
+    "mission": "Help humanity align with truth through astronomical precision and AI-powered insight.",
     "principles": [
-      "Fusion over Imitation: Mix Luxury Fashion with NASA precision.",
-      "Emotion First: Every pixel must convey 'Truth' and 'Mystery'.",
-      "Content is King: Data is the art. Charts are the hero.",
-      "Zoom In: Focus on the details of the chart.",
-      "Negative Space: Let the stars breathe."
+      "Dual Theme: Both light and dark modes are first-class. Never design for dark-only.",
+      "Content is King: Charts, numbers, and guidance are the hero — not decorative chrome.",
+      "Clarity Over Mystery: Users should always know where they are and what to do next.",
+      "Progressive Disclosure: Show the minimum required, reveal complexity on demand.",
+      "Negative Space: Let the cosmos breathe — dense grids only where data demands it."
     ]
+  },
+  "themes": {
+    "supported": ["light", "dark"],
+    "default": "dark",
+    "toggle": "Available in sidebar (dashboard) and in page header (public pages)",
+    "implementation": "useTheme() from @/context/ThemeContext. CSS variables switch via [data-theme='light'] in index.css."
   },
   "typography": {
     "primary_font": "Manrope",
     "secondary_font": "Cinzel",
     "mono_font": "JetBrains Mono",
-    "import_url": "https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;800&family=Manrope:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap",
     "usage": {
-      "headings": "font-serif (Cinzel) - Use for H1, H2, Hero text. Tracking-tight.",
-      "body": "font-sans (Manrope) - Use for all standard text, descriptions, chat.",
-      "data": "font-mono (JetBrains Mono) - Use for planetary degrees, time, coordinates.",
-      "ui_elements": "font-sans (Manrope) - Buttons, navigation, inputs."
+      "headings": "font-serif (Cinzel) — h1, h2, hero text, card titles. tracking-tight.",
+      "body": "font-sans (Manrope) — descriptions, chat messages, all standard prose.",
+      "data": "font-mono (JetBrains Mono) — planetary degrees, coordinates, timestamps.",
+      "ui": "font-sans (Manrope) — buttons, nav links, inputs, labels."
     }
   },
   "colors": {
-    "theme": "dark",
-    "palette_description": "Cosmic Luxury. Deep obsidian backgrounds, starlight white text, and mystic gold accents.",
-    "css_variables": {
-      "root": {
-        "--background": "240 10% 3.9%",
-        "--foreground": "0 0% 98%",
-        "--card": "240 10% 3.9%",
-        "--card-foreground": "0 0% 98%",
-        "--popover": "240 10% 3.9%",
-        "--popover-foreground": "0 0% 98%",
-        "--primary": "45 93% 47%",
-        "--primary-foreground": "240 5.9% 10%",
-        "--secondary": "240 3.7% 15.9%",
-        "--secondary-foreground": "0 0% 98%",
-        "--muted": "240 3.7% 15.9%",
-        "--muted-foreground": "240 5% 64.9%",
-        "--accent": "240 3.7% 15.9%",
-        "--accent-foreground": "0 0% 98%",
-        "--destructive": "0 62.8% 30.6%",
-        "--destructive-foreground": "0 0% 98%",
-        "--border": "240 3.7% 15.9%",
-        "--input": "240 3.7% 15.9%",
-        "--ring": "45 93% 47%",
-        "--radius": "0.5rem"
-      }
+    "description": "CSS custom properties defined in index.css. Use Tailwind semantic tokens, not raw hex values.",
+    "semantic_tokens": {
+      "background": "Page background",
+      "foreground": "Primary text",
+      "card": "Card background",
+      "card-foreground": "Card text",
+      "primary": "Brand accent (gold/purple depending on theme)",
+      "primary-foreground": "Text on primary",
+      "muted": "Subtle backgrounds",
+      "muted-foreground": "Secondary text",
+      "border": "Dividers and outlines",
+      "ring": "Focus rings"
     },
-    "tailwind_config_extension": {
-      "colors": {
-        "cosmic": {
-          "void": "#050505",
-          "starlight": "#F8FAFC",
-          "gold": "#D4AF37",
-          "nebula": "#6366F1",
-          "silver": "#E2E8F0"
-        }
-      }
+    "chart_colors": ["chart-1 through chart-5 for data visualisation"],
+    "accent_palette": {
+      "rose": "Saoul / AI Friend persona — rose-400, rose-500",
+      "green": "Positive signals, active transits",
+      "amber": "Warnings, birthday number",
+      "purple": "Karmic themes, spiritual content",
+      "cyan": "Personal year, sextile aspects"
     }
   },
-  "layout": {
-    "spacing_system": "Generous. Use p-8, p-12, p-24. Avoid cramped layouts.",
-    "grid_system": {
-      "marketing": "Tetris Grid (Mode A). Asymmetrical, overlapping elements.",
-      "dashboard": "Bento Grid (Mode B). High density, gap-4, 100% height utilization."
+  "css_classes": {
+    "description": "Utility classes defined in index.css. Use these instead of raw Tailwind combinations.",
+    "layout": {
+      "cosmic-page-bg": "Full-page starfield background with radial gradients",
+      "glass-header": "Sticky navigation: backdrop-blur + border-bottom",
+      "glass-card": "Content card: backdrop-blur, border, subtle background"
     },
-    "container_styles": {
-      "glass_card": "bg-black/40 backdrop-blur-xl border border-white/10 shadow-2xl",
-      "solid_card": "bg-card border border-border shadow-sm",
-      "tracing_beam": "relative overflow-hidden border border-white/20"
+    "interactive": {
+      "glow-button": "Primary CTA button with gold glow shadow on hover",
+      "sidebar-link": "Navigation item with active state (add 'active' class when selected)",
+      "card-lift": "Subtle translateY(-2px) + shadow on hover",
+      "focus-glow": "Focus ring matching primary color for inputs",
+      "link-hover": "Underline on hover for text links"
+    },
+    "chat": {
+      "chat-bubble-user": "User message bubble (primary-tinted background)",
+      "chat-bubble-assistant": "AI Coach message bubble",
+      "chat-bubble-friend": "Saoul / AI Friend message bubble (rose-tinted)"
+    },
+    "misc": {
+      "skeleton": "Loading placeholder shimmer animation",
+      "zodiac-badge": "Small pill badge for zodiac/plan labels",
+      "fade-in": "Entrance animation on mount",
+      "fade-in-delay-1 through fade-in-delay-5": "Staggered fade-in delays",
+      "animate-float": "Gentle float up/down animation for decorative elements",
+      "gradient-text": "Primary-to-accent gradient on text",
+      "hero-gradient-dark / hero-gradient-light": "Hero section overlay gradient",
+      "progress-animate": "Progress bar width animation on mount",
+      "pricing-popular": "Most Popular plan card border highlight"
     }
   },
-  "components": {
-    "buttons": {
-      "primary": "bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_15px_rgba(212,175,55,0.3)] transition-all duration-300",
-      "secondary": "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-      "ghost": "hover:bg-accent hover:text-accent-foreground"
+  "navigation": {
+    "landing_page": {
+      "links": ["Features (#features)", "Pricing (#pricing)", "FAQ (#faq)"],
+      "cta": ["Sign In → /auth", "Get Started → /auth?mode=register"],
+      "note": "Contact is accessible via footer link only, not in top nav"
     },
-    "inputs": {
-      "style": "bg-black/20 border-white/10 focus:border-primary/50 focus:ring-primary/20 h-12"
+    "dashboard_sidebar": {
+      "structure": "3 groups with group labels as small uppercase muted text",
+      "groups": {
+        "Daily": [
+          { "id": "overview", "icon": "BarChart3", "label": "Overview", "action": "shows DashboardOverview inline" },
+          { "id": "chat",     "icon": "MessageCircle", "label": "AI Coach",  "href": "/chat" },
+          { "id": "friend",   "icon": "Coffee",        "label": "AI Friend", "href": "/friend" }
+        ],
+        "Your Chart": [
+          { "id": "chart",         "icon": "Sun",      "label": "Birth Chart",   "href": "/chart" },
+          { "id": "transits",      "icon": "Calendar", "label": "Transits",      "href": "/transits" },
+          { "id": "compatibility", "icon": "Heart",    "label": "Compatibility", "href": "/compatibility" }
+        ],
+        "Account": [
+          { "id": "settings", "icon": "Settings", "label": "Settings", "href": "/settings" },
+          { "id": "admin",    "icon": "Shield",   "label": "Admin",    "href": "/admin", "condition": "user.is_admin only" }
+        ]
+      },
+      "sidebar_footer": "Theme toggle + user card (name, sun sign, plan badge) + Sign Out button",
+      "removed_items": ["Numerology", "Gematria", "Share Chart — accessible from chart page instead"]
     },
-    "cards": {
-      "default": "bg-card text-card-foreground border border-border/40 shadow-lg"
-    },
-    "navigation": {
-      "style": "glassmorphism - bg-black/60 backdrop-blur-md border-b border-white/5"
-    }
+    "breadcrumb_pattern": "All inner pages show '← Dashboard' link in top-left. Public/auth pages show '← Back to Home'."
   },
-  "assets": {
-    "images": {
-      "hero_background": {
-        "url": "https://images.unsplash.com/photo-1767188789485-54e0922d76a8?crop=entropy&cs=srgb&fm=jpg&q=85",
-        "alt": "Deep space nebula background",
-        "usage": "Hero section background with overlay"
-      },
-      "auth_background": {
-        "url": "https://images.unsplash.com/photo-1767094979496-61ff2d05040a?crop=entropy&cs=srgb&fm=jpg&q=85",
-        "alt": "Vibrant blue nebula",
-        "usage": "Split screen auth page background"
-      },
-      "features_chart": {
-        "url": "https://images.unsplash.com/photo-1768522345510-1eebe5183a21?crop=entropy&cs=srgb&fm=jpg&q=85",
-        "alt": "Abstract starfield data visualization",
-        "usage": "Feature section - Chart visualization representation"
-      },
-      "testimonial_avatar_1": {
-        "url": "https://images.unsplash.com/photo-1766879240642-03c887de8e05?crop=entropy&cs=srgb&fm=jpg&q=85",
-        "alt": "User avatar mystical",
-        "usage": "Testimonials"
-      },
-      "zodiac_icons": {
-        "url": "https://images.unsplash.com/photo-1758995115543-983c55f98a33?crop=entropy&cs=srgb&fm=jpg&q=85",
-        "alt": "Gold zodiac symbols",
-        "usage": "Decorative elements or category icons"
-      }
+  "component_patterns": {
+    "imports": {
+      "auth_and_api": "import { useAuth, API } from '@/App'",
+      "theme": "import { useTheme } from '@/context/ThemeContext'",
+      "toast": "import { toast } from 'sonner'",
+      "http": "import axios from 'axios'"
     },
-    "icons_library": "lucide-react (default), @phosphor-icons/react (recommended for mystical feel)"
+    "page_structure": "default export for page component, named exports for sub-components",
+    "data_testid": "Required on all interactive elements (buttons, inputs, links with actions)",
+    "transitions": "Use specific property transitions only (transition-colors, transition-transform). Never 'transition: all'.",
+    "icons": "Lucide React only. No emoji in JSX."
   },
-  "visual_enhancers": {
-    "gradients": "Use subtle radial gradients for spotlights. No linear gradients for backgrounds.",
-    "effects": [
-      "Noise overlay (opacity 0.03) on all solid backgrounds",
-      "Glow effects on primary buttons",
-      "1px border with 10% opacity for all cards"
+  "page_inventory": {
+    "public": ["/", "/auth", "/pricing", "/public-chart/:id", "/verify-email", "/reset-password"],
+    "authenticated": [
+      "/dashboard", "/chat", "/friend", "/chart", "/transits", "/compatibility",
+      "/numerology", "/gematria", "/settings", "/share"
     ],
-    "animations": "Framer Motion. Smooth fade-ins (duration 0.6s). Staggered children."
+    "admin": ["/admin"]
   },
-  "instructions_to_main_agent": [
-    "1. INSTALL FONTS: Add the Google Fonts link to public/index.html immediately.",
-    "2. SETUP THEME: Update src/index.css with the provided CSS variables for the 'Cosmic Luxury' palette.",
-    "3. CONFIGURE TAILWIND: Update tailwind.config.js to extend the font family (Cinzel, Manrope) and colors.",
-    "4. BUILD LAYOUTS: Use the 'Tetris' grid for the Landing Page and 'Bento' grid for the Dashboard.",
-    "5. USE SHADCN: Use Shadcn components but OVERRIDE the default styles with the provided 'glass_card' and 'primary' button styles.",
-    "6. IMAGES: Use the provided Unsplash URLs. Do not use placeholders.",
-    "7. DATA-TESTID: Add data-testid to all interactive elements."
-  ],
-  "universal_guidelines": [
-    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients",
-    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
-    "Create depth through layered design elements with z-index hierarchy",
-    "Use glass-morphism effects with backdrop filters (12-24px blur)",
-    "You MUST NOT apply universal transition. Eg: transition: all. This results in breaking transforms. Always add transitions for specific interactive elements like button, input excluding transforms",
-    "You MUST NOT center align the app container, ie do not add .App { text-align: center; } in the css file. This disrupts the human natural reading flow of text",
-    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style",
-    "NEVER: use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯📚🎭🎬🎪🎉🎊🎁🎀🎂🍰🎈🎨🎰💰💵💳🏦💎🪙💸🤑📊📈📉💹🔢🏆🥇 etc for icons.",
-    "Every interaction needs micro-animations - hover states, transitions, parallax effects, and entrance animations. Static = dead.",
-    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
-    "Subtle grain textures, noise overlays, custom cursors, selection states, and loading animations: separates good from extraordinary.",
-    "Main agent relies on these image URLs. Missing categories (especially sponsor logos) = main agent will use placeholder text which is FORBIDDEN",
-    "Prioritize using pre-existing components from src/components/ui when applicable",
-    "Create new components that match the style and conventions of existing components when needed",
-    "Examine existing components to understand the project's component patterns before creating new ones",
-    "Components MUST use named exports (export const ComponentName = ...)",
-    "Pages MUST use default exports (export default function PageName() {...})",
-    "Use sonner for toasts. Sonner component are located in /app/src/components/ui/sonner.tsx"
-  ]
+  "ux_patterns": {
+    "onboarding": "New users (numerology === null) see a welcome card on dashboard. Dismissed via localStorage key 'gab44_onboarding_skipped'.",
+    "registration": "Two-step progressive disclosure: Step 1 = name/email/password, Step 2 = birth details (skippable).",
+    "empty_states": {
+      "ChatPage": "Sparkles icon + persona intro + 3 suggestion chips that auto-submit",
+      "FriendPage": "Heart icon + Saoul persona intro + 3 suggestion chips that auto-submit",
+      "CompatibilityPage": "HeartHandshake icon + relationship type quick-picker"
+    },
+    "contextual_links": {
+      "TransitsPage": "Link to /chart: 'See how these transits interact with your natal planets →'",
+      "NumerologyPage": "Link to /chart: 'Your numerology is part of your birth chart →'",
+      "GematriaPage": "Link to /numerology: 'See your numerology profile →'",
+      "CompatibilityPage": "Button to /chat after report: 'Discuss with AI Coach'"
+    }
+  }
 }

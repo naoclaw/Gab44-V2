@@ -81,6 +81,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const updateUserTier = async (userId, newTier) => {

@@ -156,6 +156,18 @@ export default function NumerologyPage() {
           </div>
         </div>
 
+        {/* Contextual chart link */}
+        <div className="mb-6">
+          <Link
+            to="/chart"
+            className="inline-flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition-colors"
+            data-testid="numerology-chart-link"
+          >
+            Your numerology is part of your birth chart. View your full cosmic blueprint
+            <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
+
         {/* Tabs */}
         <div className="flex gap-2 mb-8">
           {["overview", "details"].map((tab) => (

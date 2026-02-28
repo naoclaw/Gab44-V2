@@ -95,6 +95,18 @@ export default function TransitsPage() {
           </Button>
         </div>
 
+        {/* Contextual chart link */}
+        <div className="mb-6">
+          <Link
+            to="/chart"
+            className="inline-flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition-colors"
+            data-testid="transits-chart-link"
+          >
+            See how these transits interact with your natal planets
+            <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
+
         {/* Filters */}
         <div className="flex flex-wrap gap-2 mb-8">
           {["all", "conjunction", "trine", "sextile", "square", "opposition"].map((f) => (
