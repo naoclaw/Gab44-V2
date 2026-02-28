@@ -187,9 +187,81 @@ pytest tests/ -v
 
 ---
 
+## AWS Deployment
+
+The CI/CD pipeline in `.github/workflows/deploy-aws.yml` automatically deploys the application to AWS on every push to `main`:
+
+- **Frontend** → S3 static website + CloudFront CDN
+- **Backend** → AWS Elastic Beanstalk (Python 3.11 + uvicorn)
+
+### Architecture
+
+```
+Browser → CloudFront (CDN) → S3 (React SPA)
+                           → Elastic Beanstalk (FastAPI) → MongoDB Atlas
+```
+
+### Prerequisites
+
+| AWS Resource | Description |
+|---|---|
+| S3 bucket (frontend) | Hosts the built React static files. Enable static website hosting. |
+| S3 bucket (EB artifacts) | Stores Elastic Beanstalk deployment ZIPs. |
+| CloudFront distribution | CDN in front of the frontend S3 bucket. Set the origin to the S3 website endpoint and configure a default root object of `index.html`. Add a custom error response for 403/404 → `index.html` (200) for client-side routing. |
+| Elastic Beanstalk application + environment | Python 3.11 platform. The `backend/Procfile` starts uvicorn. |
+| IAM user | Needs `elasticbeanstalk:*`, `s3:*` on the two buckets, and `cloudfront:CreateInvalidation`. |
+
+### GitHub Secrets
+
+Add the following secrets in **Settings → Secrets and variables → Actions**:
+
+| Secret | Description |
+|--------|-------------|
+| `AWS_ACCESS_KEY_ID` | IAM user access key |
+| `AWS_SECRET_ACCESS_KEY` | IAM user secret key |
+| `AWS_REGION` | AWS region (e.g. `us-east-1`) |
+| `EB_APP_NAME` | Elastic Beanstalk application name |
+| `EB_ENV_NAME` | Elastic Beanstalk environment name |
+| `EB_S3_BUCKET` | S3 bucket for EB deployment artifacts |
+| `FRONTEND_S3_BUCKET` | S3 bucket for the React static build |
+| `CLOUDFRONT_DISTRIBUTION_ID` | CloudFront distribution ID |
+| `REACT_APP_BACKEND_URL` | Public URL of the EB backend (no trailing slash) |
+| `REACT_APP_ONESIGNAL_APP_ID` | OneSignal App ID (optional) |
+| `MONGO_URL` | MongoDB Atlas connection string (used by tests in CI) |
+| `DB_NAME` | MongoDB database name (used by tests in CI) |
+| `JWT_SECRET` | JWT signing secret (used by tests in CI) |
+
+### Elastic Beanstalk setup
+
+1. Create an EB application and a **Python 3.11** environment.
+2. The `backend/Procfile` starts the server:
+   ```
+   web: uvicorn server:app --host 0.0.0.0 --port ${PORT:-8001}
+   ```
+3. Set the environment variables listed in `backend/.env.example` under **Configuration → Software → Environment properties**.
+4. The `backend/.ebextensions/01_python.config` and `backend/.platform/nginx/conf.d/proxy_timeout.conf` are bundled in the deployment ZIP and applied automatically.
+
+### Stripe webhook
+
+After the EB environment is up:
+
+1. In Stripe Dashboard → Developers → Webhooks, add endpoint: `https://api.yourdomain.com/api/payments/webhook`
+2. Copy the Signing Secret and set `STRIPE_WEBHOOK_SECRET` in the EB environment properties.
+
+### Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| EB deploy fails on startup | Check environment properties — `MONGO_URL`, `DB_NAME`, `JWT_SECRET` must be set |
+| Frontend routing returns 403 | Add a CloudFront custom error response: 403 → `/index.html` (200) |
+| CORS errors in the browser | Set `CORS_ORIGINS` in EB to the CloudFront domain (no trailing slash) |
+| Stripe webhooks rejected | Verify `STRIPE_WEBHOOK_SECRET` matches the Stripe signing secret |
+
+---
+
 ## Deployment Notes
 
-1. Set all env vars in your hosting platform (Railway, Render, Fly.io, etc.)
+1. Set all env vars in your hosting platform (Railway, Render, Fly.io, AWS, etc.)
 2. For Stripe webhooks: point `https://yourdomain.com/api/payments/webhook` to the FastAPI backend and set `STRIPE_WEBHOOK_SECRET`
 3. For email verification links to work: set `FRONTEND_URL=https://yourdomain.com`
 4. CORS: set `CORS_ORIGINS=https://yourdomain.com` (remove the `*` default in production)

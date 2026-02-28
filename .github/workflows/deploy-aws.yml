@@ -1,0 +1,141 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # ─── Backend → AWS Elastic Beanstalk ──────────────────────────────────────
+  deploy-backend:
+    name: Backend → Elastic Beanstalk
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run backend tests
+        working-directory: backend
+        env:
+          MONGO_URL: ${{ secrets.MONGO_URL }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        run: pytest tests/ -v --tb=short
+
+      - name: Package backend for Elastic Beanstalk
+        run: |
+          APP_VERSION="v-$(date +%Y%m%d%H%M%S)-${GITHUB_SHA::7}"
+          echo "APP_VERSION=${APP_VERSION}" >> "$GITHUB_ENV"
+          cd backend
+          zip -r "../backend-${APP_VERSION}.zip" . \
+            --exclude "*.pyc" \
+            --exclude "__pycache__/*" \
+            --exclude ".env" \
+            --exclude "venv/*" \
+            --exclude ".git/*"
+
+      - name: Upload deployment bundle to S3
+        run: |
+          aws s3 cp "backend-${APP_VERSION}.zip" \
+            "s3://${{ secrets.EB_S3_BUCKET }}/deploys/backend-${APP_VERSION}.zip"
+
+      - name: Create Elastic Beanstalk application version
+        run: |
+          aws elasticbeanstalk create-application-version \
+            --application-name "${{ secrets.EB_APP_NAME }}" \
+            --version-label "${APP_VERSION}" \
+            --source-bundle "S3Bucket=${{ secrets.EB_S3_BUCKET }},S3Key=deploys/backend-${APP_VERSION}.zip" \
+            --auto-create-application
+
+      - name: Deploy to Elastic Beanstalk environment
+        run: |
+          aws elasticbeanstalk update-environment \
+            --application-name "${{ secrets.EB_APP_NAME }}" \
+            --environment-name "${{ secrets.EB_ENV_NAME }}" \
+            --version-label "${APP_VERSION}"
+
+      - name: Wait for deployment to complete
+        run: |
+          aws elasticbeanstalk wait environment-updated \
+            --application-name "${{ secrets.EB_APP_NAME }}" \
+            --environment-names "${{ secrets.EB_ENV_NAME }}"
+
+  # ─── Frontend → AWS S3 + CloudFront ───────────────────────────────────────
+  deploy-frontend:
+    name: Frontend → S3 + CloudFront
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: yarn install --frozen-lockfile
+
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          REACT_APP_BACKEND_URL: ${{ secrets.REACT_APP_BACKEND_URL }}
+          REACT_APP_ONESIGNAL_APP_ID: ${{ secrets.REACT_APP_ONESIGNAL_APP_ID }}
+          CI: false
+        run: yarn build
+
+      - name: Sync static assets to S3 (long-lived cache)
+        run: |
+          aws s3 sync frontend/build/ "s3://${{ secrets.FRONTEND_S3_BUCKET }}/" \
+            --delete \
+            --exclude "index.html" \
+            --exclude "service-worker.js" \
+            --cache-control "public, max-age=31536000, immutable"
+
+      - name: Upload index.html and service-worker to S3 (no-cache)
+        run: |
+          for file in index.html service-worker.js; do
+            if [ -f "frontend/build/${file}" ]; then
+              aws s3 cp "frontend/build/${file}" \
+                "s3://${{ secrets.FRONTEND_S3_BUCKET }}/${file}" \
+                --cache-control "no-cache, no-store, must-revalidate"
+            fi
+          done
+
+      - name: Invalidate CloudFront distribution
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}" \
+            --paths "/*"
