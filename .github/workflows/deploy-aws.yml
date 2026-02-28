@@ -8,9 +8,16 @@ permissions:
   contents: read
 
 jobs:
-  # ─── Backend → AWS Elastic Beanstalk ──────────────────────────────────────
+  # ─── Backend → Amazon ECS Fargate (Docker) ────────────────────────────────
+  #
+  # Why ECS over Lambda?
+  #   • AI chat + Swiss Ephemeris calls routinely exceed Lambda's 29 s timeout.
+  #   • pyswisseph is a C extension — trivial in Docker, painful to package for Lambda.
+  #   • Motor keeps MongoDB connections warm across requests in a long-running container.
+  #   • Gunicorn + uvicorn workers give multi-core scaling inside a single task.
+  #
   deploy-backend:
-    name: Backend → Elastic Beanstalk
+    name: Backend → ECS Fargate
     runs-on: ubuntu-latest
 
     steps:
@@ -43,43 +50,42 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: pytest tests/ -v --tb=short
 
-      - name: Package backend for Elastic Beanstalk
-        run: |
-          APP_VERSION="v-$(date +%Y%m%d%H%M%S)-${GITHUB_SHA::7}"
-          echo "APP_VERSION=${APP_VERSION}" >> "$GITHUB_ENV"
-          cd backend
-          zip -r "../backend-${APP_VERSION}.zip" . \
-            --exclude "*.pyc" \
-            --exclude "__pycache__/*" \
-            --exclude ".env" \
-            --exclude "venv/*" \
-            --exclude ".git/*"
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Upload deployment bundle to S3
+      - name: Build, tag, and push Docker image to ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
         run: |
-          aws s3 cp "backend-${APP_VERSION}.zip" \
-            "s3://${{ secrets.EB_S3_BUCKET }}/deploys/backend-${APP_VERSION}.zip"
+          docker build -t "$ECR_REGISTRY/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG" backend/
+          docker push "$ECR_REGISTRY/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG"
+          echo "image=$ECR_REGISTRY/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
 
-      - name: Create Elastic Beanstalk application version
+      - name: Download current ECS task definition
         run: |
-          aws elasticbeanstalk create-application-version \
-            --application-name "${{ secrets.EB_APP_NAME }}" \
-            --version-label "${APP_VERSION}" \
-            --source-bundle "S3Bucket=${{ secrets.EB_S3_BUCKET }},S3Key=deploys/backend-${APP_VERSION}.zip" \
-            --auto-create-application
+          aws ecs describe-task-definition \
+            --task-definition "${{ secrets.ECS_TASK_DEFINITION }}" \
+            --query taskDefinition \
+            > task-definition.json
 
-      - name: Deploy to Elastic Beanstalk environment
-        run: |
-          aws elasticbeanstalk update-environment \
-            --application-name "${{ secrets.EB_APP_NAME }}" \
-            --environment-name "${{ secrets.EB_ENV_NAME }}" \
-            --version-label "${APP_VERSION}"
+      - name: Render new task definition with updated image
+        id: render-task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ secrets.CONTAINER_NAME }}
+          image: ${{ steps.build-image.outputs.image }}
 
-      - name: Wait for deployment to complete
-        run: |
-          aws elasticbeanstalk wait environment-updated \
-            --application-name "${{ secrets.EB_APP_NAME }}" \
-            --environment-names "${{ secrets.EB_ENV_NAME }}"
+      - name: Deploy updated task definition to ECS service
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-task-def.outputs.task-definition }}
+          service: ${{ secrets.ECS_SERVICE }}
+          cluster: ${{ secrets.ECS_CLUSTER }}
+          wait-for-service-stability: true
 
   # ─── Frontend → AWS S3 + CloudFront ───────────────────────────────────────
   deploy-frontend:
@@ -126,10 +132,10 @@ jobs:
 
       - name: Upload index.html and service-worker to S3 (no-cache)
         run: |
-          for file in index.html service-worker.js; do
-            if [ -f "frontend/build/${file}" ]; then
-              aws s3 cp "frontend/build/${file}" \
-                "s3://${{ secrets.FRONTEND_S3_BUCKET }}/${file}" \
+          for filename in index.html service-worker.js; do
+            if [ -f "frontend/build/${filename}" ]; then
+              aws s3 cp "frontend/build/${filename}" \
+                "s3://${{ secrets.FRONTEND_S3_BUCKET }}/${filename}" \
                 --cache-control "no-cache, no-store, must-revalidate"
             fi
           done

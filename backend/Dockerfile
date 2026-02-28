@@ -18,5 +18,13 @@ COPY . .
 # Expose the port the app listens on.
 EXPOSE 8001
 
-# Start the ASGI server.
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8001"]
+# Use gunicorn + uvicorn workers for multi-core throughput.
+# ECS Fargate task CPU/memory determines the effective worker count.
+# Adjust --workers to match (vCPU × 2 + 1) for your task size.
+CMD ["gunicorn", "server:app", \
+     "--worker-class", "uvicorn.workers.UvicornWorker", \
+     "--workers", "2", \
+     "--bind", "0.0.0.0:8001", \
+     "--timeout", "120", \
+     "--keep-alive", "5", \
+     "--log-level", "info"]
