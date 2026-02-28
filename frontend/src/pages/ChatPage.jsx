@@ -55,6 +55,7 @@ export default function ChatPage() {
       setSessions(response.data);
     } catch (error) {
       console.error("Error fetching sessions:", error);
+      toast.error("Could not load your past conversations.");
     }
   };
 

@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Request, BackgroundTasks, Response
+from fastapi.responses import JSONResponse
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
@@ -1397,17 +1398,24 @@ async def get_my_chart(user: dict = Depends(get_current_user), recalculate: bool
         latitude, longitude = get_coordinates(birth_place)
     
     # Calculate chart using Swiss Ephemeris
-    chart_data = calculate_natal_chart(
-        birth_date=birth_date,
-        birth_time=birth_time,
-        latitude=latitude,
-        longitude=longitude
-    )
+    try:
+        chart_data = calculate_natal_chart(
+            birth_date=birth_date,
+            birth_time=birth_time,
+            latitude=latitude,
+            longitude=longitude
+        )
 
-    # Calculate numerology from name and birth date
-    numerology_name = (user.get("birth_name") or user.get("name") or "").strip()
-    numerology = calculate_numerology(numerology_name, birth_date) if numerology_name else {}
-    gematria = calculate_gematria(numerology_name) if numerology_name else {}
+        # Calculate numerology from name and birth date
+        numerology_name = (user.get("birth_name") or user.get("name") or "").strip()
+        numerology = calculate_numerology(numerology_name, birth_date) if numerology_name else {}
+        gematria = calculate_gematria(numerology_name) if numerology_name else {}
+    except Exception as e:
+        logging.error("Chart calculation failed for user %s: %s", user["id"], e)
+        raise HTTPException(
+            status_code=500,
+            detail="Chart calculation failed. Please check your birth date and try again.",
+        )
 
     # Build chart document
     chart_doc = {
@@ -1479,7 +1487,11 @@ async def get_numerology_profile(user: dict = Depends(get_current_user)):
     if not full_name or not birth_date:
         raise HTTPException(status_code=400, detail="Name and birth date are required for numerology")
 
-    profile = numerology_full_profile(full_name, birth_date)
+    try:
+        profile = numerology_full_profile(full_name, birth_date)
+    except Exception as e:
+        logging.error("Numerology profile calculation failed for user %s: %s", user["id"], e)
+        raise HTTPException(status_code=500, detail="Numerology calculation failed. Please try again.")
     profile_doc = {"user_id": user["id"], **profile}
     await db.numerology_profiles.update_one(
         {"user_id": user["id"]},
@@ -1502,7 +1514,11 @@ async def gematria_calculate(request: GematriaRequest):
         raise HTTPException(status_code=400, detail="Text is required")
     if len(text) > 500:
         raise HTTPException(status_code=400, detail="Text must be 500 characters or less")
-    return gematria_calculate_all(text)
+    try:
+        return gematria_calculate_all(text)
+    except Exception as e:
+        logging.error("Gematria calculation failed for text %r: %s", text[:50], e)
+        raise HTTPException(status_code=500, detail="Gematria calculation failed. Please try again.")
 
 
 # ============== Cities / Geocoding (from Gab44-vision) ==============
@@ -2042,17 +2058,31 @@ async def analyze_compatibility(request: CompatibilityRequest, user: dict = Depe
         birth_time = user.get("birth_time")
         birth_place = user.get("birth_place", "")
         latitude, longitude = get_coordinates(birth_place) if birth_place else (0.0, 0.0)
-        
-        user_chart = calculate_natal_chart(birth_date, birth_time, latitude, longitude)
-    
+
+        try:
+            user_chart = calculate_natal_chart(birth_date, birth_time, latitude, longitude)
+        except Exception as e:
+            logging.error("User chart calculation failed for user %s: %s", user["id"], e)
+            raise HTTPException(
+                status_code=500,
+                detail="Could not calculate your birth chart. Please check your profile data and try again.",
+            )
+
     # Calculate partner's chart using Swiss Ephemeris
     partner_latitude, partner_longitude = get_coordinates(request.partner_birth_place)
-    partner_chart = calculate_natal_chart(
-        birth_date=request.partner_birth_date,
-        birth_time=request.partner_birth_time,
-        latitude=partner_latitude,
-        longitude=partner_longitude
-    )
+    try:
+        partner_chart = calculate_natal_chart(
+            birth_date=request.partner_birth_date,
+            birth_time=request.partner_birth_time,
+            latitude=partner_latitude,
+            longitude=partner_longitude
+        )
+    except Exception as e:
+        logging.error("Partner chart calculation failed: %s", e)
+        raise HTTPException(
+            status_code=400,
+            detail="Could not calculate your partner's chart. Please check their birth date and place.",
+        )
     
     partner_sun = partner_chart["sun_sign"]
     
@@ -2327,32 +2357,36 @@ async def create_checkout_session(req: CheckoutRequest, user: dict = Depends(get
 
     # Attach or retrieve Stripe customer for this user
     stripe_customer_id = user.get("stripe_customer_id")
-    if not stripe_customer_id:
-        customer = stripe.Customer.create(
-            email=user["email"],
-            name=user.get("name", ""),
-            metadata={"user_id": user["id"]},
-        )
-        stripe_customer_id = customer.id
-        await db.users.update_one({"id": user["id"]}, {"$set": {"stripe_customer_id": stripe_customer_id}})
+    try:
+        if not stripe_customer_id:
+            customer = stripe.Customer.create(
+                email=user["email"],
+                name=user.get("name", ""),
+                metadata={"user_id": user["id"]},
+            )
+            stripe_customer_id = customer.id
+            await db.users.update_one({"id": user["id"]}, {"$set": {"stripe_customer_id": stripe_customer_id}})
 
-    session = stripe.checkout.Session.create(
-        customer=stripe_customer_id,
-        payment_method_types=["card"],
-        mode="subscription",
-        line_items=[{
-            "price_data": {
-                "currency": "usd",
-                "product_data": {"name": plan["name"]},
-                "unit_amount": plan["amount"],
-                "recurring": {"interval": "month"},
-            },
-            "quantity": 1,
-        }],
-        success_url=f"{frontend_url}/dashboard?subscription=success&tier={tier}",
-        cancel_url=f"{frontend_url}/pricing",
-        metadata={"user_id": user["id"], "tier": tier},
-    )
+        session = stripe.checkout.Session.create(
+            customer=stripe_customer_id,
+            payment_method_types=["card"],
+            mode="subscription",
+            line_items=[{
+                "price_data": {
+                    "currency": "usd",
+                    "product_data": {"name": plan["name"]},
+                    "unit_amount": plan["amount"],
+                    "recurring": {"interval": "month"},
+                },
+                "quantity": 1,
+            }],
+            success_url=f"{frontend_url}/dashboard?subscription=success&tier={tier}",
+            cancel_url=f"{frontend_url}/pricing",
+            metadata={"user_id": user["id"], "tier": tier},
+        )
+    except stripe.error.StripeError as e:
+        logging.error("Stripe checkout error for user %s: %s", user["id"], e)
+        raise HTTPException(status_code=502, detail="Payment service unavailable. Please try again.")
 
     return {"checkout_url": session.url, "session_id": session.id}
 
@@ -2368,10 +2402,14 @@ async def create_portal_session(user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail="No active subscription found")
 
     frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
-    session = stripe.billing_portal.Session.create(
-        customer=stripe_customer_id,
-        return_url=f"{frontend_url}/settings",
-    )
+    try:
+        session = stripe.billing_portal.Session.create(
+            customer=stripe_customer_id,
+            return_url=f"{frontend_url}/settings",
+        )
+    except stripe.error.StripeError as e:
+        logging.error("Stripe portal error for customer %s: %s", stripe_customer_id, e)
+        raise HTTPException(status_code=502, detail="Payment service unavailable. Please try again.")
     return {"portal_url": session.url}
 
 
@@ -2481,13 +2519,17 @@ async def subscribe_newsletter(sub: NewsletterSubscription):
     if existing:
         return {"subscribed": True, "already_subscribed": True}
 
-    await db.newsletter_subscribers.insert_one({
-        "id": str(uuid.uuid4()),
-        "email": sub.email,
-        "name": sub.name,
-        "subscribed_at": datetime.now(timezone.utc).isoformat(),
-        "active": True,
-    })
+    try:
+        await db.newsletter_subscribers.insert_one({
+            "id": str(uuid.uuid4()),
+            "email": sub.email,
+            "name": sub.name,
+            "subscribed_at": datetime.now(timezone.utc).isoformat(),
+            "active": True,
+        })
+    except Exception as e:
+        logging.error("Newsletter subscribe DB error for %s: %s", sub.email, e)
+        raise HTTPException(status_code=500, detail="Subscription failed. Please try again.")
 
     # Send confirmation email (non-blocking fire-and-forget)
     greeting = f"Hi {sub.name}!" if sub.name else "Hi there!"
@@ -2514,15 +2556,19 @@ async def subscribe_newsletter(sub: NewsletterSubscription):
 async def submit_contact_form(msg: ContactMessage):
     """Store a contact/support ticket and forward to support email."""
     ticket_id = str(uuid.uuid4())
-    await db.contact_messages.insert_one({
-        "id": ticket_id,
-        "name": msg.name,
-        "email": msg.email,
-        "subject": msg.subject,
-        "message": msg.message,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "status": "open",
-    })
+    try:
+        await db.contact_messages.insert_one({
+            "id": ticket_id,
+            "name": msg.name,
+            "email": msg.email,
+            "subject": msg.subject,
+            "message": msg.message,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "status": "open",
+        })
+    except Exception as e:
+        logging.error("Contact form DB error from %s: %s", msg.email, e)
+        raise HTTPException(status_code=500, detail="Could not submit your message. Please try again.")
 
     # Forward to support inbox
     support_html = f"""
@@ -2534,12 +2580,14 @@ async def submit_contact_form(msg: ContactMessage):
       <p style="white-space:pre-wrap;">{msg.message}</p>
     </div>
     """
-    send_email(
+    sent_to_support = send_email(
         to_email=EMAIL_SUPPORT,
         subject=f"[Gab44 Support] {msg.subject}",
         html_content=support_html,
         from_email=EMAIL_NOREPLY,
     )
+    if not sent_to_support:
+        logging.error("Support forward email failed for ticket %s from %s", ticket_id[:8], msg.email)
 
     # Auto-reply to sender
     auto_reply = build_support_reply_email(
@@ -2758,6 +2806,21 @@ async def get_contact_messages(admin: dict = Depends(require_admin)):
 
 # Include router and setup middleware
 app.include_router(api_router)
+
+# Global exception handler: catch any unhandled exception, log it with a
+# unique request ID for log correlation, and return a clean JSON 500 instead
+# of FastAPI's default bare "Internal Server Error".
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    request_id = str(uuid.uuid4())[:8]
+    logging.error(
+        "Unhandled exception [%s] %s %s: %s",
+        request_id, request.method, request.url.path, exc,
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An unexpected error occurred.", "request_id": request_id},
+    )
 
 # CORS: combining allow_credentials=True with allow_origins=["*"] is invalid per
 # the CORS spec — browsers reject responses where Access-Control-Allow-Origin is
