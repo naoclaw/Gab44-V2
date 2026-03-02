@@ -505,7 +505,7 @@ export default function SettingsPage() {
               className="w-full border-destructive/30 text-destructive hover:bg-destructive/10 rounded-xl"
               onClick={() => {
                 logout();
-                navigate("/");
+                navigate("/auth");
               }}
               data-testid="logout-settings"
             >
