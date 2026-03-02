@@ -381,6 +381,34 @@ class CompatibilityRequest(BaseModel):
     partner_birth_name: Optional[str] = None  # legal birth name for numerology
     relationship_type: str = "romantic"  # romantic | friendship | family | business | colleague
 
+    @validator('partner_birth_time')
+    def validate_birth_time(cls, v):
+        # Empty string is not allowed - convert to None
+        if v == '':
+            return None
+        return v
+
+    @validator('partner_birth_place')
+    def validate_birth_place(cls, v):
+        # Validate that place is not empty and not the default ocean coordinates
+        if not v or not v.strip():
+            raise ValueError('Birth place is required')
+        # Check for invalid coordinates (0.0, 0.0) - this is in the Atlantic Ocean
+        v_lower = v.lower().strip()
+        if v_lower in ['0,0', '0.0, 0.0', '0 0', '(0, 0)', '(0.0, 0.0)']:
+            raise ValueError('Please provide a valid city or location')
+        return v
+
+    @validator('partner_birth_date')
+    def validate_birth_date(cls, v):
+        # Validate date format YYYY-MM-DD
+        from datetime import datetime
+        try:
+            datetime.strptime(v, '%Y-%m-%d')
+        except ValueError:
+            raise ValueError('Birth date must be in YYYY-MM-DD format')
+        return v
+
 class SynastryAspect(BaseModel):
     person1_planet: str
     person2_planet: str
