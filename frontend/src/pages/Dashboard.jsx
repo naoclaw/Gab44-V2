@@ -234,6 +234,7 @@ const DashboardOverview = () => {
         setDailyGuidance(guidanceSettled.value.data);
       } else {
         console.warn("Daily guidance fetch failed:", guidanceSettled.reason);
+        toast.error("Failed to load daily guidance. Please try again.");
       }
 
       if (transitsSettled.status === "fulfilled") {
@@ -246,6 +247,7 @@ const DashboardOverview = () => {
         setNumerology(numerologySettled.value.data);
       } else {
         console.warn("Numerology fetch failed:", numerologySettled.reason);
+        toast.error("Failed to load numerology. Please try again.");
       }
 
       setLoading(false);
