@@ -1,0 +1,36 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "frontend",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "build"
+      }
+    },
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.py"
+    },
+    {
+      "src": "/static/(.*)",
+      "dest": "/frontend/build/static/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/frontend/build/index.html"
+    }
+  ],
+  "env": {
+    "PYTHONUNBUFFERED": "1"
+  },
+  "framework": null,
+  "installCommand": "cd frontend && yarn install",
+  "buildCommand": "cd frontend && yarn build"
+}
