@@ -97,7 +97,7 @@ External: OpenAI GPT-4o · Stripe · SendGrid · OneSignal · Mapbox · Swiss Ep
 | # | Severity | Where | Issue |
 |---|---|---|---|
 | 1 | **CRITICAL** | `server.py:2434` (webhook handler) | If `STRIPE_WEBHOOK_SECRET` is unset, the webhook **accepts unsigned events**. An attacker can forge `checkout.session.completed` to upgrade arbitrary user IDs to `professional`. Must hard-fail on missing secret in production. |
-| 2 | HIGH | Email verify (`server.py:1089-1107`), Password reset (`1154-1177`) | The token-expiry constants exist (`EMAIL_VERIFY_EXPIRY_HOURS=48`, `PASSWORD_RESET_EXPIRY_HOURS=1`) but **the corresponding timestamps are never written to or checked from the user document**. A leaked token is valid forever. |
+| 2 | HIGH | Email verify (`server.py:1089-1107`) | `EMAIL_VERIFY_EXPIRY_HOURS=48` is declared but the timestamp is never written or checked — leaked verification links are valid forever. **Fixed on `beta` in commit `d297e14`.** Password-reset expiry is correctly enforced (`PASSWORD_RESET_EXPIRY_HOURS=1` writes `password_reset_expiry` and the `/auth/reset-password` handler verifies it at `server.py:1163-1169`). |
 | 3 | HIGH | `payments.py` vs `server.py:108-112` | Two payment code paths coexist with **different pricing models**: `payments.py` uses Stripe **Price IDs** (`STRIPE_PRICE_ENTHUSIAST`, etc.); `server.py` uses **inline amounts** in `STRIPE_PLAN_PRICES`. Whichever is wired up wins; the other is dead code that will silently take over if imported. |
 | 4 | HIGH | Pricing inconsistency | The `/api/pricing` payload says `enthusiast = $9.99`, `advanced = $29.99`. The Stripe inline-amount checkout charges **$19.99** and **$49.99**. Customers will see one price and be charged another. |
 | 5 | HIGH | Vercel deploy path (`api/index.py`) | `pyswisseph` is a compiled C extension. The Vercel Python runtime won't include the binary unless a custom layer / build hook is added. The recent commit `cfefa89` ("Fix Vercel routes configuration") suggests the team knows this is shaky. **Hetzner VPS migration in Phase 4 fixes this.** |
@@ -214,8 +214,8 @@ Grouped by feature. All routes are prefixed with `/api`. **🔒 = JWT required**
 
 - JWT (HS256, `server.py:90`) signed with `JWT_SECRET`. Expiration: 7 days. Payload: `{user_id, exp}`.
 - bcrypt password hashing with default salt rounds. Constant-time compare via `bcrypt.checkpw()`.
-- Email verification token: `secrets.token_urlsafe(32)`. **Expiry not enforced** (token_created_at not stored/checked).
-- Password reset token: same shape. **Expiry not enforced** either.
+- Email verification token: `secrets.token_urlsafe(32)`. **Expiry not enforced in `main`** (now fixed on `beta`).
+- Password reset token: same shape; **expiry IS enforced** (`password_reset_expiry` is written on issue and verified on use at `server.py:1163-1169`).
 - Admin RBAC: `role` field on user doc + `ADMIN_EMAILS` env auto-grants on login.
 - **No refresh tokens, no logout-side-effects, no device list.** For a mobile app this is acceptable v1; for a Telegram bot we'll need a separate auth path (linking Telegram account → Gab44 user ID).
 
@@ -263,17 +263,17 @@ The frontend already ships a tasteful, branded design system. Key tokens (`front
 
 ## 11. Phase-1 Verdict
 
-The platform is **functionally complete** as a web app. The math is right, the AI degrades gracefully, the auth is solid for v1, and the design system has real character. There are five issues that must be fixed before scaling to mobile + Telegram traffic:
+The platform is **functionally complete** as a web app. The math is right, the AI degrades gracefully, the auth is solid for v1, and the design system has real character. Five issues were flagged before scaling to mobile + Telegram traffic; the fast ones are already fixed on `beta`:
 
-1. Stripe webhook signature bypass (CRITICAL).
-2. Missing token-expiry enforcement on email-verify and password-reset.
-3. Pricing mismatch between `/api/pricing` and Stripe checkout.
-4. Two payment code paths that could collide (`payments.py` vs `server.py`).
-5. The `<Route path="*">` 404 placement bug.
+| # | Issue | Status on `beta` |
+|---|---|---|
+| 1 | Stripe webhook signature bypass (CRITICAL) | ✅ Fixed (`7f8bd51`) — endpoint now refuses without `STRIPE_WEBHOOK_SECRET`. |
+| 2 | Email-verify token expiry not enforced | ✅ Fixed (`d297e14`). Password-reset expiry was already enforced — REVIEW now corrected. |
+| 3 | Pricing mismatch `/api/pricing` vs Stripe inline amounts | ⏳ Pending — needs product decision on the canonical tier prices. |
+| 4 | `payments.py` vs `server.py` payment code coexistence | ⏳ Pending — recommend deleting `payments.py` once the bot is wired through `server.py` only, or refactoring both paths through `payments.py`. |
+| 5 | `<Route path="*">` 404 placement bug | ✅ Fixed (`e69f555`). |
 
 Plus structural debt that pays back fast:
 - Refactor `server.py` into `backend/routers/` per feature so the Telegram bot can import shared services without dragging in the FastAPI app.
 - Extract `ai/` package (prompt builders + model client) to share with bot.
-- Delete `astro_engine.py`.
-
-These are tracked as Phase 4 commits.
+- ✅ `astro_engine.py` deleted (`79a16bc`).
