@@ -354,7 +354,7 @@ class EmailBlastRequest(BaseModel):
 # Fields that must never appear in API responses
 _SENSITIVE_USER_FIELDS = frozenset({
     "_id", "password",
-    "email_verification_token",
+    "email_verification_token", "email_verification_expiry",
     "password_reset_token", "password_reset_expiry",
 })
 
@@ -384,7 +384,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         user = await db.users.find_one(
             {"id": user_id},
             {"_id": 0, "password": 0,
-             "email_verification_token": 0,
+             "email_verification_token": 0, "email_verification_expiry": 0,
              "password_reset_token": 0, "password_reset_expiry": 0}
         )
         if not user:
@@ -1027,7 +1027,10 @@ async def register(request: Request, user_data: UserCreate):
 
     # Generate email verification token
     email_verification_token = secrets.token_urlsafe(32)
-    
+    email_verification_expiry = (
+        datetime.now(timezone.utc) + timedelta(hours=EMAIL_VERIFY_EXPIRY_HOURS)
+    ).isoformat()
+
     # Create user
     user_id = str(uuid.uuid4())
     user_doc = {
@@ -1044,6 +1047,7 @@ async def register(request: Request, user_data: UserCreate):
         "subscription_tier": "seeker",  # Default to free tier; upgrades via Stripe
         "email_verified": False,
         "email_verification_token": email_verification_token,
+        "email_verification_expiry": email_verification_expiry,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
@@ -1092,9 +1096,24 @@ async def verify_email(token: str):
     user = await db.users.find_one({"email_verification_token": token})
     if not user:
         raise HTTPException(status_code=400, detail="Invalid or expired verification token")
+
+    expiry_str = user.get("email_verification_expiry", "")
+    if expiry_str:
+        expiry = datetime.fromisoformat(expiry_str)
+        if expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) > expiry:
+            raise HTTPException(
+                status_code=400,
+                detail="Verification link has expired. Please request a new one.",
+            )
+
     await db.users.update_one(
         {"id": user["id"]},
-        {"$set": {"email_verified": True}, "$unset": {"email_verification_token": ""}},
+        {
+            "$set": {"email_verified": True},
+            "$unset": {"email_verification_token": "", "email_verification_expiry": ""},
+        },
     )
     # Send a welcome email now that the address is confirmed
     frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
@@ -1112,7 +1131,13 @@ async def resend_verification(user: dict = Depends(get_current_user)):
     if user.get("email_verified"):
         return {"sent": False, "message": "Email is already verified"}
     token = secrets.token_urlsafe(32)
-    await db.users.update_one({"id": user["id"]}, {"$set": {"email_verification_token": token}})
+    expiry = (
+        datetime.now(timezone.utc) + timedelta(hours=EMAIL_VERIFY_EXPIRY_HOURS)
+    ).isoformat()
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"email_verification_token": token, "email_verification_expiry": expiry}},
+    )
     frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
     verify_url = f"{frontend_url}/verify-email?token={token}"
     sent = send_email(
@@ -1199,7 +1224,7 @@ async def update_me(update_data: UserUpdate, user: dict = Depends(get_current_us
     updated_user = await db.users.find_one(
         {"id": user["id"]},
         {"_id": 0, "password": 0,
-         "email_verification_token": 0,
+         "email_verification_token": 0, "email_verification_expiry": 0,
          "password_reset_token": 0, "password_reset_expiry": 0}
     )
     if not updated_user:
