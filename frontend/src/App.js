@@ -1,10 +1,15 @@
 import { useState, useEffect, createContext, useContext } from "react";
 import "@/App.css";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import axios from "axios";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { ReadingModeProvider } from "@/context/ReadingModeContext";
+import { isNative } from "@/lib/platform";
+
+// Capacitor serves the bundle from a file:// or capacitor:// scheme that
+// doesn't play well with history mode — fall back to hash routing on native.
+const Router = isNative() ? HashRouter : BrowserRouter;
 
 // Pages
 import LandingPage from "@/pages/LandingPage";
@@ -204,7 +209,7 @@ function App() {
       <AuthProvider>
         <div className="App min-h-screen bg-background theme-transition">
           <div className="noise-overlay" />
-          <BrowserRouter>
+          <Router>
             <Routes>
               <Route path="/" element={<LandingPage />} />
               <Route path="/auth" element={<AuthPage />} />
@@ -302,7 +307,7 @@ function App() {
               />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
-          </BrowserRouter>
+          </Router>
           <Toaster position="top-right" />
         </div>
       </AuthProvider>

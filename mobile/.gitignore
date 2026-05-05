@@ -1,0 +1,21 @@
+# Capacitor / Node
+node_modules/
+
+# Capacitor-generated platform shells (kept out of the repo until we add
+# native customizations; regenerated locally with `npm run android:add`).
+android/
+ios/
+
+# Build / IDE artefacts (in case the platforms are added)
+*.iml
+.gradle/
+.idea/
+local.properties
+build/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+Pods/
+
+# OS noise
+.DS_Store
