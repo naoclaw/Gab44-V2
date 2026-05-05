@@ -292,16 +292,16 @@ function App() {
                   </ProtectedRoute>
                 } 
               />
-              <Route 
-                path="/admin" 
+              <Route
+                path="/admin"
                 element={
                   <AdminRoute>
                     <AdminPage />
                   </AdminRoute>
-                } 
+                }
               />
+              <Route path="*" element={<NotFoundPage />} />
             </Routes>
-            <Route path="*" element={<NotFoundPage />} />
           </BrowserRouter>
           <Toaster position="top-right" />
         </div>
