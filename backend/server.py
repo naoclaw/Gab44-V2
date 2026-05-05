@@ -2424,15 +2424,19 @@ async def stripe_webhook(request: Request):
     if not STRIPE_SECRET_KEY:
         raise HTTPException(status_code=503, detail="Payment processing not configured")
 
+    if not STRIPE_WEBHOOK_SECRET:
+        # Refuse to process webhooks without signature verification — an unsigned
+        # endpoint lets anyone forge subscription events (e.g. upgrade arbitrary
+        # users to "professional"). For local dev, run `stripe listen` to forward
+        # signed events from the Stripe CLI.
+        logging.error("Stripe webhook hit but STRIPE_WEBHOOK_SECRET is not set; refusing.")
+        raise HTTPException(status_code=503, detail="Webhook signing not configured")
+
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature", "")
 
     try:
-        if STRIPE_WEBHOOK_SECRET:
-            event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
-        else:
-            # Accept without signature verification when webhook secret not configured (dev only)
-            event = stripe.Event.construct_from(json.loads(payload), stripe.api_key)
+        event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
     except (ValueError, stripe.error.SignatureVerificationError) as e:
         logging.error("Stripe webhook error: %s", e)
         raise HTTPException(status_code=400, detail="Invalid webhook payload")
