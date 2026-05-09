@@ -5,6 +5,7 @@ import { useAuth, API } from "@/App";
 import { useTheme } from "@/context/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import BuyReadingButton from "@/components/BuyReadingButton";
 import {
   Sparkles,
   Star,
@@ -241,7 +242,7 @@ const HeroSection = () => {
           relationships, career timing, and life purpose — calculated to astronomical precision.
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16 fade-in fade-in-delay-3">
+        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-6 fade-in fade-in-delay-3">
           <Button size="lg" onClick={() => navigate("/auth?mode=register")} data-testid="hero-cta-btn"
             className="glow-button bg-primary text-primary-foreground hover:bg-primary/90 text-base px-8 py-6 rounded-xl">
             Create Your Free Chart
@@ -251,6 +252,15 @@ const HeroSection = () => {
             data-testid="hero-features-btn" className="border-border hover:bg-muted text-base px-8 py-6 rounded-xl">
             Explore Features
           </Button>
+        </div>
+
+        <div className="flex flex-col items-center gap-2 mb-16 fade-in fade-in-delay-3">
+          <p className="text-sm text-muted-foreground">Or skip the wait — get a written reading from our astrologers</p>
+          <BuyReadingButton
+            label="Buy Personal Reading — $19"
+            testId="hero-buy-reading-btn"
+            className="text-base px-8 py-6"
+          />
         </div>
 
         {/* Quick Sign Calculator */}
