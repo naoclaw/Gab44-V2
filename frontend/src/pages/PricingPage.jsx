@@ -139,11 +139,12 @@ export default function PricingPage() {
               <span className="font-serif text-xl text-foreground">Gab44</span>
             </div>
             <h1 className="font-serif text-foreground mb-4">
-              Choose Your Path
+              Choose how deep you want to go
             </h1>
             <p className="text-muted-foreground max-w-xl mx-auto leading-relaxed">
-              Flexible plans designed to meet you wherever you are on your journey. 
-              Start free and upgrade when you're ready for deeper guidance.
+              Start free with your birth chart. Upgrade only if the daily
+              guidance earns its place — every paid plan can be paused or
+              cancelled in two clicks.
             </p>
           </div>
         </div>
@@ -155,20 +156,21 @@ export default function PricingPage() {
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 mb-3">
                 <Sparkles className="w-3.5 h-3.5 text-primary" />
                 <span className="text-xs font-semibold text-primary tracking-wide uppercase">
-                  Most popular — one-time
+                  Don't want a subscription? Read this first.
                 </span>
               </div>
               <h2 className="font-serif text-2xl md:text-3xl text-foreground mb-2">
-                Personal Astrology Reading
+                One personal reading, delivered in 48 hours
               </h2>
               <p className="text-muted-foreground leading-relaxed mb-3 max-w-xl">
-                A fully personalized written reading drawn from your full natal chart —
-                your strengths, your blind spots, the year ahead. Delivered within 48 hours.
-                No subscription. No commitment.
+                A real astrologer-grade written reading drawn from your full
+                natal chart — your strengths, your blind spots, the year
+                ahead. Pay once. Read it whenever you need it. No subscription,
+                no auto-renew, no cancel-flow gymnastics.
               </p>
               <div className="flex items-baseline gap-2">
                 <span className="font-serif text-4xl text-foreground">$19</span>
-                <span className="text-muted-foreground text-sm">one-time</span>
+                <span className="text-muted-foreground text-sm">one-time · 48h delivery</span>
               </div>
             </div>
             <div className="md:w-56">

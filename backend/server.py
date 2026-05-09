@@ -2828,65 +2828,65 @@ async def get_pricing(response: Response):
             {
                 "id": "seeker",
                 "name": "Seeker",
-                "tagline": "For those just starting their journey",
+                "tagline": "Know your chart's headlines, on the house",
                 "price": 0,
                 "period": "month",
                 "features": [
-                    "Basic Chart Overview",
-                    "Daily Short Guidance",
-                    "1 Compatibility Reading",
-                    "Educational Library"
+                    "Free birth chart with sun, moon, rising",
+                    "Today's short cosmic guidance",
+                    "1 free compatibility report",
+                    "Read-only access to the educational library",
                 ],
-                "cta": "Create Your Free Chart"
+                "cta": "Start free — no card needed",
             },
             {
                 "id": "enthusiast",
                 "name": "Enthusiast",
-                "tagline": "For daily guidance and deeper insights",
+                "tagline": "Daily AI coaching shaped by today's transits",
                 "price": 9.99,
                 "period": "month",
                 "popular": True,
                 "trial_days": 7,
                 "features": [
-                    "7-day free trial — cancel anytime",
+                    "7-day free trial — cancel anytime, no charge",
                     "Everything in Seeker",
-                    "Daily AI Coaching",
-                    "Monthly Detailed Reports",
-                    "Unlimited Compatibility",
-                    "30-Day Transit Forecasts"
+                    "Daily AI coaching tuned to your chart",
+                    "Monthly in-depth report on the cycles ahead",
+                    "Unlimited compatibility & synastry checks",
+                    "30-day personal transit forecast",
                 ],
-                "cta": "Start 7-Day Free Trial"
+                "cta": "Start 7-Day Free Trial",
             },
             {
                 "id": "advanced",
                 "name": "Advanced",
-                "tagline": "For serious practitioners and coaches",
+                "tagline": "See 90 days ahead — every transit, mapped",
                 "price": 29.99,
                 "period": "month",
                 "features": [
                     "Everything in Enthusiast",
-                    "Advanced Predictive Tools",
-                    "90-Day Transit Forecasts",
-                    "Chart Pattern Analysis",
-                    "Export to PDF"
+                    "90-day rolling transit forecast",
+                    "Chart pattern detection (T-squares, grand trines, yods)",
+                    "Predictive timing tools for big decisions",
+                    "Export any chart or report to PDF",
                 ],
-                "cta": "Upgrade Now"
+                "cta": "Upgrade now",
             },
             {
                 "id": "professional",
                 "name": "Professional",
-                "tagline": "For astrologers serving clients",
+                "tagline": "Tools for astrologers serving paying clients",
                 "price": 99,
                 "period": "month",
                 "features": [
                     "Everything in Advanced",
-                    "Client Management System",
-                    "White-label Reports",
-                    "API Access",
-                    "Priority Support"
+                    "Client roster with saved birth data & notes",
+                    "White-label PDF reports with your branding",
+                    "Programmatic API access for your own tools",
+                    "Priority email support, 24-hour SLA",
                 ],
-                "cta": "Contact Sales"
-            }
+                "cta": "Contact sales",
+            },
         ]
     }
 
