@@ -48,6 +48,60 @@ export default function PricingPage() {
     fetchPricing();
   }, [retryCount]);
 
+  // JSON-LD Product schema. Lets Google surface our subscription tiers
+  // (and the one-time $19 reading) as a rich snippet with prices in
+  // search results, instead of just the page meta description.
+  useEffect(() => {
+    if (!plans || plans.length === 0) return;
+    const offers = [
+      {
+        "@type": "Offer",
+        name: "Personal Astrology Reading (one-time)",
+        price: "19.00",
+        priceCurrency: "USD",
+        availability: "https://schema.org/InStock",
+        url: "https://gab44.com/pricing",
+        description: "A personalized written birth-chart reading delivered within 48 hours. No subscription.",
+      },
+      ...plans
+        .filter((p) => Number(p.price) > 0)
+        .map((p) => ({
+          "@type": "Offer",
+          name: `${p.name} subscription`,
+          price: String(p.price),
+          priceCurrency: "USD",
+          availability: "https://schema.org/InStock",
+          url: "https://gab44.com/pricing",
+          priceSpecification: {
+            "@type": "UnitPriceSpecification",
+            price: String(p.price),
+            priceCurrency: "USD",
+            referenceQuantity: { "@type": "QuantitativeValue", value: "1", unitCode: "MON" },
+          },
+        })),
+    ];
+    const schema = {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      name: "Gab44 Astrology AI Coaching",
+      description:
+        "AI-powered birth-chart readings, daily horoscope coaching, transit forecasts, and one-time personalized readings from real astrologers.",
+      brand: { "@type": "Brand", name: "Gab44" },
+      offers: { "@type": "AggregateOffer", priceCurrency: "USD", lowPrice: "0", highPrice: "99", offerCount: offers.length, offers },
+    };
+    let script = document.head.querySelector('script[data-jsonld="pricing-product"]');
+    if (!script) {
+      script = document.createElement("script");
+      script.setAttribute("type", "application/ld+json");
+      script.setAttribute("data-jsonld", "pricing-product");
+      document.head.appendChild(script);
+    }
+    script.text = JSON.stringify(schema);
+    return () => {
+      if (script && script.parentNode) script.parentNode.removeChild(script);
+    };
+  }, [plans]);
+
   const handlePlanClick = async (plan) => {
     // Free plan — just go to register/dashboard
     if (plan.id === "seeker") {

@@ -148,8 +148,29 @@ for (const [slug, m] of Object.entries(ZODIAC)) {
 {
   const url = `${SITE}/pricing`;
   const title = 'Pricing - Gab44 AI Astrology Coaching';
-  const description = 'Choose your Gab44 plan: free Seeker access, $9.99/mo Enthusiast with 7-day free trial, $19.99/mo Advanced, or $29.99/mo Professional. Plus $19 personalized written readings.';
-  const head = renderHead({ title, description, url, ogType: 'website' });
+  const description = 'Choose your Gab44 plan: free Seeker access, $9.99/mo Enthusiast with 7-day free trial, $29.99/mo Advanced, or $99/mo Professional. Plus $19 personalized written readings.';
+  const productSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: 'Gab44 Astrology AI Coaching',
+    description:
+      'AI-powered birth-chart readings, daily horoscope coaching, transit forecasts, and one-time personalized readings from real astrologers.',
+    brand: { '@type': 'Brand', name: 'Gab44' },
+    offers: {
+      '@type': 'AggregateOffer',
+      priceCurrency: 'USD',
+      lowPrice: '0',
+      highPrice: '99',
+      offerCount: 4,
+      offers: [
+        { '@type': 'Offer', name: 'Personal Astrology Reading (one-time)', price: '19.00', priceCurrency: 'USD', url, availability: 'https://schema.org/InStock' },
+        { '@type': 'Offer', name: 'Enthusiast subscription',  price: '9.99',  priceCurrency: 'USD', url, availability: 'https://schema.org/InStock' },
+        { '@type': 'Offer', name: 'Advanced subscription',     price: '29.99', priceCurrency: 'USD', url, availability: 'https://schema.org/InStock' },
+        { '@type': 'Offer', name: 'Professional subscription', price: '99.00', priceCurrency: 'USD', url, availability: 'https://schema.org/InStock' },
+      ],
+    },
+  };
+  const head = renderHead({ title, description, url, ogType: 'website', jsonLd: productSchema });
   writeRoute('pricing', rewriteHead(baseHtml, head));
 }
 
