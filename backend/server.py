@@ -2915,7 +2915,7 @@ async def buy_personal_reading(
             },
             "quantity": 1,
         }],
-        "success_url": f"{frontend_url}/dashboard?reading=success&session_id={{CHECKOUT_SESSION_ID}}",
+        "success_url": f"{frontend_url}/reading-thanks?session_id={{CHECKOUT_SESSION_ID}}",
         "cancel_url": f"{frontend_url}/pricing?reading=cancelled",
         "metadata": metadata,
         "allow_promotion_codes": True,
@@ -2975,6 +2975,113 @@ async def get_reading_product(response: Response):
         "amount_display": f"${PERSONAL_READING_PRICE_CENTS // 100}",
         "currency": "usd",
     }
+
+
+def _public_order_view(order: dict) -> dict:
+    """Sanitize a reading_orders row for the public thank-you page.
+    Drops Stripe internals, payment intent IDs, and admin-only fields."""
+    return {
+        "id": order.get("id"),
+        "status": order.get("status"),
+        "name": order.get("name"),
+        "email": order.get("email"),
+        "birth_date": order.get("birth_date"),
+        "birth_time": order.get("birth_time"),
+        "birth_place": order.get("birth_place"),
+        "notes": order.get("notes"),
+        "amount_cents": order.get("amount_cents"),
+        "currency": order.get("currency"),
+        "product": order.get("product"),
+        "created_at": order.get("created_at"),
+    }
+
+
+class ReadingContextUpdate(BaseModel):
+    name: Optional[str] = None
+    birth_date: Optional[str] = None
+    birth_time: Optional[str] = None
+    birth_place: Optional[str] = None
+    notes: Optional[str] = Field(default=None, max_length=2000)
+
+
+@api_router.get("/orders/reading/{session_id}")
+async def get_public_reading_order(session_id: str):
+    """Look up a reading order by its Stripe Checkout session id.
+
+    Public — used by the thank-you page so guest buyers (no account)
+    can see their order details and complete any missing birth context.
+    Returns a sanitized view; never exposes Stripe payment_intent or
+    admin fields.
+    """
+    order = await db.reading_orders.find_one(
+        {"stripe_session_id": session_id}, {"_id": 0}
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return _public_order_view(order)
+
+
+@api_router.patch("/orders/reading/{session_id}/context")
+async def update_public_reading_order_context(
+    session_id: str, ctx: ReadingContextUpdate
+):
+    """Allow a buyer to fill in birth context after Stripe checkout.
+
+    Open while the order is still pending or paid (i.e. before fulfilment),
+    and only within 24 h of order creation, so a stale link can't be used
+    to mutate someone else's row indefinitely. Once the operator marks the
+    order fulfilled the door closes.
+    """
+    order = await db.reading_orders.find_one(
+        {"stripe_session_id": session_id}, {"_id": 0}
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    if order.get("status") not in {"pending", "paid"}:
+        raise HTTPException(
+            status_code=409,
+            detail="This order is no longer accepting context updates.",
+        )
+
+    created_at_raw = order.get("created_at")
+    if created_at_raw:
+        try:
+            created_at = datetime.fromisoformat(created_at_raw.replace("Z", "+00:00"))
+            if datetime.now(timezone.utc) - created_at > timedelta(hours=24):
+                raise HTTPException(
+                    status_code=410,
+                    detail="Context window has closed. Email contact@gab44.com so we can update your reading.",
+                )
+        except (ValueError, TypeError):
+            pass  # bad timestamp shouldn't lock the buyer out
+
+    update: dict = {}
+    if ctx.name is not None:
+        update["name"] = ctx.name.strip()[:200] or None
+    if ctx.birth_date is not None:
+        update["birth_date"] = ctx.birth_date.strip()[:32] or None
+    if ctx.birth_time is not None:
+        update["birth_time"] = ctx.birth_time.strip()[:16] or None
+    if ctx.birth_place is not None:
+        update["birth_place"] = ctx.birth_place.strip()[:200] or None
+    if ctx.notes is not None:
+        update["notes"] = ctx.notes.strip()[:2000] or None
+
+    if not update:
+        return _public_order_view(order)
+
+    update["context_updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    await db.reading_orders.update_one(
+        {"stripe_session_id": session_id},
+        {"$set": update},
+    )
+
+    fresh = await db.reading_orders.find_one(
+        {"stripe_session_id": session_id}, {"_id": 0}
+    )
+    return _public_order_view(fresh or {**order, **update})
 
 
 @api_router.get("/readings/my-orders")
