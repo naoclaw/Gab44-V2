@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Check, ArrowLeft, Star, Sun, Moon, Loader2, RefreshCw } from "lucide-react";
 import BuyReadingButton from "@/components/BuyReadingButton";
+import ReadingTrustStrip from "@/components/ReadingTrustStrip";
 
 
 const PAID_TIERS = ["enthusiast", "advanced", "professional"];
@@ -46,6 +47,60 @@ export default function PricingPage() {
     };
     fetchPricing();
   }, [retryCount]);
+
+  // JSON-LD Product schema. Lets Google surface our subscription tiers
+  // (and the one-time $19 reading) as a rich snippet with prices in
+  // search results, instead of just the page meta description.
+  useEffect(() => {
+    if (!plans || plans.length === 0) return;
+    const offers = [
+      {
+        "@type": "Offer",
+        name: "Personal Astrology Reading (one-time)",
+        price: "19.00",
+        priceCurrency: "USD",
+        availability: "https://schema.org/InStock",
+        url: "https://gab44.com/pricing",
+        description: "A personalized written birth-chart reading delivered within 48 hours. No subscription.",
+      },
+      ...plans
+        .filter((p) => Number(p.price) > 0)
+        .map((p) => ({
+          "@type": "Offer",
+          name: `${p.name} subscription`,
+          price: String(p.price),
+          priceCurrency: "USD",
+          availability: "https://schema.org/InStock",
+          url: "https://gab44.com/pricing",
+          priceSpecification: {
+            "@type": "UnitPriceSpecification",
+            price: String(p.price),
+            priceCurrency: "USD",
+            referenceQuantity: { "@type": "QuantitativeValue", value: "1", unitCode: "MON" },
+          },
+        })),
+    ];
+    const schema = {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      name: "Gab44 Astrology AI Coaching",
+      description:
+        "AI-powered birth-chart readings, daily horoscope coaching, transit forecasts, and one-time personalized readings from real astrologers.",
+      brand: { "@type": "Brand", name: "Gab44" },
+      offers: { "@type": "AggregateOffer", priceCurrency: "USD", lowPrice: "0", highPrice: "99", offerCount: offers.length, offers },
+    };
+    let script = document.head.querySelector('script[data-jsonld="pricing-product"]');
+    if (!script) {
+      script = document.createElement("script");
+      script.setAttribute("type", "application/ld+json");
+      script.setAttribute("data-jsonld", "pricing-product");
+      document.head.appendChild(script);
+    }
+    script.text = JSON.stringify(schema);
+    return () => {
+      if (script && script.parentNode) script.parentNode.removeChild(script);
+    };
+  }, [plans]);
 
   const handlePlanClick = async (plan) => {
     // Free plan — just go to register/dashboard
@@ -112,7 +167,7 @@ export default function PricingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background cosmic-page-bg p-8">
+    <div className="min-h-screen bg-background cosmic-page-bg p-4 sm:p-6 md:p-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-12">
@@ -138,11 +193,12 @@ export default function PricingPage() {
               <span className="font-serif text-xl text-foreground">Gab44</span>
             </div>
             <h1 className="font-serif text-foreground mb-4">
-              Choose Your Path
+              Choose how deep you want to go
             </h1>
             <p className="text-muted-foreground max-w-xl mx-auto leading-relaxed">
-              Flexible plans designed to meet you wherever you are on your journey. 
-              Start free and upgrade when you're ready for deeper guidance.
+              Start free with your birth chart. Upgrade only if the daily
+              guidance earns its place — every paid plan can be paused or
+              cancelled in two clicks.
             </p>
           </div>
         </div>
@@ -154,20 +210,21 @@ export default function PricingPage() {
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 mb-3">
                 <Sparkles className="w-3.5 h-3.5 text-primary" />
                 <span className="text-xs font-semibold text-primary tracking-wide uppercase">
-                  Most popular — one-time
+                  Don't want a subscription? Read this first.
                 </span>
               </div>
               <h2 className="font-serif text-2xl md:text-3xl text-foreground mb-2">
-                Personal Astrology Reading
+                One personal reading, delivered in 48 hours
               </h2>
               <p className="text-muted-foreground leading-relaxed mb-3 max-w-xl">
-                A fully personalized written reading drawn from your full natal chart —
-                your strengths, your blind spots, the year ahead. Delivered within 48 hours.
-                No subscription. No commitment.
+                A real astrologer-grade written reading drawn from your full
+                natal chart — your strengths, your blind spots, the year
+                ahead. Pay once. Read it whenever you need it. No subscription,
+                no auto-renew, no cancel-flow gymnastics.
               </p>
               <div className="flex items-baseline gap-2">
                 <span className="font-serif text-4xl text-foreground">$19</span>
-                <span className="text-muted-foreground text-sm">one-time</span>
+                <span className="text-muted-foreground text-sm">one-time · 48h delivery</span>
               </div>
             </div>
             <div className="md:w-56">
@@ -176,11 +233,9 @@ export default function PricingPage() {
                 label="Buy now — $19"
                 testId="pricing-buy-reading"
               />
-              <p className="text-xs text-muted-foreground text-center mt-2">
-                Secure checkout via Stripe
-              </p>
             </div>
           </div>
+          <ReadingTrustStrip className="mt-5 pt-4 border-t border-border/40" />
         </div>
 
         {/* Pricing Grid */}

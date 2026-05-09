@@ -2203,8 +2203,193 @@ Respond ONLY with valid JSON matching this exact structure:
         {"$set": guidance_doc},
         upsert=True,
     )
-    
+
     return DailyGuidance(**guidance)
+
+
+# ============== Public per-sign horoscope (SEO landing pages) ==============
+
+_ZODIAC_SLUGS = {
+    "aries": "Aries", "taurus": "Taurus", "gemini": "Gemini",
+    "cancer": "Cancer", "leo": "Leo", "virgo": "Virgo",
+    "libra": "Libra", "scorpio": "Scorpio", "sagittarius": "Sagittarius",
+    "capricorn": "Capricorn", "aquarius": "Aquarius", "pisces": "Pisces",
+}
+
+# Static fallback descriptions used when the LLM is unavailable. Keeps the
+# SEO page useful (and indexable) even on a cold OpenAI outage.
+_FALLBACK_HOROSCOPES = {
+    "Aries": "Mars-ruled fire fuels your ambition today. Channel restless energy into one decisive action rather than scattering it across many.",
+    "Taurus": "Venus invites slowness — savour the small comforts. A patient conversation today is worth a hurried bargain tomorrow.",
+    "Gemini": "Mercury sharpens your tongue and your timing. Send the message you've been drafting; words land cleanly today.",
+    "Cancer": "The Moon turns your gaze inward. Tend to home, kin, and the quiet voice that's been asking for a softer schedule.",
+    "Leo": "Solar warmth amplifies whatever you put in front of others. Lead with generosity and let your work be seen, not announced.",
+    "Virgo": "Mercury's precision makes this a day for editing — your projects, your calendar, your inner self-talk. Trim what no longer serves.",
+    "Libra": "Venus seeks balance. Resist the urge to please everyone; the most diplomatic move today is naming the imbalance out loud.",
+    "Scorpio": "Pluto's depth surfaces what's been buried. Trust the discomfort — it's pointing toward the truth you've been circling.",
+    "Sagittarius": "Jupiter widens the horizon. Book the travel, take the course, pitch the bigger vision. Optimism is strategic today.",
+    "Capricorn": "Saturn rewards structure. One disciplined hour today compounds into a season's progress. Build the system, not the moment.",
+    "Aquarius": "Uranus sparks invention. The unconventional answer is the right one — share the idea even if the room isn't ready.",
+    "Pisces": "Neptune softens the edges. Creative and intuitive work flow today; protect a quiet pocket for the inner weather to settle.",
+}
+
+_SIGN_DATE_RANGES = {
+    "Aries": "March 21 – April 19", "Taurus": "April 20 – May 20",
+    "Gemini": "May 21 – June 20", "Cancer": "June 21 – July 22",
+    "Leo": "July 23 – August 22", "Virgo": "August 23 – September 22",
+    "Libra": "September 23 – October 22", "Scorpio": "October 23 – November 21",
+    "Sagittarius": "November 22 – December 21", "Capricorn": "December 22 – January 19",
+    "Aquarius": "January 20 – February 18", "Pisces": "February 19 – March 20",
+}
+
+
+def _fallback_sign_horoscope(sign: str, today: str) -> dict:
+    base = _FALLBACK_HOROSCOPES.get(sign, "Trust the cosmic weather and move with intention today.")
+    return {
+        "date": today,
+        "sign": sign,
+        "summary": base,
+        "love": f"In love, {sign} benefits from clear words over assumptions today.",
+        "career": f"At work, {sign} should take one focused step rather than juggling many.",
+        "wellness": f"For wellness, {sign} is asked to honour rest as a source of clarity.",
+        "lucky_number": (hash(f"{sign}{today}") % 9) + 1,
+        "lucky_color": ["amber", "indigo", "rose", "emerald", "sapphire", "gold"][hash(today) % 6],
+        "mood": "centred",
+    }
+
+
+@api_router.get("/horoscope/daily")
+async def get_all_public_horoscopes(response: Response):
+    """Return today's horoscope for all 12 signs in one payload.
+
+    Powers the /horoscope/today index page. Reuses the per-sign cache;
+    any sign that hasn't been generated yet for today gets generated
+    and cached on demand. Order matches the zodiac wheel (Aries
+    through Pisces).
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    cached_rows = await db.public_horoscopes.find(
+        {"date": today}, {"_id": 0}
+    ).to_list(length=20)
+    by_sign = {row["sign"]: row for row in cached_rows if "sign" in row}
+
+    results = []
+    for slug, sign in _ZODIAC_SLUGS.items():
+        h = by_sign.get(sign)
+        if not h:
+            # Cold sign for today — generate via the per-sign helper
+            # which will populate the cache as a side effect.
+            await get_public_sign_horoscope(slug)
+            h = await db.public_horoscopes.find_one(
+                {"sign": sign, "date": today}, {"_id": 0}
+            ) or _fallback_sign_horoscope(sign, today)
+        results.append({
+            "slug": slug,
+            "sign": h.get("sign", sign),
+            "summary": h.get("summary", ""),
+            "love": h.get("love", ""),
+            "career": h.get("career", ""),
+            "wellness": h.get("wellness", ""),
+            "lucky_number": h.get("lucky_number"),
+            "lucky_color": h.get("lucky_color"),
+            "mood": h.get("mood"),
+            "date_range": _SIGN_DATE_RANGES.get(sign, ""),
+        })
+
+    response.headers["Cache-Control"] = "public, max-age=600, s-maxage=3600"
+    return {"date": today, "signs": results}
+
+
+@api_router.get("/horoscope/daily/{slug}")
+async def get_public_sign_horoscope(slug: str):
+    """Public, daily-cached horoscope for a single zodiac sign.
+
+    Powers the per-sign SEO landing pages at /zodiac/<sign>. No auth — these
+    pages are designed to rank organically and convert anonymous traffic into
+    free-chart signups and one-time reading buyers.
+    """
+    sign = _ZODIAC_SLUGS.get(slug.lower())
+    if not sign:
+        raise HTTPException(status_code=404, detail="Unknown zodiac sign")
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    cached = await db.public_horoscopes.find_one(
+        {"sign": sign, "date": today}, {"_id": 0}
+    )
+    if cached:
+        return {
+            **cached,
+            "element": get_sign_element(sign),
+            "modality": get_sign_modality(sign),
+            "polarity": get_sign_polarity(sign),
+            "ruling_planet": get_ruling_planet(sign),
+            "date_range": _SIGN_DATE_RANGES.get(sign, ""),
+        }
+
+    horoscope = None
+    if openai_client:
+        prompt = f"""Generate today's daily horoscope for {sign} ({today}).
+
+Return ONLY valid JSON with this exact shape:
+{{
+  "summary": "2-3 sentence cosmic overview, written warmly and specifically for {sign}",
+  "love": "1-2 sentences on love and connection today",
+  "career": "1-2 sentences on work and ambition today",
+  "wellness": "1-2 sentences on body, mind, and rest today",
+  "lucky_number": <integer 1-9>,
+  "lucky_color": "<single color name, lowercase>",
+  "mood": "<single mood word, lowercase>"
+}}
+
+Tone: insightful, modern, never cliché. Reference real astrological context (current planetary energy, season, lunar phase) when natural. Avoid the words "today" and "you" repetitively. No markdown, no preamble — JSON only."""
+        try:
+            completion = await openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are Gab44, an expert astrology AI. Return only valid JSON."},
+                    {"role": "user", "content": prompt},
+                ],
+            )
+            raw = completion.choices[0].message.content.strip()
+            match = re.search(r"```(?:json)?\s*([\s\S]+?)```", raw)
+            if match:
+                raw = match.group(1).strip()
+            parsed = json.loads(raw)
+            horoscope = {
+                "date": today,
+                "sign": sign,
+                "summary": str(parsed.get("summary", ""))[:600],
+                "love": str(parsed.get("love", ""))[:300],
+                "career": str(parsed.get("career", ""))[:300],
+                "wellness": str(parsed.get("wellness", ""))[:300],
+                "lucky_number": int(parsed.get("lucky_number") or 0) or ((hash(f"{sign}{today}") % 9) + 1),
+                "lucky_color": str(parsed.get("lucky_color", "amber"))[:32],
+                "mood": str(parsed.get("mood", "centred"))[:32],
+            }
+        except Exception as exc:
+            logging.error("Public horoscope LLM error for %s: %s", sign, exc)
+
+    if horoscope is None:
+        horoscope = _fallback_sign_horoscope(sign, today)
+
+    try:
+        await db.public_horoscopes.update_one(
+            {"sign": sign, "date": today},
+            {"$set": {**horoscope, "created_at": datetime.now(timezone.utc).isoformat()}},
+            upsert=True,
+        )
+    except Exception as exc:
+        logging.warning("Could not cache public horoscope for %s: %s", sign, exc)
+
+    return {
+        **horoscope,
+        "element": get_sign_element(sign),
+        "modality": get_sign_modality(sign),
+        "polarity": get_sign_polarity(sign),
+        "ruling_planet": get_ruling_planet(sign),
+        "date_range": _SIGN_DATE_RANGES.get(sign, ""),
+    }
 
 
 def _build_voice_script(user: dict, guidance: dict) -> str:
@@ -2354,6 +2539,128 @@ async def get_voice_horoscope(user: dict = Depends(get_current_user)):
             "X-Voice-Id": ELEVENLABS_VOICE_ID,
         },
     )
+
+
+@api_router.get("/horoscope/daily/{slug}/voice")
+async def get_public_sign_voice(slug: str):
+    """Public ~25s narrated preview of today's per-sign horoscope.
+
+    Powers the voice player on /zodiac/<sign> landings as a free-tier
+    teaser. Cached per (sign, UTC date) in db.voice_previews so we
+    pay ElevenLabs at most 12 generations per day, regardless of
+    organic traffic. Anonymous visitors hear the summary; the CTA
+    upsells the full personalized daily voice reading on subscribed
+    accounts.
+    """
+    sign = _ZODIAC_SLUGS.get(slug.lower())
+    if not sign:
+        raise HTTPException(status_code=404, detail="Unknown zodiac sign")
+    if not ELEVENLABS_API_KEY:
+        raise HTTPException(status_code=503, detail="Voice service is not configured.")
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    cached = await db.voice_previews.find_one(
+        {"sign": sign, "date": today},
+        {"_id": 0, "audio": 1, "voice_id": 1},
+    )
+    if cached and cached.get("audio"):
+        return Response(
+            content=bytes(cached["audio"]),
+            media_type="audio/mpeg",
+            headers={
+                # Public, can sit on edge caches for the rest of the UTC day
+                "Cache-Control": "public, max-age=3600, s-maxage=21600",
+                "X-Voice-Cache": "hit",
+                "X-Voice-Id": cached.get("voice_id", ELEVENLABS_VOICE_ID),
+            },
+        )
+
+    horoscope = await db.public_horoscopes.find_one(
+        {"sign": sign, "date": today},
+        {"_id": 0},
+    )
+    if not horoscope:
+        # Populate the daily horoscope cache by calling the generator
+        await get_public_sign_horoscope(slug)
+        horoscope = await db.public_horoscopes.find_one(
+            {"sign": sign, "date": today},
+            {"_id": 0},
+        )
+    if not horoscope:
+        raise HTTPException(status_code=502, detail="Could not produce horoscope for narration.")
+
+    summary = str(horoscope.get("summary") or "").strip()
+    mood = str(horoscope.get("mood") or "").strip()
+    if not summary:
+        raise HTTPException(status_code=502, detail="No horoscope text available to narrate.")
+
+    intro = f"Hello {sign}. Here is your cosmic preview for today."
+    mood_line = f"Today's mood is {mood}." if mood else ""
+    outro = (
+        "For your full personalized daily voice reading -- shaped by your real birth chart "
+        "and the live transits affecting your life right now -- visit Gab44 dot com."
+    )
+    script = " ".join(part for part in [intro, summary, mood_line, outro] if part)
+    script = script[:1200]
+
+    try:
+        resp = await asyncio.to_thread(
+            _requests.post,
+            f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}",
+            headers={
+                "xi-api-key": ELEVENLABS_API_KEY,
+                "Content-Type": "application/json",
+                "Accept": "audio/mpeg",
+            },
+            json={
+                "text": script,
+                "model_id": ELEVENLABS_MODEL_ID,
+                "voice_settings": {
+                    "stability": 0.55,
+                    "similarity_boost": 0.75,
+                    "style": 0.35,
+                    "use_speaker_boost": True,
+                },
+            },
+            timeout=60,
+        )
+    except Exception as e:
+        logging.error(f"ElevenLabs preview request failed: {e}")
+        raise HTTPException(status_code=502, detail="Voice service is temporarily unavailable.")
+
+    if resp.status_code != 200:
+        logging.error(f"ElevenLabs preview error {resp.status_code}: {resp.text[:300]}")
+        raise HTTPException(status_code=502, detail="Voice generation failed. Please try again.")
+
+    audio = resp.content
+    try:
+        await db.voice_previews.update_one(
+            {"sign": sign, "date": today},
+            {"$set": {
+                "sign": sign,
+                "date": today,
+                "audio": audio,
+                "voice_id": ELEVENLABS_VOICE_ID,
+                "model_id": ELEVENLABS_MODEL_ID,
+                "script_chars": len(script),
+                "created_at": datetime.now(timezone.utc),
+            }},
+            upsert=True,
+        )
+    except Exception as exc:
+        logging.warning("Could not cache voice preview for %s: %s", sign, exc)
+
+    return Response(
+        content=audio,
+        media_type="audio/mpeg",
+        headers={
+            "Cache-Control": "public, max-age=3600, s-maxage=21600",
+            "X-Voice-Cache": "miss",
+            "X-Voice-Id": ELEVENLABS_VOICE_ID,
+        },
+    )
+
 
 # ============== Compatibility Routes ==============
 
@@ -2563,63 +2870,65 @@ async def get_pricing(response: Response):
             {
                 "id": "seeker",
                 "name": "Seeker",
-                "tagline": "For those just starting their journey",
+                "tagline": "Know your chart's headlines, on the house",
                 "price": 0,
                 "period": "month",
                 "features": [
-                    "Basic Chart Overview",
-                    "Daily Short Guidance",
-                    "1 Compatibility Reading",
-                    "Educational Library"
+                    "Free birth chart with sun, moon, rising",
+                    "Today's short cosmic guidance",
+                    "1 free compatibility report",
+                    "Read-only access to the educational library",
                 ],
-                "cta": "Create Your Free Chart"
+                "cta": "Start free — no card needed",
             },
             {
                 "id": "enthusiast",
                 "name": "Enthusiast",
-                "tagline": "For daily guidance and deeper insights",
+                "tagline": "Daily AI coaching shaped by today's transits",
                 "price": 9.99,
                 "period": "month",
                 "popular": True,
+                "trial_days": 7,
                 "features": [
+                    "7-day free trial — cancel anytime, no charge",
                     "Everything in Seeker",
-                    "Daily AI Coaching",
-                    "Monthly Detailed Reports",
-                    "Unlimited Compatibility",
-                    "30-Day Transit Forecasts"
+                    "Daily AI coaching tuned to your chart",
+                    "Monthly in-depth report on the cycles ahead",
+                    "Unlimited compatibility & synastry checks",
+                    "30-day personal transit forecast",
                 ],
-                "cta": "Start Free Trial"
+                "cta": "Start 7-Day Free Trial",
             },
             {
                 "id": "advanced",
                 "name": "Advanced",
-                "tagline": "For serious practitioners and coaches",
+                "tagline": "See 90 days ahead — every transit, mapped",
                 "price": 29.99,
                 "period": "month",
                 "features": [
                     "Everything in Enthusiast",
-                    "Advanced Predictive Tools",
-                    "90-Day Transit Forecasts",
-                    "Chart Pattern Analysis",
-                    "Export to PDF"
+                    "90-day rolling transit forecast",
+                    "Chart pattern detection (T-squares, grand trines, yods)",
+                    "Predictive timing tools for big decisions",
+                    "Export any chart or report to PDF",
                 ],
-                "cta": "Upgrade Now"
+                "cta": "Upgrade now",
             },
             {
                 "id": "professional",
                 "name": "Professional",
-                "tagline": "For astrologers serving clients",
+                "tagline": "Tools for astrologers serving paying clients",
                 "price": 99,
                 "period": "month",
                 "features": [
                     "Everything in Advanced",
-                    "Client Management System",
-                    "White-label Reports",
-                    "API Access",
-                    "Priority Support"
+                    "Client roster with saved birth data & notes",
+                    "White-label PDF reports with your branding",
+                    "Programmatic API access for your own tools",
+                    "Priority email support, 24-hour SLA",
                 ],
-                "cta": "Contact Sales"
-            }
+                "cta": "Contact sales",
+            },
         ]
     }
 
@@ -2679,11 +2988,19 @@ async def create_checkout_session(req: CheckoutRequest, user: dict = Depends(get
             stripe_customer_id = customer.id
             await db.users.update_one({"id": user["id"]}, {"$set": {"stripe_customer_id": stripe_customer_id}})
 
-        session = stripe.checkout.Session.create(
-            customer=stripe_customer_id,
-            payment_method_types=["card"],
-            mode="subscription",
-            line_items=[{
+        # 7-day free trial on the Enthusiast tier matches the "Start Free
+        # Trial" CTA copy. Other tiers convert immediately. Stripe does not
+        # charge during the trial; if the user cancels through the customer
+        # portal before day 7, they pay nothing.
+        subscription_data = None
+        if tier == "enthusiast":
+            subscription_data = {"trial_period_days": 7}
+
+        session_params = {
+            "customer": stripe_customer_id,
+            "payment_method_types": ["card"],
+            "mode": "subscription",
+            "line_items": [{
                 "price_data": {
                     "currency": "usd",
                     "product_data": {"name": plan["name"]},
@@ -2692,10 +3009,15 @@ async def create_checkout_session(req: CheckoutRequest, user: dict = Depends(get
                 },
                 "quantity": 1,
             }],
-            success_url=f"{frontend_url}/dashboard?subscription=success&tier={tier}",
-            cancel_url=f"{frontend_url}/pricing",
-            metadata={"user_id": user["id"], "tier": tier},
-        )
+            "success_url": f"{frontend_url}/dashboard?subscription=success&tier={tier}",
+            "cancel_url": f"{frontend_url}/pricing",
+            "metadata": {"user_id": user["id"], "tier": tier},
+            "allow_promotion_codes": True,
+        }
+        if subscription_data:
+            session_params["subscription_data"] = subscription_data
+
+        session = stripe.checkout.Session.create(**session_params)
     except stripe.error.StripeError as e:
         logging.error("Stripe checkout error for user %s: %s", user["id"], e)
         raise HTTPException(status_code=502, detail="Payment service unavailable. Please try again.")
@@ -2772,7 +3094,7 @@ async def buy_personal_reading(
             },
             "quantity": 1,
         }],
-        "success_url": f"{frontend_url}/dashboard?reading=success&session_id={{CHECKOUT_SESSION_ID}}",
+        "success_url": f"{frontend_url}/reading-thanks?session_id={{CHECKOUT_SESSION_ID}}",
         "cancel_url": f"{frontend_url}/pricing?reading=cancelled",
         "metadata": metadata,
         "allow_promotion_codes": True,
@@ -2832,6 +3154,113 @@ async def get_reading_product(response: Response):
         "amount_display": f"${PERSONAL_READING_PRICE_CENTS // 100}",
         "currency": "usd",
     }
+
+
+def _public_order_view(order: dict) -> dict:
+    """Sanitize a reading_orders row for the public thank-you page.
+    Drops Stripe internals, payment intent IDs, and admin-only fields."""
+    return {
+        "id": order.get("id"),
+        "status": order.get("status"),
+        "name": order.get("name"),
+        "email": order.get("email"),
+        "birth_date": order.get("birth_date"),
+        "birth_time": order.get("birth_time"),
+        "birth_place": order.get("birth_place"),
+        "notes": order.get("notes"),
+        "amount_cents": order.get("amount_cents"),
+        "currency": order.get("currency"),
+        "product": order.get("product"),
+        "created_at": order.get("created_at"),
+    }
+
+
+class ReadingContextUpdate(BaseModel):
+    name: Optional[str] = None
+    birth_date: Optional[str] = None
+    birth_time: Optional[str] = None
+    birth_place: Optional[str] = None
+    notes: Optional[str] = Field(default=None, max_length=2000)
+
+
+@api_router.get("/orders/reading/{session_id}")
+async def get_public_reading_order(session_id: str):
+    """Look up a reading order by its Stripe Checkout session id.
+
+    Public — used by the thank-you page so guest buyers (no account)
+    can see their order details and complete any missing birth context.
+    Returns a sanitized view; never exposes Stripe payment_intent or
+    admin fields.
+    """
+    order = await db.reading_orders.find_one(
+        {"stripe_session_id": session_id}, {"_id": 0}
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return _public_order_view(order)
+
+
+@api_router.patch("/orders/reading/{session_id}/context")
+async def update_public_reading_order_context(
+    session_id: str, ctx: ReadingContextUpdate
+):
+    """Allow a buyer to fill in birth context after Stripe checkout.
+
+    Open while the order is still pending or paid (i.e. before fulfilment),
+    and only within 24 h of order creation, so a stale link can't be used
+    to mutate someone else's row indefinitely. Once the operator marks the
+    order fulfilled the door closes.
+    """
+    order = await db.reading_orders.find_one(
+        {"stripe_session_id": session_id}, {"_id": 0}
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    if order.get("status") not in {"pending", "paid"}:
+        raise HTTPException(
+            status_code=409,
+            detail="This order is no longer accepting context updates.",
+        )
+
+    created_at_raw = order.get("created_at")
+    if created_at_raw:
+        try:
+            created_at = datetime.fromisoformat(created_at_raw.replace("Z", "+00:00"))
+            if datetime.now(timezone.utc) - created_at > timedelta(hours=24):
+                raise HTTPException(
+                    status_code=410,
+                    detail="Context window has closed. Email contact@gab44.com so we can update your reading.",
+                )
+        except (ValueError, TypeError):
+            pass  # bad timestamp shouldn't lock the buyer out
+
+    update: dict = {}
+    if ctx.name is not None:
+        update["name"] = ctx.name.strip()[:200] or None
+    if ctx.birth_date is not None:
+        update["birth_date"] = ctx.birth_date.strip()[:32] or None
+    if ctx.birth_time is not None:
+        update["birth_time"] = ctx.birth_time.strip()[:16] or None
+    if ctx.birth_place is not None:
+        update["birth_place"] = ctx.birth_place.strip()[:200] or None
+    if ctx.notes is not None:
+        update["notes"] = ctx.notes.strip()[:2000] or None
+
+    if not update:
+        return _public_order_view(order)
+
+    update["context_updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    await db.reading_orders.update_one(
+        {"stripe_session_id": session_id},
+        {"$set": update},
+    )
+
+    fresh = await db.reading_orders.find_one(
+        {"stripe_session_id": session_id}, {"_id": 0}
+    )
+    return _public_order_view(fresh or {**order, **update})
 
 
 @api_router.get("/readings/my-orders")
@@ -3313,6 +3742,85 @@ async def get_contact_messages(admin: dict = Depends(require_admin)):
     ).sort("created_at", -1).to_list(500)
     return {"count": len(tickets), "tickets": tickets}
 
+
+@api_router.get("/admin/reading-orders")
+async def get_reading_orders(
+    status: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 50,
+    admin: dict = Depends(require_admin),
+):
+    """Return all $19 personal-reading orders, newest first.
+
+    Filterable by status (pending|paid|fulfilled). Pending rows are inserted
+    by the buy-reading endpoint; the Stripe webhook flips them to paid; the
+    admin marks them fulfilled when the reading is delivered."""
+    limit = min(max(limit, 1), 200)
+    skip = max(skip, 0)
+
+    query: dict = {}
+    if status:
+        query["status"] = status
+
+    orders = await db.reading_orders.find(
+        query, {"_id": 0}
+    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+
+    total = await db.reading_orders.count_documents(query)
+
+    # Counts by status (across all orders, ignoring the optional filter)
+    counts_pipeline = [{"$group": {"_id": "$status", "count": {"$sum": 1}}}]
+    counts_rows = await db.reading_orders.aggregate(counts_pipeline).to_list(10)
+    counts = {row["_id"] or "unknown": row["count"] for row in counts_rows}
+
+    paid_total_cents = 0
+    revenue_pipeline = [
+        {"$match": {"status": {"$in": ["paid", "fulfilled"]}}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount_cents"}}},
+    ]
+    revenue_rows = await db.reading_orders.aggregate(revenue_pipeline).to_list(1)
+    if revenue_rows:
+        paid_total_cents = revenue_rows[0].get("total") or 0
+
+    return {
+        "orders": orders,
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+        "counts": counts,
+        "paid_total_cents": paid_total_cents,
+    }
+
+
+@api_router.put("/admin/reading-orders/{order_id}/status")
+async def update_reading_order_status(
+    order_id: str,
+    status: str,
+    admin: dict = Depends(require_admin),
+):
+    """Update the status of a reading order. Used to mark a paid order as
+    fulfilled once the operator has delivered the written reading."""
+    valid = {"pending", "paid", "fulfilled", "refunded"}
+    if status not in valid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status. Must be one of: {sorted(valid)}",
+        )
+
+    update = {"status": status}
+    if status == "fulfilled":
+        update["fulfilled_at"] = datetime.now(timezone.utc).isoformat()
+        update["fulfilled_by"] = admin.get("id")
+
+    result = await db.reading_orders.update_one(
+        {"id": order_id},
+        {"$set": update},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Reading order not found")
+
+    return {"message": f"Order {order_id} updated to {status}"}
+
 # Include router and setup middleware
 app.include_router(api_router)
 
@@ -3393,6 +3901,10 @@ async def create_indexes():
     await db.daily_guidance.create_index([("user_id", 1), ("date", 1)], unique=True)
     # Voice horoscope cache (binary MP3 per user per UTC day)
     await db.voice_horoscopes.create_index([("user_id", 1), ("date", 1)], unique=True)
+    # Public per-sign horoscope cache (one row per sign per UTC day)
+    await db.public_horoscopes.create_index([("sign", 1), ("date", 1)], unique=True)
+    # Public per-sign voice preview cache (binary MP3 per sign per UTC day)
+    await db.voice_previews.create_index([("sign", 1), ("date", 1)], unique=True)
     # Newsletter subscribers
     await db.newsletter_subscribers.create_index("email", unique=True)
     # One-time personal reading orders

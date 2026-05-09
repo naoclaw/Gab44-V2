@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth, API } from "@/App";
 import { useTheme } from "@/context/ThemeContext";
+import { loadOneSignal } from "@/lib/onesignal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,26 +28,21 @@ import {
   Mail
 } from "lucide-react";
 
-// OneSignal SDK is initialized in public/index.html with the App ID.
-// These helpers wrap the async SDK interface.
+// OneSignal SDK is lazy-loaded — see frontend/src/lib/onesignal.js. AuthProvider
+// kicks off the load when the user becomes authed; we await loadOneSignal() here
+// in case the user toggles push before the SDK has finished injecting.
 
 async function requestPushPermission() {
-  if (!window.OneSignalDeferred) return null;
-  return new Promise((resolve) => {
-    window.OneSignalDeferred.push(async (OneSignal) => {
-      try {
-        const permission = await OneSignal.Notifications.requestPermission();
-        if (permission) {
-          const playerId = await OneSignal.User.PushSubscription.id;
-          resolve(playerId || null);
-        } else {
-          resolve(null);
-        }
-      } catch {
-        resolve(null);
-      }
-    });
-  });
+  const sdk = await loadOneSignal();
+  if (!sdk) return null;
+  try {
+    const permission = await sdk.Notifications.requestPermission();
+    if (!permission) return null;
+    const playerId = await sdk.User.PushSubscription.id;
+    return playerId || null;
+  } catch {
+    return null;
+  }
 }
 
 export default function SettingsPage() {
@@ -103,12 +99,13 @@ export default function SettingsPage() {
   };
 
   const handlePushToggle = async (checked) => {
-    if (!window.OneSignalDeferred) {
-      toast.error("Push notifications are not supported in this browser.");
-      return;
-    }
     setPushLoading(true);
     try {
+      const sdk = await loadOneSignal();
+      if (!sdk) {
+        toast.error("Push notifications are not configured for this site.");
+        return;
+      }
       if (checked) {
         const playerId = await requestPushPermission();
         if (playerId) {
@@ -121,11 +118,10 @@ export default function SettingsPage() {
           toast.error("Permission denied. Please allow notifications in your browser settings.");
         }
       } else {
-        // Unsubscribe via OneSignal SDK
-        if (window.OneSignalDeferred) {
-          window.OneSignalDeferred.push((OneSignal) => {
-            OneSignal.User.PushSubscription.optOut().catch(() => {});
-          });
+        try {
+          await sdk.User.PushSubscription.optOut();
+        } catch {
+          // ignore — caller may already be opted out
         }
         setPushEnabled(false);
         toast.success("Push notifications disabled.");

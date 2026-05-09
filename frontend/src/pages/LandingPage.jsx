@@ -6,6 +6,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import BuyReadingButton from "@/components/BuyReadingButton";
+import ReadingTrustStrip from "@/components/ReadingTrustStrip";
 import {
   Sparkles,
   Star,
@@ -221,46 +222,63 @@ const HeroSection = () => {
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
-      <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: `url('https://images.unsplash.com/photo-1767188789485-54e0922d76a8?crop=entropy&cs=srgb&fm=jpg&q=85&w=2000')` }}
-      />
+      <picture className="absolute inset-0 w-full h-full">
+        <source
+          type="image/avif"
+          srcSet="https://images.unsplash.com/photo-1767188789485-54e0922d76a8?crop=entropy&cs=srgb&fm=avif&q=70&w=800 800w, https://images.unsplash.com/photo-1767188789485-54e0922d76a8?crop=entropy&cs=srgb&fm=avif&q=70&w=1600 1600w, https://images.unsplash.com/photo-1767188789485-54e0922d76a8?crop=entropy&cs=srgb&fm=avif&q=70&w=2400 2400w"
+          sizes="100vw"
+        />
+        <source
+          type="image/webp"
+          srcSet="https://images.unsplash.com/photo-1767188789485-54e0922d76a8?crop=entropy&cs=srgb&fm=webp&q=75&w=800 800w, https://images.unsplash.com/photo-1767188789485-54e0922d76a8?crop=entropy&cs=srgb&fm=webp&q=75&w=1600 1600w, https://images.unsplash.com/photo-1767188789485-54e0922d76a8?crop=entropy&cs=srgb&fm=webp&q=75&w=2400 2400w"
+          sizes="100vw"
+        />
+        <img
+          src="https://images.unsplash.com/photo-1767188789485-54e0922d76a8?crop=entropy&cs=srgb&fm=jpg&q=80&w=1600"
+          alt=""
+          aria-hidden="true"
+          fetchpriority="high"
+          decoding="async"
+          className="absolute inset-0 w-full h-full object-cover object-center"
+        />
+      </picture>
       <div className={`absolute inset-0 ${theme === "dark" ? "hero-gradient-dark" : "hero-gradient-light"}`} />
       <div className="absolute inset-0 cosmic-gradient" />
       <div className="absolute top-1/4 left-10 w-2 h-2 rounded-full bg-primary/50 animate-float" style={{ animationDelay: "0s" }} />
       <div className="absolute top-1/3 right-20 w-1.5 h-1.5 rounded-full bg-chart-2/50 animate-float" style={{ animationDelay: "1s" }} />
       <div className="absolute bottom-1/3 left-1/4 w-1 h-1 rounded-full bg-foreground/30 animate-float" style={{ animationDelay: "2s" }} />
 
-      <div className="relative z-10 max-w-6xl mx-auto px-6 text-center">
-        <p className="text-primary font-semibold mb-4 fade-in tracking-widest text-sm uppercase">Your Birth Chart. Decoded.</p>
-        <h1 className="font-serif text-5xl md:text-7xl lg:text-8xl font-semibold text-foreground mb-6 fade-in fade-in-delay-1 hero-title">
+      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 text-center">
+        <p className="text-primary font-semibold mb-4 fade-in tracking-widest text-xs sm:text-sm uppercase">Your Birth Chart. Decoded.</p>
+        <h1 className="font-serif text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-semibold text-foreground mb-6 fade-in fade-in-delay-1 hero-title">
           The Stars Know You. <br />
           <span className="gradient-text">Now You Can Know Them.</span>
         </h1>
-        <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 fade-in fade-in-delay-2 leading-relaxed">
+        <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 fade-in fade-in-delay-2 leading-relaxed">
           Enter your birth details and receive a detailed, AI-interpreted chart covering your personality,
           relationships, career timing, and life purpose — calculated to astronomical precision.
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-6 fade-in fade-in-delay-3">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center mb-6 fade-in fade-in-delay-3">
           <Button size="lg" onClick={() => navigate("/auth?mode=register")} data-testid="hero-cta-btn"
-            className="glow-button bg-primary text-primary-foreground hover:bg-primary/90 text-base px-8 py-6 rounded-xl">
+            className="glow-button bg-primary text-primary-foreground hover:bg-primary/90 text-base px-6 sm:px-8 py-5 sm:py-6 rounded-xl w-full sm:w-auto">
             Create Your Free Chart
             <ArrowRight className="ml-2 w-5 h-5" />
           </Button>
           <Button size="lg" variant="outline" onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
-            data-testid="hero-features-btn" className="border-border hover:bg-muted text-base px-8 py-6 rounded-xl">
+            data-testid="hero-features-btn" className="border-border hover:bg-muted text-base px-6 sm:px-8 py-5 sm:py-6 rounded-xl w-full sm:w-auto">
             Explore Features
           </Button>
         </div>
 
-        <div className="flex flex-col items-center gap-2 mb-16 fade-in fade-in-delay-3">
+        <div className="flex flex-col items-center gap-3 mb-16 fade-in fade-in-delay-3">
           <p className="text-sm text-muted-foreground">Or skip the wait — get a written reading from our astrologers</p>
           <BuyReadingButton
             label="Buy Personal Reading — $19"
             testId="hero-buy-reading-btn"
             className="text-base px-8 py-6"
           />
+          <ReadingTrustStrip className="mt-1" />
         </div>
 
         {/* Quick Sign Calculator */}
@@ -286,11 +304,22 @@ const HeroSection = () => {
                   </li>
                 ))}
               </ul>
-              <p className="text-xs text-muted-foreground mb-2">Your full chart has 40+ more data points — planets, houses, aspects, numerology.</p>
-              <Button size="sm" onClick={() => navigate("/auth?mode=register")} className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg text-xs">
-                Get Your Full Chart Free
-                <ArrowRight className="ml-1 w-3.5 h-3.5" />
-              </Button>
+              <p className="text-xs text-muted-foreground mb-3">Your full chart has 40+ more data points — planets, houses, aspects, numerology.</p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button size="sm" onClick={() => navigate("/auth?mode=register")} className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg text-xs flex-1">
+                  Get Your Full Chart Free
+                  <ArrowRight className="ml-1 w-3.5 h-3.5" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => navigate(`/zodiac/${sunSign.toLowerCase()}`)}
+                  data-testid="hero-read-horoscope-btn"
+                  className="rounded-lg text-xs flex-1"
+                >
+                  Read today's horoscope →
+                </Button>
+              </div>
             </div>
           )}
         </div>
@@ -443,7 +472,7 @@ const FeaturesSection = () => {
           {features.map((feature, index) => (
             <div key={feature.title} className="feature-card rounded-2xl overflow-hidden group card-lift" data-testid={`feature-card-${index}`}>
               <div className="aspect-video overflow-hidden">
-                <img src={feature.image} alt={feature.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <img src={feature.image} alt={feature.title} loading="lazy" decoding="async" width="800" height="450" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
               </div>
               <div className="p-6">
                 <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
@@ -498,8 +527,8 @@ const PricingSection = () => {
       tagline: "For daily guidance and deeper insights",
       price: 9.99,
       period: "/month",
-      features: ["Everything in Seeker", "Daily AI Coaching", "Monthly Detailed Reports", "Unlimited Compatibility", "30-Day Transit Forecasts"],
-      cta: "Start Free Trial",
+      features: ["7-day free trial — cancel anytime", "Everything in Seeker", "Daily AI Coaching", "Monthly Detailed Reports", "Unlimited Compatibility", "30-Day Transit Forecasts"],
+      cta: "Start 7-Day Free Trial",
       popular: true,
     },
     {
@@ -569,6 +598,60 @@ const PricingSection = () => {
     </section>
   );
 };
+
+// ─── Zodiac Discovery Strip ──────────────────────────────────────────────
+const ZODIAC_DISCOVERY = [
+  { slug: "aries",       name: "Aries",       glyph: "♈", dates: "Mar 21 – Apr 19" },
+  { slug: "taurus",      name: "Taurus",      glyph: "♉", dates: "Apr 20 – May 20" },
+  { slug: "gemini",      name: "Gemini",      glyph: "♊", dates: "May 21 – Jun 20" },
+  { slug: "cancer",      name: "Cancer",      glyph: "♋", dates: "Jun 21 – Jul 22" },
+  { slug: "leo",         name: "Leo",         glyph: "♌", dates: "Jul 23 – Aug 22" },
+  { slug: "virgo",       name: "Virgo",       glyph: "♍", dates: "Aug 23 – Sep 22" },
+  { slug: "libra",       name: "Libra",       glyph: "♎", dates: "Sep 23 – Oct 22" },
+  { slug: "scorpio",     name: "Scorpio",     glyph: "♏", dates: "Oct 23 – Nov 21" },
+  { slug: "sagittarius", name: "Sagittarius", glyph: "♐", dates: "Nov 22 – Dec 21" },
+  { slug: "capricorn",   name: "Capricorn",   glyph: "♑", dates: "Dec 22 – Jan 19" },
+  { slug: "aquarius",    name: "Aquarius",    glyph: "♒", dates: "Jan 20 – Feb 18" },
+  { slug: "pisces",      name: "Pisces",      glyph: "♓", dates: "Feb 19 – Mar 20" },
+];
+
+const ZodiacDiscoverySection = () => (
+  <section id="daily-horoscopes" className="py-24 px-6">
+    <div className="max-w-6xl mx-auto">
+      <div className="text-center mb-12">
+        <p className="text-primary font-semibold mb-3 tracking-widest text-sm uppercase">
+          Daily Horoscopes
+        </p>
+        <h2 className="font-serif text-foreground mb-4">Find your sign</h2>
+        <p className="text-muted-foreground max-w-xl mx-auto">
+          Tap your sign for today's reading — refreshed every morning, free, no signup.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+        {ZODIAC_DISCOVERY.map((s) => (
+          <Link
+            key={s.slug}
+            to={`/zodiac/${s.slug}`}
+            className="glass-card rounded-2xl p-4 text-center card-lift hover:border-primary/30 transition-colors"
+            data-testid={`landing-zodiac-${s.slug}`}
+          >
+            <div className="text-3xl mb-2 select-none" aria-hidden>{s.glyph}</div>
+            <p className="text-sm font-medium text-foreground">{s.name}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{s.dates}</p>
+          </Link>
+        ))}
+      </div>
+
+      <p className="text-center text-sm text-muted-foreground mt-6">
+        Or see all 12 at a glance —{" "}
+        <Link to="/horoscope/today" className="text-primary hover:underline" data-testid="landing-horoscope-today-link">
+          today's horoscope for every sign →
+        </Link>
+      </p>
+    </div>
+  </section>
+);
 
 // ─── FAQ Section ──────────────────────────────────────────────────────────
 const FAQSection = () => {
@@ -711,6 +794,7 @@ export default function LandingPage() {
       <HeroSection />
       <GematriaSection />
       <FeaturesSection />
+      <ZodiacDiscoverySection />
       <PricingSection />
       <FAQSection />
       <Footer />

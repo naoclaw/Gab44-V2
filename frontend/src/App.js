@@ -1,29 +1,43 @@
-import { useState, useEffect, createContext, useContext } from "react";
+import { useState, useEffect, createContext, useContext, lazy, Suspense } from "react";
 import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import axios from "axios";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { ReadingModeProvider } from "@/context/ReadingModeContext";
+import { loadOneSignal } from "@/lib/onesignal";
 
-// Pages
+// Public pages — eager-loaded so the marketing surface and auth routes
+// have zero bundle-fetch latency on first paint.
 import LandingPage from "@/pages/LandingPage";
 import AuthPage from "@/pages/AuthPage";
-import Dashboard from "@/pages/Dashboard";
-import ChatPage from "@/pages/ChatPage";
-import FriendPage from "@/pages/FriendPage";
-import ChartPage from "@/pages/ChartPage";
-import TransitsPage from "@/pages/TransitsPage";
 import PricingPage from "@/pages/PricingPage";
-import SettingsPage from "@/pages/SettingsPage";
-import ShareChartPage from "@/pages/ShareChartPage";
-import AdminPage from "@/pages/AdminPage";
-import CompatibilityPage from "@/pages/CompatibilityPage";
 import VerifyEmailPage from "@/pages/VerifyEmailPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import PublicChartPage from "@/pages/PublicChartPage";
-import NumerologyPage from "@/pages/NumerologyPage";
-import GematriaPage from "@/pages/GematriaPage";
+import ZodiacLandingPage from "@/pages/ZodiacLandingPage";
+import HoroscopeTodayPage from "@/pages/HoroscopeTodayPage";
+import ReadingThanksPage from "@/pages/ReadingThanksPage";
+
+// Authed pages — code-split. The marketing entry doesn't need any of
+// this in its initial bundle.
+const Dashboard          = lazy(() => import("@/pages/Dashboard"));
+const ChatPage           = lazy(() => import("@/pages/ChatPage"));
+const FriendPage         = lazy(() => import("@/pages/FriendPage"));
+const ChartPage          = lazy(() => import("@/pages/ChartPage"));
+const TransitsPage       = lazy(() => import("@/pages/TransitsPage"));
+const SettingsPage       = lazy(() => import("@/pages/SettingsPage"));
+const ShareChartPage     = lazy(() => import("@/pages/ShareChartPage"));
+const AdminPage          = lazy(() => import("@/pages/AdminPage"));
+const CompatibilityPage  = lazy(() => import("@/pages/CompatibilityPage"));
+const NumerologyPage     = lazy(() => import("@/pages/NumerologyPage"));
+const GematriaPage       = lazy(() => import("@/pages/GematriaPage"));
+
+const RouteFallback = () => (
+  <div className="min-h-screen bg-background cosmic-page-bg flex items-center justify-center">
+    <div className="animate-pulse-glow w-16 h-16 rounded-full bg-primary/20" />
+  </div>
+);
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
@@ -99,6 +113,13 @@ const AuthProvider = ({ children }) => {
     };
     verifyToken();
   }, [token]);
+
+  // Lazy-load the OneSignal SDK only after the user is authed. Public
+  // marketing surfaces (LandingPage, /zodiac/*, /horoscope/today,
+  // /pricing) never pay the SDK download cost.
+  useEffect(() => {
+    if (user) loadOneSignal();
+  }, [user]);
 
   const login = async (email, password) => {
     const response = await axios.post(`${API}/auth/login`, { email, password });
@@ -205,6 +226,7 @@ function App() {
         <div className="App min-h-screen bg-background theme-transition">
           <div className="noise-overlay" />
           <BrowserRouter>
+            <Suspense fallback={<RouteFallback />}>
             <Routes>
               <Route path="/" element={<LandingPage />} />
               <Route path="/auth" element={<AuthPage />} />
@@ -212,6 +234,9 @@ function App() {
               <Route path="/verify-email" element={<VerifyEmailPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route path="/chart/public/:token" element={<PublicChartPage />} />
+              <Route path="/zodiac/:sign" element={<ZodiacLandingPage />} />
+              <Route path="/horoscope/today" element={<HoroscopeTodayPage />} />
+              <Route path="/reading-thanks" element={<ReadingThanksPage />} />
               <Route 
                 path="/dashboard" 
                 element={
@@ -302,6 +327,7 @@ function App() {
               />
             </Routes>
             <Route path="*" element={<NotFoundPage />} />
+            </Suspense>
           </BrowserRouter>
           <Toaster position="top-right" />
         </div>

@@ -5,6 +5,36 @@ import { API } from "@/App";
 import { Sparkles, Loader2, XCircle, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+function setMeta(name, content, attr = "name") {
+  if (!content) return null;
+  let el = document.head.querySelector(`meta[${attr}="${name}"]`);
+  let created = false;
+  if (!el) {
+    el = document.createElement("meta");
+    el.setAttribute(attr, name);
+    created = true;
+    document.head.appendChild(el);
+  }
+  const prev = el.getAttribute("content");
+  el.setAttribute("content", content);
+  return { el, prev, created };
+}
+
+function setLink(rel, href) {
+  if (!href) return null;
+  let el = document.head.querySelector(`link[rel="${rel}"]`);
+  let created = false;
+  if (!el) {
+    el = document.createElement("link");
+    el.setAttribute("rel", rel);
+    created = true;
+    document.head.appendChild(el);
+  }
+  const prev = el.getAttribute("href");
+  el.setAttribute("href", href);
+  return { el, prev, created };
+}
+
 const SIGN_SYMBOLS = {
   Aries: "♈", Taurus: "♉", Gemini: "♊", Cancer: "♋", Leo: "♌", Virgo: "♍",
   Libra: "♎", Scorpio: "♏", Sagittarius: "♐", Capricorn: "♑", Aquarius: "♒", Pisces: "♓"
@@ -26,6 +56,55 @@ export default function PublicChartPage() {
       .then(r => { setChart(r.data); setStatus("ok"); })
       .catch(() => setStatus("error"));
   }, [token]);
+
+  // Per-page social-share meta. Only fires once the chart has loaded so
+  // we have the buyer's first name and sun sign to make the preview pop.
+  useEffect(() => {
+    if (status !== "ok" || !chart) return;
+    const firstName = (chart.name || "").toString().split(" ")[0] || "Their";
+    const possessive = firstName.endsWith("s") ? `${firstName}'` : `${firstName}'s`;
+    const sunSign = chart.sun_sign || "";
+    const title = sunSign
+      ? `${possessive} cosmic blueprint — ${sunSign} · Gab44`
+      : `${possessive} cosmic blueprint · Gab44`;
+    const description = sunSign
+      ? `A ${sunSign} sun, with moon and rising mapped to astronomical precision. Discover your own chart at gab44.com.`
+      : "A natal chart mapped to astronomical precision. Discover your own at gab44.com.";
+    const url = `https://gab44.com/chart/public/${token}`;
+    const imageUrl = `${API}/chart/public/${token}/image.png?style=card&size=1080`;
+
+    const prevTitle = document.title;
+    document.title = title;
+
+    const restorers = [
+      setMeta("description", description),
+      setMeta("og:title", title, "property"),
+      setMeta("og:description", description, "property"),
+      setMeta("og:type", "article", "property"),
+      setMeta("og:url", url, "property"),
+      setMeta("og:image", imageUrl, "property"),
+      setMeta("og:image:width", "1080", "property"),
+      setMeta("og:image:height", "1080", "property"),
+      setMeta("twitter:card", "summary_large_image"),
+      setMeta("twitter:title", title),
+      setMeta("twitter:description", description),
+      setMeta("twitter:image", imageUrl),
+      setLink("canonical", url),
+    ].filter(Boolean);
+
+    return () => {
+      document.title = prevTitle;
+      for (const r of restorers) {
+        if (!r) continue;
+        if (r.created) {
+          r.el.remove();
+        } else if (r.prev != null) {
+          if (r.el.tagName === "META") r.el.setAttribute("content", r.prev);
+          else r.el.setAttribute("href", r.prev);
+        }
+      }
+    };
+  }, [status, chart, token]);
 
   if (status === "loading") {
     return (
