@@ -2258,6 +2258,48 @@ def _fallback_sign_horoscope(sign: str, today: str) -> dict:
     }
 
 
+@api_router.get("/horoscope/daily")
+async def get_all_public_horoscopes(response: Response):
+    """Return today's horoscope for all 12 signs in one payload.
+
+    Powers the /horoscope/today index page. Reuses the per-sign cache;
+    any sign that hasn't been generated yet for today gets generated
+    and cached on demand. Order matches the zodiac wheel (Aries
+    through Pisces).
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    cached_rows = await db.public_horoscopes.find(
+        {"date": today}, {"_id": 0}
+    ).to_list(length=20)
+    by_sign = {row["sign"]: row for row in cached_rows if "sign" in row}
+
+    results = []
+    for slug, sign in _ZODIAC_SLUGS.items():
+        h = by_sign.get(sign)
+        if not h:
+            # Cold sign for today — generate via the per-sign helper
+            # which will populate the cache as a side effect.
+            await get_public_sign_horoscope(slug)
+            h = await db.public_horoscopes.find_one(
+                {"sign": sign, "date": today}, {"_id": 0}
+            ) or _fallback_sign_horoscope(sign, today)
+        results.append({
+            "slug": slug,
+            "sign": h.get("sign", sign),
+            "summary": h.get("summary", ""),
+            "love": h.get("love", ""),
+            "career": h.get("career", ""),
+            "wellness": h.get("wellness", ""),
+            "lucky_number": h.get("lucky_number"),
+            "lucky_color": h.get("lucky_color"),
+            "mood": h.get("mood"),
+            "date_range": _SIGN_DATE_RANGES.get(sign, ""),
+        })
+
+    response.headers["Cache-Control"] = "public, max-age=600, s-maxage=3600"
+    return {"date": today, "signs": results}
+
+
 @api_router.get("/horoscope/daily/{slug}")
 async def get_public_sign_horoscope(slug: str):
     """Public, daily-cached horoscope for a single zodiac sign.

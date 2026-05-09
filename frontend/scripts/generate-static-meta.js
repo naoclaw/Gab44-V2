@@ -153,6 +153,28 @@ for (const [slug, m] of Object.entries(ZODIAC)) {
   writeRoute('pricing', rewriteHead(baseHtml, head));
 }
 
+// ---- /horoscope/today ----
+{
+  const url = `${SITE}/horoscope/today`;
+  const title = "Today's Horoscope for All 12 Zodiac Signs - Gab44";
+  const description = 'Daily horoscopes for every zodiac sign - love, career, wellness, lucky number for Aries, Taurus, Gemini, Cancer, Leo, Virgo, Libra, Scorpio, Sagittarius, Capricorn, Aquarius, Pisces. Refreshed every morning by Gab44.';
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: title,
+    description,
+    author: { '@type': 'Organization', name: 'Gab44' },
+    publisher: {
+      '@type': 'Organization',
+      name: 'Gab44',
+      logo: { '@type': 'ImageObject', url: DEFAULT_OG_IMAGE },
+    },
+    mainEntityOfPage: url,
+  };
+  const head = renderHead({ title, description, url, ogType: 'article', jsonLd });
+  writeRoute('horoscope/today', rewriteHead(baseHtml, head));
+}
+
 // ---- sitemap.xml ----
 // Regenerate the sitemap so <lastmod> reflects this build date. The 12
 // zodiac landings render daily-refreshed horoscope content, so we want
@@ -163,9 +185,10 @@ for (const [slug, m] of Object.entries(ZODIAC)) {
 {
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD UTC
   const entries = [
-    { loc: `${SITE}/`,         changefreq: 'daily',   priority: '1.0', lastmod: today },
-    { loc: `${SITE}/pricing`,  changefreq: 'monthly', priority: '0.8', lastmod: today },
-    { loc: `${SITE}/auth`,     changefreq: 'monthly', priority: '0.4' },
+    { loc: `${SITE}/`,                 changefreq: 'daily',   priority: '1.0', lastmod: today },
+    { loc: `${SITE}/horoscope/today`,  changefreq: 'daily',   priority: '0.95', lastmod: today },
+    { loc: `${SITE}/pricing`,          changefreq: 'monthly', priority: '0.8', lastmod: today },
+    { loc: `${SITE}/auth`,             changefreq: 'monthly', priority: '0.4' },
     ...Object.keys(ZODIAC).map((slug) => ({
       loc: `${SITE}/zodiac/${slug}`,
       changefreq: 'daily',

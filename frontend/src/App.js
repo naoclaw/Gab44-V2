@@ -15,6 +15,7 @@ import VerifyEmailPage from "@/pages/VerifyEmailPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import PublicChartPage from "@/pages/PublicChartPage";
 import ZodiacLandingPage from "@/pages/ZodiacLandingPage";
+import HoroscopeTodayPage from "@/pages/HoroscopeTodayPage";
 import ReadingThanksPage from "@/pages/ReadingThanksPage";
 
 // Authed pages — code-split. The marketing entry doesn't need any of
@@ -226,6 +227,7 @@ function App() {
               <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route path="/chart/public/:token" element={<PublicChartPage />} />
               <Route path="/zodiac/:sign" element={<ZodiacLandingPage />} />
+              <Route path="/horoscope/today" element={<HoroscopeTodayPage />} />
               <Route path="/reading-thanks" element={<ReadingThanksPage />} />
               <Route 
                 path="/dashboard" 

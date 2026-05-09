@@ -642,6 +642,13 @@ const ZodiacDiscoverySection = () => (
           </Link>
         ))}
       </div>
+
+      <p className="text-center text-sm text-muted-foreground mt-6">
+        Or see all 12 at a glance —{" "}
+        <Link to="/horoscope/today" className="text-primary hover:underline" data-testid="landing-horoscope-today-link">
+          today's horoscope for every sign →
+        </Link>
+      </p>
     </div>
   </section>
 );
