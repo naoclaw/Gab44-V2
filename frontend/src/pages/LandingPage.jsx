@@ -500,8 +500,8 @@ const PricingSection = () => {
       tagline: "For daily guidance and deeper insights",
       price: 9.99,
       period: "/month",
-      features: ["Everything in Seeker", "Daily AI Coaching", "Monthly Detailed Reports", "Unlimited Compatibility", "30-Day Transit Forecasts"],
-      cta: "Start Free Trial",
+      features: ["7-day free trial — cancel anytime", "Everything in Seeker", "Daily AI Coaching", "Monthly Detailed Reports", "Unlimited Compatibility", "30-Day Transit Forecasts"],
+      cta: "Start 7-Day Free Trial",
       popular: true,
     },
     {

@@ -2724,14 +2724,16 @@ async def get_pricing(response: Response):
                 "price": 9.99,
                 "period": "month",
                 "popular": True,
+                "trial_days": 7,
                 "features": [
+                    "7-day free trial — cancel anytime",
                     "Everything in Seeker",
                     "Daily AI Coaching",
                     "Monthly Detailed Reports",
                     "Unlimited Compatibility",
                     "30-Day Transit Forecasts"
                 ],
-                "cta": "Start Free Trial"
+                "cta": "Start 7-Day Free Trial"
             },
             {
                 "id": "advanced",
@@ -2822,11 +2824,19 @@ async def create_checkout_session(req: CheckoutRequest, user: dict = Depends(get
             stripe_customer_id = customer.id
             await db.users.update_one({"id": user["id"]}, {"$set": {"stripe_customer_id": stripe_customer_id}})
 
-        session = stripe.checkout.Session.create(
-            customer=stripe_customer_id,
-            payment_method_types=["card"],
-            mode="subscription",
-            line_items=[{
+        # 7-day free trial on the Enthusiast tier matches the "Start Free
+        # Trial" CTA copy. Other tiers convert immediately. Stripe does not
+        # charge during the trial; if the user cancels through the customer
+        # portal before day 7, they pay nothing.
+        subscription_data = None
+        if tier == "enthusiast":
+            subscription_data = {"trial_period_days": 7}
+
+        session_params = {
+            "customer": stripe_customer_id,
+            "payment_method_types": ["card"],
+            "mode": "subscription",
+            "line_items": [{
                 "price_data": {
                     "currency": "usd",
                     "product_data": {"name": plan["name"]},
@@ -2835,10 +2845,15 @@ async def create_checkout_session(req: CheckoutRequest, user: dict = Depends(get
                 },
                 "quantity": 1,
             }],
-            success_url=f"{frontend_url}/dashboard?subscription=success&tier={tier}",
-            cancel_url=f"{frontend_url}/pricing",
-            metadata={"user_id": user["id"], "tier": tier},
-        )
+            "success_url": f"{frontend_url}/dashboard?subscription=success&tier={tier}",
+            "cancel_url": f"{frontend_url}/pricing",
+            "metadata": {"user_id": user["id"], "tier": tier},
+            "allow_promotion_codes": True,
+        }
+        if subscription_data:
+            session_params["subscription_data"] = subscription_data
+
+        session = stripe.checkout.Session.create(**session_params)
     except stripe.error.StripeError as e:
         logging.error("Stripe checkout error for user %s: %s", user["id"], e)
         raise HTTPException(status_code=502, detail="Payment service unavailable. Please try again.")
