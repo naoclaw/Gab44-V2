@@ -153,4 +153,45 @@ for (const [slug, m] of Object.entries(ZODIAC)) {
   writeRoute('pricing', rewriteHead(baseHtml, head));
 }
 
+// ---- sitemap.xml ----
+// Regenerate the sitemap so <lastmod> reflects this build date. The 12
+// zodiac landings render daily-refreshed horoscope content, so we want
+// the sitemap to advertise today's date as lastmod for each of them
+// (and for the homepage). Operator should redeploy daily for max
+// crawl freshness; this also lets ad-hoc deploys move the lastmod
+// without an out-of-band cron.
+{
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD UTC
+  const entries = [
+    { loc: `${SITE}/`,         changefreq: 'daily',   priority: '1.0', lastmod: today },
+    { loc: `${SITE}/pricing`,  changefreq: 'monthly', priority: '0.8', lastmod: today },
+    { loc: `${SITE}/auth`,     changefreq: 'monthly', priority: '0.4' },
+    ...Object.keys(ZODIAC).map((slug) => ({
+      loc: `${SITE}/zodiac/${slug}`,
+      changefreq: 'daily',
+      priority: '0.9',
+      lastmod: today,
+    })),
+  ];
+  const xml =
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+    entries
+      .map((e) => {
+        const lines = [
+          `  <url>`,
+          `    <loc>${e.loc}</loc>`,
+          e.lastmod ? `    <lastmod>${e.lastmod}</lastmod>` : null,
+          `    <changefreq>${e.changefreq}</changefreq>`,
+          `    <priority>${e.priority}</priority>`,
+          `  </url>`,
+        ].filter(Boolean);
+        return lines.join('\n');
+      })
+      .join('\n') +
+    `\n</urlset>\n`;
+  fs.writeFileSync(path.join(buildDir, 'sitemap.xml'), xml, 'utf8');
+  console.log('[generate-static-meta] wrote sitemap.xml');
+}
+
 console.log('[generate-static-meta] done');
