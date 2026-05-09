@@ -445,7 +445,7 @@ const FeaturesSection = () => {
           {features.map((feature, index) => (
             <div key={feature.title} className="feature-card rounded-2xl overflow-hidden group card-lift" data-testid={`feature-card-${index}`}>
               <div className="aspect-video overflow-hidden">
-                <img src={feature.image} alt={feature.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <img src={feature.image} alt={feature.title} loading="lazy" decoding="async" width="800" height="450" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
               </div>
               <div className="p-6">
                 <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
