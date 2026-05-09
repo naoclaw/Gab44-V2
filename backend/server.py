@@ -10,6 +10,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import os
+import asyncio
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr, field_validator
@@ -93,6 +94,12 @@ JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
 # OpenAI / LLM Configuration
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+
+# ElevenLabs TTS Configuration (voice horoscope feature)
+ELEVENLABS_API_KEY = os.environ.get('ELEVENLABS_API_KEY', '')
+ELEVENLABS_VOICE_ID = os.environ.get('ELEVENLABS_VOICE_ID', 'EXAVITQu4vr4xnSDxMaL')  # "Sarah" - warm female narrator
+ELEVENLABS_MODEL_ID = os.environ.get('ELEVENLABS_MODEL_ID', 'eleven_turbo_v2_5')
+VOICE_HOROSCOPE_TIERS = {"enthusiast", "advanced", "professional"}
 
 # Admin emails (set via environment variable)
 ADMIN_EMAILS = [e.strip().lower() for e in os.environ.get('ADMIN_EMAILS', '').split(',') if e.strip()]
@@ -2048,6 +2055,155 @@ Respond ONLY with valid JSON matching this exact structure:
     
     return DailyGuidance(**guidance)
 
+
+def _build_voice_script(user: dict, guidance: dict) -> str:
+    """Compose a natural, spoken-word script from a DailyGuidance dict."""
+    name = str(user.get("name", "seeker")).split()[0][:40] or "seeker"
+    sun = str(user.get("sun_sign", "")).strip()
+    energy = guidance.get("overall_energy", "")
+    focus = guidance.get("focus_areas") or []
+    actions = guidance.get("action_items") or []
+    highlights = guidance.get("transit_highlights") or []
+
+    parts = []
+    sun_phrase = f", dear {sun}" if sun and sun.lower() != "unknown" else ""
+    parts.append(f"Good morning {name}{sun_phrase}. Here is your cosmic reading for today.")
+    if energy:
+        parts.append(energy)
+    if focus:
+        parts.append("Today, the stars are asking you to focus on " + _join_human(focus) + ".")
+    if highlights:
+        h = highlights[0]
+        if isinstance(h, dict) and h.get("transit"):
+            line = h["transit"]
+            if h.get("influence"):
+                line += f" — {h['influence']}"
+            if h.get("advice"):
+                line += f". The advice from this transit: {h['advice']}"
+            parts.append(line + ".")
+    if actions:
+        parts.append("Three intentions to carry through your day. " +
+                     " ".join([f"{i+1}. {a}." for i, a in enumerate(actions[:3])]))
+    parts.append("Move gently, trust the timing, and let the cosmos work with you. This is Gab44.")
+    # ElevenLabs caps a single request at ~5000 chars — keep well under
+    script = " ".join(p.strip() for p in parts if p)
+    return script[:2400]
+
+
+def _join_human(items: list) -> str:
+    cleaned = [str(x).strip() for x in items if str(x).strip()]
+    if not cleaned:
+        return ""
+    if len(cleaned) == 1:
+        return cleaned[0]
+    if len(cleaned) == 2:
+        return f"{cleaned[0]} and {cleaned[1]}"
+    return ", ".join(cleaned[:-1]) + f", and {cleaned[-1]}"
+
+
+@api_router.get("/guidance/voice")
+async def get_voice_horoscope(user: dict = Depends(get_current_user)):
+    """Stream a TTS-narrated daily horoscope (premium tiers only).
+
+    Returns audio/mpeg bytes. Cached per (user_id, date) to keep ElevenLabs
+    spend bounded — first call generates, subsequent calls in the same UTC
+    day return the cached MP3 instantly.
+    """
+    tier = (user.get("subscription_tier") or "seeker").lower()
+    if tier not in VOICE_HOROSCOPE_TIERS:
+        raise HTTPException(
+            status_code=403,
+            detail="Voice horoscope is a premium feature. Upgrade to Enthusiast or higher to unlock daily audio readings.",
+        )
+    if not ELEVENLABS_API_KEY:
+        raise HTTPException(status_code=503, detail="Voice service is not configured.")
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    cached = await db.voice_horoscopes.find_one(
+        {"user_id": user["id"], "date": today},
+        {"_id": 0, "audio": 1, "voice_id": 1},
+    )
+    if cached and cached.get("audio"):
+        return Response(
+            content=bytes(cached["audio"]),
+            media_type="audio/mpeg",
+            headers={
+                "Cache-Control": "private, max-age=3600",
+                "X-Voice-Cache": "hit",
+                "X-Voice-Id": cached.get("voice_id", ELEVENLABS_VOICE_ID),
+            },
+        )
+
+    # Reuse today's cached daily guidance text — generate it if absent
+    guidance_doc = await db.daily_guidance.find_one(
+        {"user_id": user["id"], "date": today}, {"_id": 0}
+    )
+    if not guidance_doc:
+        await get_daily_guidance(user)  # populates cache
+        guidance_doc = await db.daily_guidance.find_one(
+            {"user_id": user["id"], "date": today}, {"_id": 0}
+        )
+    if not guidance_doc:
+        raise HTTPException(status_code=500, detail="Could not produce daily guidance for narration.")
+
+    script = _build_voice_script(user, guidance_doc)
+
+    try:
+        resp = await asyncio.to_thread(
+            _requests.post,
+            f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}",
+            headers={
+                "xi-api-key": ELEVENLABS_API_KEY,
+                "Content-Type": "application/json",
+                "Accept": "audio/mpeg",
+            },
+            json={
+                "text": script,
+                "model_id": ELEVENLABS_MODEL_ID,
+                "voice_settings": {
+                    "stability": 0.55,
+                    "similarity_boost": 0.75,
+                    "style": 0.35,
+                    "use_speaker_boost": True,
+                },
+            },
+            timeout=60,
+        )
+    except Exception as e:
+        logging.error(f"ElevenLabs request failed: {e}")
+        raise HTTPException(status_code=502, detail="Voice service is temporarily unavailable.")
+
+    if resp.status_code != 200:
+        logging.error(f"ElevenLabs error {resp.status_code}: {resp.text[:300]}")
+        raise HTTPException(status_code=502, detail="Voice generation failed. Please try again.")
+
+    audio = resp.content
+    # Persist for the rest of the UTC day
+    await db.voice_horoscopes.update_one(
+        {"user_id": user["id"], "date": today},
+        {"$set": {
+            "user_id": user["id"],
+            "date": today,
+            "audio": audio,
+            "voice_id": ELEVENLABS_VOICE_ID,
+            "model_id": ELEVENLABS_MODEL_ID,
+            "script_chars": len(script),
+            "created_at": datetime.now(timezone.utc),
+        }},
+        upsert=True,
+    )
+
+    return Response(
+        content=audio,
+        media_type="audio/mpeg",
+        headers={
+            "Cache-Control": "private, max-age=3600",
+            "X-Voice-Cache": "miss",
+            "X-Voice-Id": ELEVENLABS_VOICE_ID,
+        },
+    )
+
 # ============== Compatibility Routes ==============
 
 @api_router.post("/compatibility/analyze")
@@ -2888,6 +3044,8 @@ async def create_indexes():
     await db.compatibility_reports.create_index("id", unique=True)
     # Daily guidance cache
     await db.daily_guidance.create_index([("user_id", 1), ("date", 1)], unique=True)
+    # Voice horoscope cache (binary MP3 per user per UTC day)
+    await db.voice_horoscopes.create_index([("user_id", 1), ("date", 1)], unique=True)
     # Newsletter subscribers
     await db.newsletter_subscribers.create_index("email", unique=True)
     # Contact messages
