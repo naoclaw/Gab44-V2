@@ -617,6 +617,14 @@ export default function Dashboard() {
           });
         });
     }
+    if (params.get("reading") === "success") {
+      window.history.replaceState({}, "", window.location.pathname);
+      import("sonner").then(({ toast }) => {
+        toast.success(
+          "Payment received — your personal reading is on its way. We'll email it within 48 hours."
+        );
+      });
+    }
   }, [token, updateUser]);
 
   return (

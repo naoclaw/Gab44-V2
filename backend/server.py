@@ -119,6 +119,15 @@ STRIPE_PLAN_PRICES = {
     "professional": {"amount": 9900, "name": "Gab44 Professional"},
 }
 
+# One-time products (mode=payment). Single source of truth for SKUs.
+PERSONAL_READING_SKU = "personal_reading"
+PERSONAL_READING_PRICE_CENTS = 1900
+PERSONAL_READING_NAME = "Gab44 Personal Astrology Reading"
+PERSONAL_READING_DESCRIPTION = (
+    "A one-time, fully personalized astrology reading drawn from your full natal chart. "
+    "Delivered as a written report within 48 hours."
+)
+
 # OneSignal Configuration
 ONESIGNAL_APP_ID = os.environ.get('ONESIGNAL_APP_ID', '')
 ONESIGNAL_API_KEY = os.environ.get('ONESIGNAL_API_KEY', '')
@@ -339,6 +348,17 @@ class CompatibilityReport(BaseModel):
 class CheckoutRequest(BaseModel):
     tier: str  # enthusiast | advanced | professional
 
+class BuyReadingRequest(BaseModel):
+    """One-time $19 personal reading. Email is required for guest checkout
+    (Stripe will also collect/verify it); birth fields are optional context
+    the buyer can include up-front so we have a head start when delivering."""
+    email: Optional[EmailStr] = None
+    name: Optional[str] = None
+    birth_date: Optional[str] = None
+    birth_time: Optional[str] = None
+    birth_place: Optional[str] = None
+    notes: Optional[str] = Field(default=None, max_length=2000)
+
 class DeviceRegistration(BaseModel):
     player_id: str  # OneSignal player/subscription ID
 
@@ -415,6 +435,31 @@ async def require_admin(user: dict = Depends(get_current_user)) -> dict:
     if not user.get("is_admin", False):
         raise HTTPException(status_code=403, detail="Admin access required")
     return user
+
+async def get_optional_user(request: Request) -> Optional[dict]:
+    """Extract a user from the Authorization header if present, else None.
+    Never raises — used by endpoints that must work for both authed and guest
+    callers (e.g. one-time-purchase checkout)."""
+    auth = request.headers.get("authorization") or request.headers.get("Authorization")
+    if not auth or not auth.lower().startswith("bearer "):
+        return None
+    token = auth.split(" ", 1)[1].strip()
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = payload.get("user_id")
+        if not user_id:
+            return None
+        user = await db.users.find_one(
+            {"id": user_id},
+            {"_id": 0, "password": 0,
+             "email_verification_token": 0,
+             "password_reset_token": 0, "password_reset_expiry": 0}
+        )
+        return user
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+        return None
 
 # ============== Email Helper (SendGrid) ==============
 
@@ -2680,6 +2725,125 @@ async def create_portal_session(user: dict = Depends(get_current_user)):
     return {"portal_url": session.url}
 
 
+@api_router.post("/payments/buy-reading")
+async def buy_personal_reading(
+    req: BuyReadingRequest,
+    request: Request,
+    user: Optional[dict] = Depends(get_optional_user),
+):
+    """Create a Stripe Checkout session for a one-time $19 personal reading.
+
+    Works for both logged-in users (we attach user_id and reuse their email)
+    and guest checkout (Stripe collects the email at the hosted page)."""
+    if not STRIPE_SECRET_KEY:
+        raise HTTPException(status_code=503, detail="Payment processing not configured")
+
+    frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+
+    metadata = {
+        "product": PERSONAL_READING_SKU,
+        "sku": PERSONAL_READING_SKU,
+    }
+    if user:
+        metadata["user_id"] = user["id"]
+    if req.name:
+        metadata["buyer_name"] = req.name[:200]
+    if req.birth_date:
+        metadata["birth_date"] = req.birth_date[:32]
+    if req.birth_time:
+        metadata["birth_time"] = req.birth_time[:16]
+    if req.birth_place:
+        metadata["birth_place"] = req.birth_place[:200]
+    if req.notes:
+        # Stripe metadata values cap at 500 chars per key; full notes go to the DB
+        metadata["notes_excerpt"] = req.notes[:480]
+
+    session_params = {
+        "mode": "payment",
+        "payment_method_types": ["card"],
+        "line_items": [{
+            "price_data": {
+                "currency": "usd",
+                "product_data": {
+                    "name": PERSONAL_READING_NAME,
+                    "description": PERSONAL_READING_DESCRIPTION,
+                },
+                "unit_amount": PERSONAL_READING_PRICE_CENTS,
+            },
+            "quantity": 1,
+        }],
+        "success_url": f"{frontend_url}/dashboard?reading=success&session_id={{CHECKOUT_SESSION_ID}}",
+        "cancel_url": f"{frontend_url}/pricing?reading=cancelled",
+        "metadata": metadata,
+        "allow_promotion_codes": True,
+    }
+
+    # Prefer authenticated user's email; otherwise use email from the request body
+    # (or let Stripe collect it on the hosted page if neither is supplied).
+    customer_email = (user.get("email") if user else None) or (req.email or None)
+    if customer_email:
+        session_params["customer_email"] = customer_email
+    if user:
+        session_params["client_reference_id"] = user["id"]
+
+    try:
+        session = stripe.checkout.Session.create(**session_params)
+    except stripe.error.StripeError as e:
+        logging.error("Stripe one-time checkout error: %s", e)
+        raise HTTPException(status_code=502, detail="Payment service unavailable. Please try again.")
+
+    # Pre-record a pending order so we have a paper trail even if the webhook
+    # is delayed or lost. The webhook will flip status -> "paid".
+    try:
+        await db.reading_orders.insert_one({
+            "id": str(uuid.uuid4()),
+            "stripe_session_id": session.id,
+            "stripe_payment_intent": session.payment_intent,
+            "user_id": user["id"] if user else None,
+            "email": customer_email,
+            "name": req.name,
+            "birth_date": req.birth_date,
+            "birth_time": req.birth_time,
+            "birth_place": req.birth_place,
+            "notes": req.notes,
+            "amount_cents": PERSONAL_READING_PRICE_CENTS,
+            "currency": "usd",
+            "product": PERSONAL_READING_SKU,
+            "status": "pending",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception as exc:
+        # Logging only — do not block the redirect to Stripe over a DB hiccup.
+        logging.error("Failed to pre-record reading order for session %s: %s", session.id, exc)
+
+    return {"checkout_url": session.url, "session_id": session.id}
+
+
+@api_router.get("/payments/reading-product")
+async def get_reading_product(response: Response):
+    """Public endpoint exposing the one-time personal-reading SKU + price.
+    Lets the frontend render a single source-of-truth price tag."""
+    response.headers["Cache-Control"] = "public, max-age=600"
+    return {
+        "sku": PERSONAL_READING_SKU,
+        "name": PERSONAL_READING_NAME,
+        "description": PERSONAL_READING_DESCRIPTION,
+        "amount_cents": PERSONAL_READING_PRICE_CENTS,
+        "amount_display": f"${PERSONAL_READING_PRICE_CENTS // 100}",
+        "currency": "usd",
+    }
+
+
+@api_router.get("/readings/my-orders")
+async def list_my_reading_orders(user: dict = Depends(get_current_user)):
+    """List the authed user's personal-reading purchases."""
+    docs = await db.reading_orders.find(
+        {"user_id": user["id"]},
+        {"_id": 0, "notes": 0},
+    ).sort("created_at", -1).to_list(50)
+    return {"orders": docs}
+
+
 @api_router.post("/payments/webhook")
 async def stripe_webhook(request: Request):
     """Handle Stripe webhook events."""
@@ -2704,21 +2868,98 @@ async def stripe_webhook(request: Request):
 
     if event_type == "checkout.session.completed":
         session_obj = event["data"]["object"]
-        user_id = session_obj.get("metadata", {}).get("user_id")
-        tier = session_obj.get("metadata", {}).get("tier")
-        stripe_customer_id = session_obj.get("customer")
-        stripe_subscription_id = session_obj.get("subscription")
+        meta = session_obj.get("metadata", {}) or {}
+        product = meta.get("product")
+        mode = session_obj.get("mode")
 
-        if user_id and tier:
-            await db.users.update_one(
-                {"id": user_id},
-                {"$set": {
-                    "subscription_tier": tier,
-                    "stripe_customer_id": stripe_customer_id,
-                    "stripe_subscription_id": stripe_subscription_id,
-                }},
+        # Branch: one-time personal reading vs subscription upgrade.
+        if product == PERSONAL_READING_SKU or mode == "payment":
+            session_id = session_obj.get("id")
+            payment_intent = session_obj.get("payment_intent")
+            customer_details = session_obj.get("customer_details") or {}
+            paid_email = (
+                customer_details.get("email")
+                or session_obj.get("customer_email")
+                or meta.get("email")
             )
-            logging.info("Upgraded user %s to %s", user_id, tier)
+            amount_total = session_obj.get("amount_total")
+            now_iso = datetime.now(timezone.utc).isoformat()
+
+            update_doc = {
+                "status": "paid",
+                "stripe_payment_intent": payment_intent,
+                "paid_email": paid_email,
+                "amount_paid_cents": amount_total,
+                "paid_at": now_iso,
+            }
+
+            existing = await db.reading_orders.find_one(
+                {"stripe_session_id": session_id}, {"_id": 0, "id": 1}
+            )
+            if existing:
+                await db.reading_orders.update_one(
+                    {"stripe_session_id": session_id},
+                    {"$set": update_doc},
+                )
+            else:
+                # Webhook arrived without a pre-record (e.g. the pre-insert failed,
+                # or the checkout was created out-of-band). Insert from webhook.
+                await db.reading_orders.insert_one({
+                    "id": str(uuid.uuid4()),
+                    "stripe_session_id": session_id,
+                    "user_id": meta.get("user_id"),
+                    "email": paid_email,
+                    "name": meta.get("buyer_name"),
+                    "birth_date": meta.get("birth_date"),
+                    "birth_time": meta.get("birth_time"),
+                    "birth_place": meta.get("birth_place"),
+                    "notes": meta.get("notes_excerpt"),
+                    "amount_cents": PERSONAL_READING_PRICE_CENTS,
+                    "currency": "usd",
+                    "product": PERSONAL_READING_SKU,
+                    "created_at": now_iso,
+                    **update_doc,
+                })
+            logging.info("Personal reading paid: session=%s email=%s", session_id, paid_email)
+
+            # Best-effort fulfilment notification to the support inbox.
+            try:
+                if SENDGRID_API_KEY and EMAIL_SUPPORT:
+                    notify_html = (
+                        f"<h2>New paid personal reading — ${(amount_total or 0)/100:.2f}</h2>"
+                        f"<p><b>Email:</b> {paid_email}</p>"
+                        f"<p><b>User ID:</b> {meta.get('user_id') or '—'}</p>"
+                        f"<p><b>Name:</b> {meta.get('buyer_name') or '—'}</p>"
+                        f"<p><b>Birth:</b> {meta.get('birth_date') or '—'} "
+                        f"{meta.get('birth_time') or ''} — {meta.get('birth_place') or '—'}</p>"
+                        f"<p><b>Stripe session:</b> {session_id}</p>"
+                    )
+                    SendGridAPIClient(SENDGRID_API_KEY).send(Mail(
+                        from_email=EMAIL_NOREPLY,
+                        to_emails=EMAIL_SUPPORT,
+                        subject=f"[Gab44] Paid reading — {paid_email or 'unknown'}",
+                        html_content=notify_html,
+                    ))
+            except Exception as exc:
+                logging.error("Failed to send fulfilment email for %s: %s", session_id, exc)
+
+        else:
+            # Subscription upgrade flow (existing behavior).
+            user_id = meta.get("user_id")
+            tier = meta.get("tier")
+            stripe_customer_id = session_obj.get("customer")
+            stripe_subscription_id = session_obj.get("subscription")
+
+            if user_id and tier:
+                await db.users.update_one(
+                    {"id": user_id},
+                    {"$set": {
+                        "subscription_tier": tier,
+                        "stripe_customer_id": stripe_customer_id,
+                        "stripe_subscription_id": stripe_subscription_id,
+                    }},
+                )
+                logging.info("Upgraded user %s to %s", user_id, tier)
 
     elif event_type in ("customer.subscription.updated", "customer.subscription.deleted"):
         sub = event["data"]["object"]
@@ -3154,6 +3395,11 @@ async def create_indexes():
     await db.voice_horoscopes.create_index([("user_id", 1), ("date", 1)], unique=True)
     # Newsletter subscribers
     await db.newsletter_subscribers.create_index("email", unique=True)
+    # One-time personal reading orders
+    await db.reading_orders.create_index("stripe_session_id", unique=True, sparse=True)
+    await db.reading_orders.create_index("user_id", sparse=True)
+    await db.reading_orders.create_index("email", sparse=True)
+    await db.reading_orders.create_index("created_at")
     # Contact messages
     await db.contact_messages.create_index("created_at")
     logger.info("MongoDB indexes created")
