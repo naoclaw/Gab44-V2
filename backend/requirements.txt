@@ -31,3 +31,4 @@ timezonefinder>=6.5.0
 stripe>=7.0.0
 openai>=1.0.0
 sendgrid>=6.9.0
+Pillow>=10.0.0

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import axios from "axios";
 import { API } from "@/App";
-import { Sparkles, Loader2, XCircle } from "lucide-react";
+import { Sparkles, Loader2, XCircle, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const SIGN_SYMBOLS = {
@@ -63,7 +63,39 @@ export default function PublicChartPage() {
         </Link>
       </div>
 
-      {/* Chart Card */}
+      {/* Server-rendered share card image — high-fidelity PNG with full wheel */}
+      <div className="max-w-xl mx-auto rounded-2xl overflow-hidden shadow-2xl mb-6 bg-[#0F0F14]">
+        <img
+          src={`${API}/chart/public/${token}/image.png?style=card&size=1080`}
+          alt="Cosmic blueprint share card"
+          className="block w-full h-auto"
+          loading="lazy"
+          data-testid="public-chart-image"
+        />
+      </div>
+
+      <div className="max-w-xl mx-auto flex flex-wrap gap-3 justify-center mb-8">
+        <a
+          href={`${API}/chart/public/${token}/image.png?style=card&size=1080`}
+          download="gab44-cosmic-blueprint.png"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 text-black text-sm font-medium hover:bg-amber-600 transition-colors"
+          data-testid="public-chart-download-card"
+        >
+          <Download className="w-4 h-4" />
+          Download share card
+        </a>
+        <a
+          href={`${API}/chart/public/${token}/image.png?style=wheel&size=1600`}
+          download="gab44-natal-wheel.png"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-muted/40 text-foreground text-sm font-medium hover:bg-muted/60 transition-colors border border-border"
+          data-testid="public-chart-download-wheel"
+        >
+          <Download className="w-4 h-4" />
+          Download natal wheel
+        </a>
+      </div>
+
+      {/* Detailed planet/pattern breakdown below the share image */}
       <div className="max-w-xl mx-auto rounded-2xl overflow-hidden shadow-2xl"
            style={{ background: "linear-gradient(135deg, #0F0F14 0%, #1a1a2e 50%, #16213e 100%)" }}>
         <div className="relative p-8">

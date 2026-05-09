@@ -1,5 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Request, BackgroundTasks, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response as FastAPIResponse
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
@@ -41,6 +41,7 @@ from astro_calculator import (
 from numerology import calculate_full_profile as numerology_full_profile
 from gematria import calculate_all as gematria_calculate_all
 from cities import geocode_search
+from chart_image import render_wheel, render_share_card, to_png_bytes
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -1580,6 +1581,111 @@ async def get_public_chart(share_token: str, response: Response):
     }
     response.headers["Cache-Control"] = "public, max-age=3600"
     return public_fields
+
+
+# ============== Birth Chart Image Generator ==============
+# Renders the user's natal wheel as a shareable PNG. Two render styles:
+#   style=card  -> 1080x1080 social card (default; wheel + big-three + brand)
+#   style=wheel -> square natal-wheel only (no header/footer)
+
+_VALID_IMAGE_STYLES = {"card", "wheel"}
+
+
+def _format_birth_for_card(user_doc: dict | None) -> tuple[str, str]:
+    """Pretty-print birth date + place for the share card. Falls back to empty."""
+    if not user_doc:
+        return "", ""
+    raw_date = (user_doc.get("birth_date") or "").strip()
+    pretty_date = ""
+    if raw_date:
+        try:
+            pretty_date = datetime.strptime(raw_date, "%Y-%m-%d").strftime("%B %-d, %Y")
+        except ValueError:
+            pretty_date = raw_date
+    place = (user_doc.get("birth_place") or "").strip()
+    return pretty_date, place
+
+
+def _render_chart_png(chart: dict, *, user_doc: dict | None, style: str, size: int) -> bytes:
+    """Render `chart` to PNG bytes. Pure function — no IO."""
+    if style not in _VALID_IMAGE_STYLES:
+        raise HTTPException(status_code=400, detail=f"Unknown style {style!r}. Use one of: {sorted(_VALID_IMAGE_STYLES)}")
+    # Reasonable bounds — beyond 2000 the file balloons and Pillow eats CPU.
+    size = max(512, min(int(size), 2000))
+    if style == "wheel":
+        img = render_wheel(chart, size=size)
+    else:
+        name = ""
+        if user_doc:
+            name = (user_doc.get("name") or user_doc.get("birth_name") or "").strip()
+        pretty_date, place = _format_birth_for_card(user_doc)
+        img = render_share_card(
+            chart,
+            user_name=name,
+            birth_date=pretty_date,
+            birth_place=place,
+            size=size,
+        )
+    return to_png_bytes(img)
+
+
+@api_router.get("/chart/image.png")
+async def get_my_chart_image(
+    user: dict = Depends(get_current_user),
+    style: str = "card",
+    size: int = 1080,
+):
+    """Render the authenticated user's birth chart as a downloadable PNG."""
+    chart = await db.birth_charts.find_one({"user_id": user["id"]}, {"_id": 0})
+    if not chart:
+        raise HTTPException(status_code=404, detail="No chart found. Generate your chart first.")
+    try:
+        png = await asyncio.to_thread(_render_chart_png, chart, user_doc=user, style=style, size=size)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error("Chart image render failed for user %s: %s", user["id"], e)
+        raise HTTPException(status_code=500, detail="Failed to render chart image. Please try again.")
+    safe_name = re.sub(r"[^A-Za-z0-9]+", "-", (user.get("name") or "chart")).strip("-").lower() or "chart"
+    return FastAPIResponse(
+        content=png,
+        media_type="image/png",
+        headers={
+            "Content-Disposition": f'inline; filename="gab44-{safe_name}-{style}.png"',
+            "Cache-Control": "private, max-age=300",
+        },
+    )
+
+
+@api_router.get("/chart/public/{share_token}/image.png")
+async def get_public_chart_image(
+    share_token: str,
+    style: str = "card",
+    size: int = 1080,
+):
+    """Render the publicly-shared chart as PNG. No auth — used for OG images and direct downloads."""
+    chart = await db.birth_charts.find_one({"share_token": share_token}, {"_id": 0})
+    if not chart:
+        raise HTTPException(status_code=404, detail="Chart not found or sharing has been disabled.")
+    user_doc = await db.users.find_one({"id": chart["user_id"]}, {"_id": 0, "name": 1, "birth_name": 1, "birth_date": 1, "birth_place": 1})
+    try:
+        png = await asyncio.to_thread(_render_chart_png, chart, user_doc=user_doc, style=style, size=size)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error("Public chart image render failed for token %s: %s", share_token[:6], e)
+        raise HTTPException(status_code=500, detail="Failed to render chart image.")
+    safe_name = re.sub(r"[^A-Za-z0-9]+", "-", ((user_doc or {}).get("name") or "chart")).strip("-").lower() or "chart"
+    return FastAPIResponse(
+        content=png,
+        media_type="image/png",
+        headers={
+            "Content-Disposition": f'inline; filename="gab44-{safe_name}-{style}.png"',
+            # Public images are safe to cache; charts are immutable per share_token.
+            "Cache-Control": "public, max-age=86400",
+        },
+    )
+
 
 # ============== Transit Routes ==============
 
