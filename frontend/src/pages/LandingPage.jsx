@@ -572,6 +572,53 @@ const PricingSection = () => {
   );
 };
 
+// ─── Zodiac Discovery Strip ──────────────────────────────────────────────
+const ZODIAC_DISCOVERY = [
+  { slug: "aries",       name: "Aries",       glyph: "♈", dates: "Mar 21 – Apr 19" },
+  { slug: "taurus",      name: "Taurus",      glyph: "♉", dates: "Apr 20 – May 20" },
+  { slug: "gemini",      name: "Gemini",      glyph: "♊", dates: "May 21 – Jun 20" },
+  { slug: "cancer",      name: "Cancer",      glyph: "♋", dates: "Jun 21 – Jul 22" },
+  { slug: "leo",         name: "Leo",         glyph: "♌", dates: "Jul 23 – Aug 22" },
+  { slug: "virgo",       name: "Virgo",       glyph: "♍", dates: "Aug 23 – Sep 22" },
+  { slug: "libra",       name: "Libra",       glyph: "♎", dates: "Sep 23 – Oct 22" },
+  { slug: "scorpio",     name: "Scorpio",     glyph: "♏", dates: "Oct 23 – Nov 21" },
+  { slug: "sagittarius", name: "Sagittarius", glyph: "♐", dates: "Nov 22 – Dec 21" },
+  { slug: "capricorn",   name: "Capricorn",   glyph: "♑", dates: "Dec 22 – Jan 19" },
+  { slug: "aquarius",    name: "Aquarius",    glyph: "♒", dates: "Jan 20 – Feb 18" },
+  { slug: "pisces",      name: "Pisces",      glyph: "♓", dates: "Feb 19 – Mar 20" },
+];
+
+const ZodiacDiscoverySection = () => (
+  <section id="daily-horoscopes" className="py-24 px-6">
+    <div className="max-w-6xl mx-auto">
+      <div className="text-center mb-12">
+        <p className="text-primary font-semibold mb-3 tracking-widest text-sm uppercase">
+          Daily Horoscopes
+        </p>
+        <h2 className="font-serif text-foreground mb-4">Find your sign</h2>
+        <p className="text-muted-foreground max-w-xl mx-auto">
+          Tap your sign for today's reading — refreshed every morning, free, no signup.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+        {ZODIAC_DISCOVERY.map((s) => (
+          <Link
+            key={s.slug}
+            to={`/zodiac/${s.slug}`}
+            className="glass-card rounded-2xl p-4 text-center card-lift hover:border-primary/30 transition-colors"
+            data-testid={`landing-zodiac-${s.slug}`}
+          >
+            <div className="text-3xl mb-2 select-none" aria-hidden>{s.glyph}</div>
+            <p className="text-sm font-medium text-foreground">{s.name}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{s.dates}</p>
+          </Link>
+        ))}
+      </div>
+    </div>
+  </section>
+);
+
 // ─── FAQ Section ──────────────────────────────────────────────────────────
 const FAQSection = () => {
   const faqs = [
@@ -713,6 +760,7 @@ export default function LandingPage() {
       <HeroSection />
       <GematriaSection />
       <FeaturesSection />
+      <ZodiacDiscoverySection />
       <PricingSection />
       <FAQSection />
       <Footer />
