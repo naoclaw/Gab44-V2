@@ -293,22 +293,22 @@ export default function ZodiacLandingPage() {
       </header>
 
       {/* Hero */}
-      <section className="px-6 pt-12 pb-16">
+      <section className="px-4 sm:px-6 pt-10 sm:pt-12 pb-12 sm:pb-16">
         <div className="max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 mb-6">
             <Sparkles className="w-3.5 h-3.5 text-primary" />
-            <span className="text-xs font-semibold text-primary tracking-wide uppercase">
+            <span className="text-[11px] sm:text-xs font-semibold text-primary tracking-wide uppercase">
               Daily Horoscope · {todayHuman()}
             </span>
           </div>
 
-          <div className="text-7xl mb-4 select-none" aria-hidden>
+          <div className="text-6xl sm:text-7xl mb-4 select-none" aria-hidden>
             {meta.glyph}
           </div>
-          <h1 className="font-serif text-foreground text-4xl md:text-5xl mb-4">
+          <h1 className="font-serif text-foreground text-3xl sm:text-4xl md:text-5xl mb-4">
             {meta.name} Horoscope
           </h1>
-          <p className="text-muted-foreground text-base max-w-2xl mx-auto leading-relaxed">
+          <p className="text-muted-foreground text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
             {meta.dates} · {meta.element} sign · ruled by {meta.ruler}.
           </p>
 

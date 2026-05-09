@@ -232,25 +232,25 @@ const HeroSection = () => {
       <div className="absolute top-1/3 right-20 w-1.5 h-1.5 rounded-full bg-chart-2/50 animate-float" style={{ animationDelay: "1s" }} />
       <div className="absolute bottom-1/3 left-1/4 w-1 h-1 rounded-full bg-foreground/30 animate-float" style={{ animationDelay: "2s" }} />
 
-      <div className="relative z-10 max-w-6xl mx-auto px-6 text-center">
-        <p className="text-primary font-semibold mb-4 fade-in tracking-widest text-sm uppercase">Your Birth Chart. Decoded.</p>
-        <h1 className="font-serif text-5xl md:text-7xl lg:text-8xl font-semibold text-foreground mb-6 fade-in fade-in-delay-1 hero-title">
+      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 text-center">
+        <p className="text-primary font-semibold mb-4 fade-in tracking-widest text-xs sm:text-sm uppercase">Your Birth Chart. Decoded.</p>
+        <h1 className="font-serif text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-semibold text-foreground mb-6 fade-in fade-in-delay-1 hero-title">
           The Stars Know You. <br />
           <span className="gradient-text">Now You Can Know Them.</span>
         </h1>
-        <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 fade-in fade-in-delay-2 leading-relaxed">
+        <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 fade-in fade-in-delay-2 leading-relaxed">
           Enter your birth details and receive a detailed, AI-interpreted chart covering your personality,
           relationships, career timing, and life purpose — calculated to astronomical precision.
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-6 fade-in fade-in-delay-3">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center mb-6 fade-in fade-in-delay-3">
           <Button size="lg" onClick={() => navigate("/auth?mode=register")} data-testid="hero-cta-btn"
-            className="glow-button bg-primary text-primary-foreground hover:bg-primary/90 text-base px-8 py-6 rounded-xl">
+            className="glow-button bg-primary text-primary-foreground hover:bg-primary/90 text-base px-6 sm:px-8 py-5 sm:py-6 rounded-xl w-full sm:w-auto">
             Create Your Free Chart
             <ArrowRight className="ml-2 w-5 h-5" />
           </Button>
           <Button size="lg" variant="outline" onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
-            data-testid="hero-features-btn" className="border-border hover:bg-muted text-base px-8 py-6 rounded-xl">
+            data-testid="hero-features-btn" className="border-border hover:bg-muted text-base px-6 sm:px-8 py-5 sm:py-6 rounded-xl w-full sm:w-auto">
             Explore Features
           </Button>
         </div>
