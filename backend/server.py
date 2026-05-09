@@ -3313,6 +3313,85 @@ async def get_contact_messages(admin: dict = Depends(require_admin)):
     ).sort("created_at", -1).to_list(500)
     return {"count": len(tickets), "tickets": tickets}
 
+
+@api_router.get("/admin/reading-orders")
+async def get_reading_orders(
+    status: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 50,
+    admin: dict = Depends(require_admin),
+):
+    """Return all $19 personal-reading orders, newest first.
+
+    Filterable by status (pending|paid|fulfilled). Pending rows are inserted
+    by the buy-reading endpoint; the Stripe webhook flips them to paid; the
+    admin marks them fulfilled when the reading is delivered."""
+    limit = min(max(limit, 1), 200)
+    skip = max(skip, 0)
+
+    query: dict = {}
+    if status:
+        query["status"] = status
+
+    orders = await db.reading_orders.find(
+        query, {"_id": 0}
+    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+
+    total = await db.reading_orders.count_documents(query)
+
+    # Counts by status (across all orders, ignoring the optional filter)
+    counts_pipeline = [{"$group": {"_id": "$status", "count": {"$sum": 1}}}]
+    counts_rows = await db.reading_orders.aggregate(counts_pipeline).to_list(10)
+    counts = {row["_id"] or "unknown": row["count"] for row in counts_rows}
+
+    paid_total_cents = 0
+    revenue_pipeline = [
+        {"$match": {"status": {"$in": ["paid", "fulfilled"]}}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount_cents"}}},
+    ]
+    revenue_rows = await db.reading_orders.aggregate(revenue_pipeline).to_list(1)
+    if revenue_rows:
+        paid_total_cents = revenue_rows[0].get("total") or 0
+
+    return {
+        "orders": orders,
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+        "counts": counts,
+        "paid_total_cents": paid_total_cents,
+    }
+
+
+@api_router.put("/admin/reading-orders/{order_id}/status")
+async def update_reading_order_status(
+    order_id: str,
+    status: str,
+    admin: dict = Depends(require_admin),
+):
+    """Update the status of a reading order. Used to mark a paid order as
+    fulfilled once the operator has delivered the written reading."""
+    valid = {"pending", "paid", "fulfilled", "refunded"}
+    if status not in valid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status. Must be one of: {sorted(valid)}",
+        )
+
+    update = {"status": status}
+    if status == "fulfilled":
+        update["fulfilled_at"] = datetime.now(timezone.utc).isoformat()
+        update["fulfilled_by"] = admin.get("id")
+
+    result = await db.reading_orders.update_one(
+        {"id": order_id},
+        {"$set": update},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Reading order not found")
+
+    return {"message": f"Order {order_id} updated to {status}"}
+
 # Include router and setup middleware
 app.include_router(api_router)
 
