@@ -304,11 +304,22 @@ const HeroSection = () => {
                   </li>
                 ))}
               </ul>
-              <p className="text-xs text-muted-foreground mb-2">Your full chart has 40+ more data points — planets, houses, aspects, numerology.</p>
-              <Button size="sm" onClick={() => navigate("/auth?mode=register")} className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg text-xs">
-                Get Your Full Chart Free
-                <ArrowRight className="ml-1 w-3.5 h-3.5" />
-              </Button>
+              <p className="text-xs text-muted-foreground mb-3">Your full chart has 40+ more data points — planets, houses, aspects, numerology.</p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button size="sm" onClick={() => navigate("/auth?mode=register")} className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg text-xs flex-1">
+                  Get Your Full Chart Free
+                  <ArrowRight className="ml-1 w-3.5 h-3.5" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => navigate(`/zodiac/${sunSign.toLowerCase()}`)}
+                  data-testid="hero-read-horoscope-btn"
+                  className="rounded-lg text-xs flex-1"
+                >
+                  Read today's horoscope →
+                </Button>
+              </div>
             </div>
           )}
         </div>
