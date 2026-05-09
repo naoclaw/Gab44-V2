@@ -24,18 +24,6 @@
               fetchpriority="high">
         <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;800&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
         <title>Gab44 — The Stars Know You. Now You Can Know Them.</title>
-        <!-- OneSignal Web Push SDK -->
-        <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-        <script>
-            window.OneSignalDeferred = window.OneSignalDeferred || [];
-            OneSignalDeferred.push(function(OneSignal) {
-                OneSignal.init({
-                    appId: "%REACT_APP_ONESIGNAL_APP_ID%",
-                    notifyButton: { enable: false },
-                    allowLocalhostAsSecureOrigin: true,
-                });
-            });
-        </script>
     </head>
     <body>
         <noscript>You need to enable JavaScript to run this app.</noscript>

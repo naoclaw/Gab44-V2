@@ -5,6 +5,7 @@ import axios from "axios";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { ReadingModeProvider } from "@/context/ReadingModeContext";
+import { loadOneSignal } from "@/lib/onesignal";
 
 // Public pages — eager-loaded so the marketing surface and auth routes
 // have zero bundle-fetch latency on first paint.
@@ -112,6 +113,13 @@ const AuthProvider = ({ children }) => {
     };
     verifyToken();
   }, [token]);
+
+  // Lazy-load the OneSignal SDK only after the user is authed. Public
+  // marketing surfaces (LandingPage, /zodiac/*, /horoscope/today,
+  // /pricing) never pay the SDK download cost.
+  useEffect(() => {
+    if (user) loadOneSignal();
+  }, [user]);
 
   const login = async (email, password) => {
     const response = await axios.post(`${API}/auth/login`, { email, password });
