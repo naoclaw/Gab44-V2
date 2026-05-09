@@ -24,6 +24,7 @@ import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import PublicChartPage from "@/pages/PublicChartPage";
 import NumerologyPage from "@/pages/NumerologyPage";
 import GematriaPage from "@/pages/GematriaPage";
+import ZodiacLandingPage from "@/pages/ZodiacLandingPage";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
@@ -212,6 +213,7 @@ function App() {
               <Route path="/verify-email" element={<VerifyEmailPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route path="/chart/public/:token" element={<PublicChartPage />} />
+              <Route path="/zodiac/:sign" element={<ZodiacLandingPage />} />
               <Route 
                 path="/dashboard" 
                 element={

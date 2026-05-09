@@ -2203,8 +2203,151 @@ Respond ONLY with valid JSON matching this exact structure:
         {"$set": guidance_doc},
         upsert=True,
     )
-    
+
     return DailyGuidance(**guidance)
+
+
+# ============== Public per-sign horoscope (SEO landing pages) ==============
+
+_ZODIAC_SLUGS = {
+    "aries": "Aries", "taurus": "Taurus", "gemini": "Gemini",
+    "cancer": "Cancer", "leo": "Leo", "virgo": "Virgo",
+    "libra": "Libra", "scorpio": "Scorpio", "sagittarius": "Sagittarius",
+    "capricorn": "Capricorn", "aquarius": "Aquarius", "pisces": "Pisces",
+}
+
+# Static fallback descriptions used when the LLM is unavailable. Keeps the
+# SEO page useful (and indexable) even on a cold OpenAI outage.
+_FALLBACK_HOROSCOPES = {
+    "Aries": "Mars-ruled fire fuels your ambition today. Channel restless energy into one decisive action rather than scattering it across many.",
+    "Taurus": "Venus invites slowness — savour the small comforts. A patient conversation today is worth a hurried bargain tomorrow.",
+    "Gemini": "Mercury sharpens your tongue and your timing. Send the message you've been drafting; words land cleanly today.",
+    "Cancer": "The Moon turns your gaze inward. Tend to home, kin, and the quiet voice that's been asking for a softer schedule.",
+    "Leo": "Solar warmth amplifies whatever you put in front of others. Lead with generosity and let your work be seen, not announced.",
+    "Virgo": "Mercury's precision makes this a day for editing — your projects, your calendar, your inner self-talk. Trim what no longer serves.",
+    "Libra": "Venus seeks balance. Resist the urge to please everyone; the most diplomatic move today is naming the imbalance out loud.",
+    "Scorpio": "Pluto's depth surfaces what's been buried. Trust the discomfort — it's pointing toward the truth you've been circling.",
+    "Sagittarius": "Jupiter widens the horizon. Book the travel, take the course, pitch the bigger vision. Optimism is strategic today.",
+    "Capricorn": "Saturn rewards structure. One disciplined hour today compounds into a season's progress. Build the system, not the moment.",
+    "Aquarius": "Uranus sparks invention. The unconventional answer is the right one — share the idea even if the room isn't ready.",
+    "Pisces": "Neptune softens the edges. Creative and intuitive work flow today; protect a quiet pocket for the inner weather to settle.",
+}
+
+_SIGN_DATE_RANGES = {
+    "Aries": "March 21 – April 19", "Taurus": "April 20 – May 20",
+    "Gemini": "May 21 – June 20", "Cancer": "June 21 – July 22",
+    "Leo": "July 23 – August 22", "Virgo": "August 23 – September 22",
+    "Libra": "September 23 – October 22", "Scorpio": "October 23 – November 21",
+    "Sagittarius": "November 22 – December 21", "Capricorn": "December 22 – January 19",
+    "Aquarius": "January 20 – February 18", "Pisces": "February 19 – March 20",
+}
+
+
+def _fallback_sign_horoscope(sign: str, today: str) -> dict:
+    base = _FALLBACK_HOROSCOPES.get(sign, "Trust the cosmic weather and move with intention today.")
+    return {
+        "date": today,
+        "sign": sign,
+        "summary": base,
+        "love": f"In love, {sign} benefits from clear words over assumptions today.",
+        "career": f"At work, {sign} should take one focused step rather than juggling many.",
+        "wellness": f"For wellness, {sign} is asked to honour rest as a source of clarity.",
+        "lucky_number": (hash(f"{sign}{today}") % 9) + 1,
+        "lucky_color": ["amber", "indigo", "rose", "emerald", "sapphire", "gold"][hash(today) % 6],
+        "mood": "centred",
+    }
+
+
+@api_router.get("/horoscope/daily/{slug}")
+async def get_public_sign_horoscope(slug: str):
+    """Public, daily-cached horoscope for a single zodiac sign.
+
+    Powers the per-sign SEO landing pages at /zodiac/<sign>. No auth — these
+    pages are designed to rank organically and convert anonymous traffic into
+    free-chart signups and one-time reading buyers.
+    """
+    sign = _ZODIAC_SLUGS.get(slug.lower())
+    if not sign:
+        raise HTTPException(status_code=404, detail="Unknown zodiac sign")
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    cached = await db.public_horoscopes.find_one(
+        {"sign": sign, "date": today}, {"_id": 0}
+    )
+    if cached:
+        return {
+            **cached,
+            "element": get_sign_element(sign),
+            "modality": get_sign_modality(sign),
+            "polarity": get_sign_polarity(sign),
+            "ruling_planet": get_ruling_planet(sign),
+            "date_range": _SIGN_DATE_RANGES.get(sign, ""),
+        }
+
+    horoscope = None
+    if openai_client:
+        prompt = f"""Generate today's daily horoscope for {sign} ({today}).
+
+Return ONLY valid JSON with this exact shape:
+{{
+  "summary": "2-3 sentence cosmic overview, written warmly and specifically for {sign}",
+  "love": "1-2 sentences on love and connection today",
+  "career": "1-2 sentences on work and ambition today",
+  "wellness": "1-2 sentences on body, mind, and rest today",
+  "lucky_number": <integer 1-9>,
+  "lucky_color": "<single color name, lowercase>",
+  "mood": "<single mood word, lowercase>"
+}}
+
+Tone: insightful, modern, never cliché. Reference real astrological context (current planetary energy, season, lunar phase) when natural. Avoid the words "today" and "you" repetitively. No markdown, no preamble — JSON only."""
+        try:
+            completion = await openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are Gab44, an expert astrology AI. Return only valid JSON."},
+                    {"role": "user", "content": prompt},
+                ],
+            )
+            raw = completion.choices[0].message.content.strip()
+            match = re.search(r"```(?:json)?\s*([\s\S]+?)```", raw)
+            if match:
+                raw = match.group(1).strip()
+            parsed = json.loads(raw)
+            horoscope = {
+                "date": today,
+                "sign": sign,
+                "summary": str(parsed.get("summary", ""))[:600],
+                "love": str(parsed.get("love", ""))[:300],
+                "career": str(parsed.get("career", ""))[:300],
+                "wellness": str(parsed.get("wellness", ""))[:300],
+                "lucky_number": int(parsed.get("lucky_number") or 0) or ((hash(f"{sign}{today}") % 9) + 1),
+                "lucky_color": str(parsed.get("lucky_color", "amber"))[:32],
+                "mood": str(parsed.get("mood", "centred"))[:32],
+            }
+        except Exception as exc:
+            logging.error("Public horoscope LLM error for %s: %s", sign, exc)
+
+    if horoscope is None:
+        horoscope = _fallback_sign_horoscope(sign, today)
+
+    try:
+        await db.public_horoscopes.update_one(
+            {"sign": sign, "date": today},
+            {"$set": {**horoscope, "created_at": datetime.now(timezone.utc).isoformat()}},
+            upsert=True,
+        )
+    except Exception as exc:
+        logging.warning("Could not cache public horoscope for %s: %s", sign, exc)
+
+    return {
+        **horoscope,
+        "element": get_sign_element(sign),
+        "modality": get_sign_modality(sign),
+        "polarity": get_sign_polarity(sign),
+        "ruling_planet": get_ruling_planet(sign),
+        "date_range": _SIGN_DATE_RANGES.get(sign, ""),
+    }
 
 
 def _build_voice_script(user: dict, guidance: dict) -> str:
@@ -3472,6 +3615,8 @@ async def create_indexes():
     await db.daily_guidance.create_index([("user_id", 1), ("date", 1)], unique=True)
     # Voice horoscope cache (binary MP3 per user per UTC day)
     await db.voice_horoscopes.create_index([("user_id", 1), ("date", 1)], unique=True)
+    # Public per-sign horoscope cache (one row per sign per UTC day)
+    await db.public_horoscopes.create_index([("sign", 1), ("date", 1)], unique=True)
     # Newsletter subscribers
     await db.newsletter_subscribers.create_index("email", unique=True)
     # One-time personal reading orders
