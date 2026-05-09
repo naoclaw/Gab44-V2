@@ -222,10 +222,26 @@ const HeroSection = () => {
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
-      <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: `url('https://images.unsplash.com/photo-1767188789485-54e0922d76a8?crop=entropy&cs=srgb&fm=jpg&q=85&w=2000')` }}
-      />
+      <picture className="absolute inset-0 w-full h-full">
+        <source
+          type="image/avif"
+          srcSet="https://images.unsplash.com/photo-1767188789485-54e0922d76a8?crop=entropy&cs=srgb&fm=avif&q=70&w=800 800w, https://images.unsplash.com/photo-1767188789485-54e0922d76a8?crop=entropy&cs=srgb&fm=avif&q=70&w=1600 1600w, https://images.unsplash.com/photo-1767188789485-54e0922d76a8?crop=entropy&cs=srgb&fm=avif&q=70&w=2400 2400w"
+          sizes="100vw"
+        />
+        <source
+          type="image/webp"
+          srcSet="https://images.unsplash.com/photo-1767188789485-54e0922d76a8?crop=entropy&cs=srgb&fm=webp&q=75&w=800 800w, https://images.unsplash.com/photo-1767188789485-54e0922d76a8?crop=entropy&cs=srgb&fm=webp&q=75&w=1600 1600w, https://images.unsplash.com/photo-1767188789485-54e0922d76a8?crop=entropy&cs=srgb&fm=webp&q=75&w=2400 2400w"
+          sizes="100vw"
+        />
+        <img
+          src="https://images.unsplash.com/photo-1767188789485-54e0922d76a8?crop=entropy&cs=srgb&fm=jpg&q=80&w=1600"
+          alt=""
+          aria-hidden="true"
+          fetchpriority="high"
+          decoding="async"
+          className="absolute inset-0 w-full h-full object-cover object-center"
+        />
+      </picture>
       <div className={`absolute inset-0 ${theme === "dark" ? "hero-gradient-dark" : "hero-gradient-light"}`} />
       <div className="absolute inset-0 cosmic-gradient" />
       <div className="absolute top-1/4 left-10 w-2 h-2 rounded-full bg-primary/50 animate-float" style={{ animationDelay: "0s" }} />
