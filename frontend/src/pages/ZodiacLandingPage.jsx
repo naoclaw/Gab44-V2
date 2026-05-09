@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, Navigate } from "react-router-dom";
 import axios from "axios";
 import { API } from "@/App";
@@ -15,6 +15,9 @@ import {
   Sun,
   Moon,
   ArrowLeft,
+  Play,
+  Pause,
+  Volume2,
 } from "lucide-react";
 
 const ZODIAC = {
@@ -73,6 +76,123 @@ function todayHuman() {
     day: "numeric",
     year: "numeric",
   });
+}
+
+function VoicePreview({ slug, signName, disabled }) {
+  const [state, setState] = useState("idle"); // idle | loading | playing | paused | error
+  const [errorMsg, setErrorMsg] = useState("");
+  const audioRef = useRef(null);
+  const urlRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (urlRef.current) {
+        URL.revokeObjectURL(urlRef.current);
+        urlRef.current = null;
+      }
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  // If the slug changes (e.g. via cross-sign nav), drop any cached audio.
+  useEffect(() => {
+    setState("idle");
+    setErrorMsg("");
+    if (urlRef.current) {
+      URL.revokeObjectURL(urlRef.current);
+      urlRef.current = null;
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+  }, [slug]);
+
+  const onClick = async () => {
+    if (state === "playing" && audioRef.current) {
+      audioRef.current.pause();
+      setState("paused");
+      return;
+    }
+    if (state === "paused" && audioRef.current) {
+      audioRef.current.play();
+      setState("playing");
+      return;
+    }
+    setState("loading");
+    setErrorMsg("");
+    try {
+      const res = await axios.get(`${API}/horoscope/daily/${slug}/voice`, {
+        responseType: "blob",
+      });
+      const url = URL.createObjectURL(res.data);
+      urlRef.current = url;
+      const audio = new Audio(url);
+      audio.onended = () => setState("idle");
+      audio.onerror = () => {
+        setErrorMsg("Playback failed.");
+        setState("error");
+      };
+      audioRef.current = audio;
+      await audio.play();
+      setState("playing");
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      setErrorMsg(
+        typeof detail === "string"
+          ? detail
+          : "Voice preview unavailable right now."
+      );
+      setState("error");
+    }
+  };
+
+  const isBusy = state === "loading";
+  const Icon = state === "playing" ? Pause : state === "loading" ? Volume2 : Play;
+  const label =
+    state === "playing"
+      ? "Pause preview"
+      : state === "loading"
+      ? "Loading…"
+      : state === "paused"
+      ? "Resume"
+      : `Hear today's ${signName} reading`;
+
+  return (
+    <div
+      className="mt-6 rounded-2xl border border-primary/20 bg-primary/5 p-4 md:p-5 flex flex-col sm:flex-row sm:items-center gap-4"
+      data-testid="zodiac-voice-preview"
+    >
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled || isBusy}
+        className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground px-5 py-3 font-medium disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90 transition-opacity flex-shrink-0"
+        data-testid="zodiac-voice-play"
+        aria-label={label}
+      >
+        <Icon className={`w-4 h-4 ${isBusy ? "animate-pulse" : ""}`} />
+        <span className="text-sm">{label}</span>
+      </button>
+      <div className="text-xs text-muted-foreground leading-relaxed">
+        {state === "error" && errorMsg ? (
+          <span className="text-destructive">{errorMsg}</span>
+        ) : (
+          <>
+            Free 25-second narrated preview. Want a full reading shaped by{" "}
+            <span className="text-foreground">your</span> birth chart and live
+            transits?{" "}
+            <Link to="/pricing" className="text-primary hover:underline">
+              See plans →
+            </Link>
+          </>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function ZodiacLandingPage() {
@@ -226,6 +346,11 @@ export default function ZodiacLandingPage() {
                     </div>
                   </div>
                 )}
+                <VoicePreview
+                  slug={slug}
+                  signName={meta.name}
+                  disabled={!horoscope}
+                />
               </>
             )}
           </div>

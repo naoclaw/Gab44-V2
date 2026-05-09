@@ -2498,6 +2498,128 @@ async def get_voice_horoscope(user: dict = Depends(get_current_user)):
         },
     )
 
+
+@api_router.get("/horoscope/daily/{slug}/voice")
+async def get_public_sign_voice(slug: str):
+    """Public ~25s narrated preview of today's per-sign horoscope.
+
+    Powers the voice player on /zodiac/<sign> landings as a free-tier
+    teaser. Cached per (sign, UTC date) in db.voice_previews so we
+    pay ElevenLabs at most 12 generations per day, regardless of
+    organic traffic. Anonymous visitors hear the summary; the CTA
+    upsells the full personalized daily voice reading on subscribed
+    accounts.
+    """
+    sign = _ZODIAC_SLUGS.get(slug.lower())
+    if not sign:
+        raise HTTPException(status_code=404, detail="Unknown zodiac sign")
+    if not ELEVENLABS_API_KEY:
+        raise HTTPException(status_code=503, detail="Voice service is not configured.")
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    cached = await db.voice_previews.find_one(
+        {"sign": sign, "date": today},
+        {"_id": 0, "audio": 1, "voice_id": 1},
+    )
+    if cached and cached.get("audio"):
+        return Response(
+            content=bytes(cached["audio"]),
+            media_type="audio/mpeg",
+            headers={
+                # Public, can sit on edge caches for the rest of the UTC day
+                "Cache-Control": "public, max-age=3600, s-maxage=21600",
+                "X-Voice-Cache": "hit",
+                "X-Voice-Id": cached.get("voice_id", ELEVENLABS_VOICE_ID),
+            },
+        )
+
+    horoscope = await db.public_horoscopes.find_one(
+        {"sign": sign, "date": today},
+        {"_id": 0},
+    )
+    if not horoscope:
+        # Populate the daily horoscope cache by calling the generator
+        await get_public_sign_horoscope(slug)
+        horoscope = await db.public_horoscopes.find_one(
+            {"sign": sign, "date": today},
+            {"_id": 0},
+        )
+    if not horoscope:
+        raise HTTPException(status_code=502, detail="Could not produce horoscope for narration.")
+
+    summary = str(horoscope.get("summary") or "").strip()
+    mood = str(horoscope.get("mood") or "").strip()
+    if not summary:
+        raise HTTPException(status_code=502, detail="No horoscope text available to narrate.")
+
+    intro = f"Hello {sign}. Here is your cosmic preview for today."
+    mood_line = f"Today's mood is {mood}." if mood else ""
+    outro = (
+        "For your full personalized daily voice reading -- shaped by your real birth chart "
+        "and the live transits affecting your life right now -- visit Gab44 dot com."
+    )
+    script = " ".join(part for part in [intro, summary, mood_line, outro] if part)
+    script = script[:1200]
+
+    try:
+        resp = await asyncio.to_thread(
+            _requests.post,
+            f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}",
+            headers={
+                "xi-api-key": ELEVENLABS_API_KEY,
+                "Content-Type": "application/json",
+                "Accept": "audio/mpeg",
+            },
+            json={
+                "text": script,
+                "model_id": ELEVENLABS_MODEL_ID,
+                "voice_settings": {
+                    "stability": 0.55,
+                    "similarity_boost": 0.75,
+                    "style": 0.35,
+                    "use_speaker_boost": True,
+                },
+            },
+            timeout=60,
+        )
+    except Exception as e:
+        logging.error(f"ElevenLabs preview request failed: {e}")
+        raise HTTPException(status_code=502, detail="Voice service is temporarily unavailable.")
+
+    if resp.status_code != 200:
+        logging.error(f"ElevenLabs preview error {resp.status_code}: {resp.text[:300]}")
+        raise HTTPException(status_code=502, detail="Voice generation failed. Please try again.")
+
+    audio = resp.content
+    try:
+        await db.voice_previews.update_one(
+            {"sign": sign, "date": today},
+            {"$set": {
+                "sign": sign,
+                "date": today,
+                "audio": audio,
+                "voice_id": ELEVENLABS_VOICE_ID,
+                "model_id": ELEVENLABS_MODEL_ID,
+                "script_chars": len(script),
+                "created_at": datetime.now(timezone.utc),
+            }},
+            upsert=True,
+        )
+    except Exception as exc:
+        logging.warning("Could not cache voice preview for %s: %s", sign, exc)
+
+    return Response(
+        content=audio,
+        media_type="audio/mpeg",
+        headers={
+            "Cache-Control": "public, max-age=3600, s-maxage=21600",
+            "X-Voice-Cache": "miss",
+            "X-Voice-Id": ELEVENLABS_VOICE_ID,
+        },
+    )
+
+
 # ============== Compatibility Routes ==============
 
 @api_router.post("/compatibility/analyze")
@@ -3739,6 +3861,8 @@ async def create_indexes():
     await db.voice_horoscopes.create_index([("user_id", 1), ("date", 1)], unique=True)
     # Public per-sign horoscope cache (one row per sign per UTC day)
     await db.public_horoscopes.create_index([("sign", 1), ("date", 1)], unique=True)
+    # Public per-sign voice preview cache (binary MP3 per sign per UTC day)
+    await db.voice_previews.create_index([("sign", 1), ("date", 1)], unique=True)
     # Newsletter subscribers
     await db.newsletter_subscribers.create_index("email", unique=True)
     # One-time personal reading orders
