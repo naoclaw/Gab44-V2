@@ -4,6 +4,7 @@ import axios from "axios";
 import { API } from "@/App";
 import { Button } from "@/components/ui/button";
 import BuyReadingButton from "@/components/BuyReadingButton";
+import ReadingTrustStrip from "@/components/ReadingTrustStrip";
 import {
   Sparkles,
   Heart,
@@ -251,6 +252,7 @@ export default function ZodiacLandingPage() {
           <p className="text-xs text-muted-foreground mt-4">
             Free chart · no credit card · or skip the wait with a written reading
           </p>
+          <ReadingTrustStrip className="mt-3" />
         </div>
       </section>
 
@@ -353,6 +355,7 @@ export default function ZodiacLandingPage() {
               </Button>
             </Link>
           </div>
+          <ReadingTrustStrip className="mt-5" />
         </div>
       </section>
 

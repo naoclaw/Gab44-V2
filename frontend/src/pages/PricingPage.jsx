@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Check, ArrowLeft, Star, Sun, Moon, Loader2, RefreshCw } from "lucide-react";
 import BuyReadingButton from "@/components/BuyReadingButton";
+import ReadingTrustStrip from "@/components/ReadingTrustStrip";
 
 
 const PAID_TIERS = ["enthusiast", "advanced", "professional"];
@@ -176,11 +177,9 @@ export default function PricingPage() {
                 label="Buy now — $19"
                 testId="pricing-buy-reading"
               />
-              <p className="text-xs text-muted-foreground text-center mt-2">
-                Secure checkout via Stripe
-              </p>
             </div>
           </div>
+          <ReadingTrustStrip className="mt-5 pt-4 border-t border-border/40" />
         </div>
 
         {/* Pricing Grid */}

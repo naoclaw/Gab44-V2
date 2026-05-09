@@ -6,6 +6,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import BuyReadingButton from "@/components/BuyReadingButton";
+import ReadingTrustStrip from "@/components/ReadingTrustStrip";
 import {
   Sparkles,
   Star,
@@ -254,13 +255,14 @@ const HeroSection = () => {
           </Button>
         </div>
 
-        <div className="flex flex-col items-center gap-2 mb-16 fade-in fade-in-delay-3">
+        <div className="flex flex-col items-center gap-3 mb-16 fade-in fade-in-delay-3">
           <p className="text-sm text-muted-foreground">Or skip the wait — get a written reading from our astrologers</p>
           <BuyReadingButton
             label="Buy Personal Reading — $19"
             testId="hero-buy-reading-btn"
             className="text-base px-8 py-6"
           />
+          <ReadingTrustStrip className="mt-1" />
         </div>
 
         {/* Quick Sign Calculator */}
