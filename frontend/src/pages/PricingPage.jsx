@@ -6,6 +6,7 @@ import axios from "axios";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Check, ArrowLeft, Star, Sun, Moon, Loader2, RefreshCw } from "lucide-react";
+import BuyReadingButton from "@/components/BuyReadingButton";
 
 
 const PAID_TIERS = ["enthusiast", "advanced", "professional"];
@@ -19,6 +20,16 @@ export default function PricingPage() {
   const [checkoutLoading, setCheckoutLoading] = useState(null); // tier being checked out
   const [pricingError, setPricingError] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("reading") === "cancelled") {
+      toast.message("Checkout cancelled. No charge was made.");
+      params.delete("reading");
+      const search = params.toString();
+      window.history.replaceState({}, "", window.location.pathname + (search ? `?${search}` : ""));
+    }
+  }, []);
 
   useEffect(() => {
     const fetchPricing = async () => {
@@ -133,6 +144,42 @@ export default function PricingPage() {
               Flexible plans designed to meet you wherever you are on your journey. 
               Start free and upgrade when you're ready for deeper guidance.
             </p>
+          </div>
+        </div>
+
+        {/* One-time Personal Reading Hero */}
+        <div className="glass-card rounded-2xl p-6 md:p-8 mb-10 border border-primary/30" data-testid="buy-reading-hero">
+          <div className="flex flex-col md:flex-row md:items-center gap-6">
+            <div className="flex-1">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 mb-3">
+                <Sparkles className="w-3.5 h-3.5 text-primary" />
+                <span className="text-xs font-semibold text-primary tracking-wide uppercase">
+                  Most popular — one-time
+                </span>
+              </div>
+              <h2 className="font-serif text-2xl md:text-3xl text-foreground mb-2">
+                Personal Astrology Reading
+              </h2>
+              <p className="text-muted-foreground leading-relaxed mb-3 max-w-xl">
+                A fully personalized written reading drawn from your full natal chart —
+                your strengths, your blind spots, the year ahead. Delivered within 48 hours.
+                No subscription. No commitment.
+              </p>
+              <div className="flex items-baseline gap-2">
+                <span className="font-serif text-4xl text-foreground">$19</span>
+                <span className="text-muted-foreground text-sm">one-time</span>
+              </div>
+            </div>
+            <div className="md:w-56">
+              <BuyReadingButton
+                className="w-full text-base py-6"
+                label="Buy now — $19"
+                testId="pricing-buy-reading"
+              />
+              <p className="text-xs text-muted-foreground text-center mt-2">
+                Secure checkout via Stripe
+              </p>
+            </div>
           </div>
         </div>
 
