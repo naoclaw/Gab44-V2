@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Request
 from datetime import datetime
 import time
 import os
+import functools
 from dotenv import load_dotenv
 
 load_dotenv('/root/secrets/all-keys.env')
@@ -11,12 +12,23 @@ router = APIRouter(prefix='/performance', tags=['Optimization'])
 # In-memory response time tracking (bypasses MongoDB)
 RESPONSE_TIMES = []
 
+import functools
+import inspect
+
 def track_endpoint_performance(func):
+    @functools.wraps(func)
     async def wrapper(*args, **kwargs):
         from fastapi import Request
         import time
         from datetime import datetime
-        request = kwargs.get('request')
+        # Extract request from args or kwargs
+        request = None
+        for arg in args:
+            if isinstance(arg, Request):
+                request = arg
+                break
+        if not request:
+            request = kwargs.get('request')
         if request:
             start_time = time.time()
             response = await func(*args, **kwargs)
@@ -31,6 +43,8 @@ def track_endpoint_performance(func):
                 RESPONSE_TIMES.pop(0)
             return response
         return await func(*args, **kwargs)
+    # Preserve original function signature outside wrapper to fix FastAPI parameter parsing
+    wrapper.__signature__ = inspect.signature(func)
     return wrapper
 
 @router.get('/response-time-stats')

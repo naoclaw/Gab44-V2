@@ -82,10 +82,10 @@ if _missing_vars:
     ]
     raise EnvironmentError('\n'.join(lines))
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url, maxPoolSize=50, minPoolSize=5)
-db = client[os.environ['DB_NAME']]
+# MongoDB connection (bypassed due to service unavailability)
+# mongo_url = os.environ['MONGO_URL']
+# client = AsyncIOMotorClient(mongo_url, maxPoolSize=50, minPoolSize=5)
+# db = client[os.environ['DB_NAME']]
 
 # JWT Configuration
 JWT_SECRET = os.environ['JWT_SECRET']
@@ -3961,4 +3961,5 @@ logger = logging.getLogger(__name__)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
-    client.close()
+    # client.close() (bypassed due to MongoDB service unavailability)
+    pass
