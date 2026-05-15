@@ -31,6 +31,7 @@ def track_endpoint_performance(func):
                 RESPONSE_TIMES.pop(0)
             return response
         return await func(*args, **kwargs)
+    return wrapper
 
 @router.get('/response-time-stats')
 def get_response_time_stats(path: str | None = None):
