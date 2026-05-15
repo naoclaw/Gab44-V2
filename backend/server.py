@@ -163,6 +163,10 @@ app = FastAPI(title="Gab44 - Astrology AI Coaching Platform")
 api_router = APIRouter(prefix="/api")
 from voice_horoscope import router as voice_horoscope_router
 app.include_router(voice_horoscope_router)
+from birth_chart_image import router as birth_chart_router
+app.include_router(birth_chart_router)
+from zodiac_seo import router as zodiac_seo_router
+app.include_router(zodiac_seo_router)
 security = HTTPBearer()
 
 # Rate limiter (uses client IP address)
