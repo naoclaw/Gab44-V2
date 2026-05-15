@@ -169,6 +169,8 @@ from zodiac_seo import router as zodiac_seo_router
 app.include_router(zodiac_seo_router)
 from conversion_optimization import router as conversion_router
 app.include_router(conversion_router)
+from conversion_optimization import router as conversion_router
+app.include_router(conversion_router)
 security = HTTPBearer()
 
 # Rate limiter (uses client IP address)
