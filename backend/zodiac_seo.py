@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 import os
 from dotenv import load_dotenv
+from performance_optimization import track_endpoint_performance
 
 load_dotenv('/root/secrets/all-keys.env')
 
@@ -20,7 +21,8 @@ ZODIAC_CONTENT = {
 }
 
 @router.get('/{sign}/landing-page')
-def get_zodiac_landing_page(sign: str):
+@track_endpoint_performance
+def get_zodiac_landing_page(sign: str, request: Request):
     if sign not in ZODIAC_CONTENT:
         return {'error': 'Zodiac sign not found', 'suggested_signs': list(ZODIAC_CONTENT.keys())}
     return ZODIAC_CONTENT[sign]
