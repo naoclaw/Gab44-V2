@@ -22,7 +22,7 @@ ZODIAC_CONTENT = {
 
 @router.get('/{sign}/landing-page')
 @track_endpoint_performance
-def get_zodiac_landing_page(sign: str, request: Request):
+async def get_zodiac_landing_page(sign: str, request: Request):
     if sign not in ZODIAC_CONTENT:
         return {'error': 'Zodiac sign not found', 'suggested_signs': list(ZODIAC_CONTENT.keys())}
     return ZODIAC_CONTENT[sign]
