@@ -94,6 +94,11 @@ JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
+# ElevenLabs / Voice Configuration
+ELEVENLABS_API_KEY = os.environ.get('ELEVENLABS_API_KEY', '')
+ELEVENLABS_VOICE_ID = os.environ.get('ELEVENLABS_VOICE_ID', '21m00Tcm4TlvDq8ikWAM')  # Default: Rachel
+ELEVENLABS_MODEL_ID = os.environ.get('ELEVENLABS_MODEL_ID', 'eleven_monolingual_v1')
+
 # Admin emails (set via environment variable)
 ADMIN_EMAILS = [e.strip().lower() for e in os.environ.get('ADMIN_EMAILS', '').split(',') if e.strip()]
 
@@ -143,6 +148,8 @@ CHAT_DAILY_LIMITS: dict[str, int] = {
 
 app = FastAPI(title="Gab44 - Astrology AI Coaching Platform")
 api_router = APIRouter(prefix="/api")
+from voice_horoscope import router as voice_horoscope_router
+app.include_router(voice_horoscope_router)
 security = HTTPBearer()
 
 # Rate limiter (uses client IP address)
