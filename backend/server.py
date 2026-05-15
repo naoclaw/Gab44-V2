@@ -169,6 +169,10 @@ from zodiac_seo import router as zodiac_seo_router
 app.include_router(zodiac_seo_router)
 from conversion_optimization import router as conversion_router
 app.include_router(conversion_router)
+from mobile_optimization import router as mobile_router
+app.include_router(mobile_router)
+from performance_optimization import router as performance_router
+app.include_router(performance_router)
 from conversion_optimization import router as conversion_router
 app.include_router(conversion_router)
 security = HTTPBearer()
