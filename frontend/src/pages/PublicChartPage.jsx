@@ -2,8 +2,38 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import axios from "axios";
 import { API } from "@/App";
-import { Sparkles, Loader2, XCircle } from "lucide-react";
+import { Sparkles, Loader2, XCircle, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+function setMeta(name, content, attr = "name") {
+  if (!content) return null;
+  let el = document.head.querySelector(`meta[${attr}="${name}"]`);
+  let created = false;
+  if (!el) {
+    el = document.createElement("meta");
+    el.setAttribute(attr, name);
+    created = true;
+    document.head.appendChild(el);
+  }
+  const prev = el.getAttribute("content");
+  el.setAttribute("content", content);
+  return { el, prev, created };
+}
+
+function setLink(rel, href) {
+  if (!href) return null;
+  let el = document.head.querySelector(`link[rel="${rel}"]`);
+  let created = false;
+  if (!el) {
+    el = document.createElement("link");
+    el.setAttribute("rel", rel);
+    created = true;
+    document.head.appendChild(el);
+  }
+  const prev = el.getAttribute("href");
+  el.setAttribute("href", href);
+  return { el, prev, created };
+}
 
 const SIGN_SYMBOLS = {
   Aries: "♈", Taurus: "♉", Gemini: "♊", Cancer: "♋", Leo: "♌", Virgo: "♍",
@@ -26,6 +56,55 @@ export default function PublicChartPage() {
       .then(r => { setChart(r.data); setStatus("ok"); })
       .catch(() => setStatus("error"));
   }, [token]);
+
+  // Per-page social-share meta. Only fires once the chart has loaded so
+  // we have the buyer's first name and sun sign to make the preview pop.
+  useEffect(() => {
+    if (status !== "ok" || !chart) return;
+    const firstName = (chart.name || "").toString().split(" ")[0] || "Their";
+    const possessive = firstName.endsWith("s") ? `${firstName}'` : `${firstName}'s`;
+    const sunSign = chart.sun_sign || "";
+    const title = sunSign
+      ? `${possessive} cosmic blueprint — ${sunSign} · Gab44`
+      : `${possessive} cosmic blueprint · Gab44`;
+    const description = sunSign
+      ? `A ${sunSign} sun, with moon and rising mapped to astronomical precision. Discover your own chart at gab44.com.`
+      : "A natal chart mapped to astronomical precision. Discover your own at gab44.com.";
+    const url = `https://gab44.com/chart/public/${token}`;
+    const imageUrl = `${API}/chart/public/${token}/image.png?style=card&size=1080`;
+
+    const prevTitle = document.title;
+    document.title = title;
+
+    const restorers = [
+      setMeta("description", description),
+      setMeta("og:title", title, "property"),
+      setMeta("og:description", description, "property"),
+      setMeta("og:type", "article", "property"),
+      setMeta("og:url", url, "property"),
+      setMeta("og:image", imageUrl, "property"),
+      setMeta("og:image:width", "1080", "property"),
+      setMeta("og:image:height", "1080", "property"),
+      setMeta("twitter:card", "summary_large_image"),
+      setMeta("twitter:title", title),
+      setMeta("twitter:description", description),
+      setMeta("twitter:image", imageUrl),
+      setLink("canonical", url),
+    ].filter(Boolean);
+
+    return () => {
+      document.title = prevTitle;
+      for (const r of restorers) {
+        if (!r) continue;
+        if (r.created) {
+          r.el.remove();
+        } else if (r.prev != null) {
+          if (r.el.tagName === "META") r.el.setAttribute("content", r.prev);
+          else r.el.setAttribute("href", r.prev);
+        }
+      }
+    };
+  }, [status, chart, token]);
 
   if (status === "loading") {
     return (
@@ -63,7 +142,39 @@ export default function PublicChartPage() {
         </Link>
       </div>
 
-      {/* Chart Card */}
+      {/* Server-rendered share card image — high-fidelity PNG with full wheel */}
+      <div className="max-w-xl mx-auto rounded-2xl overflow-hidden shadow-2xl mb-6 bg-[#0F0F14]">
+        <img
+          src={`${API}/chart/public/${token}/image.png?style=card&size=1080`}
+          alt="Cosmic blueprint share card"
+          className="block w-full h-auto"
+          loading="lazy"
+          data-testid="public-chart-image"
+        />
+      </div>
+
+      <div className="max-w-xl mx-auto flex flex-wrap gap-3 justify-center mb-8">
+        <a
+          href={`${API}/chart/public/${token}/image.png?style=card&size=1080`}
+          download="gab44-cosmic-blueprint.png"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 text-black text-sm font-medium hover:bg-amber-600 transition-colors"
+          data-testid="public-chart-download-card"
+        >
+          <Download className="w-4 h-4" />
+          Download share card
+        </a>
+        <a
+          href={`${API}/chart/public/${token}/image.png?style=wheel&size=1600`}
+          download="gab44-natal-wheel.png"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-muted/40 text-foreground text-sm font-medium hover:bg-muted/60 transition-colors border border-border"
+          data-testid="public-chart-download-wheel"
+        >
+          <Download className="w-4 h-4" />
+          Download natal wheel
+        </a>
+      </div>
+
+      {/* Detailed planet/pattern breakdown below the share image */}
       <div className="max-w-xl mx-auto rounded-2xl overflow-hidden shadow-2xl"
            style={{ background: "linear-gradient(135deg, #0F0F14 0%, #1a1a2e 50%, #16213e 100%)" }}>
         <div className="relative p-8">

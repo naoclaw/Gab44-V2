@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth, API } from "@/App";
 import { useTheme } from "@/context/ThemeContext";
 import axios from "axios";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Sparkles,
@@ -23,8 +24,120 @@ import {
   Shield,
   Heart,
   Hash,
-  Coffee
+  Coffee,
+  Play,
+  Pause,
+  Loader2,
+  Lock,
+  Volume2,
 } from "lucide-react";
+
+const VOICE_TIERS = new Set(["enthusiast", "advanced", "professional"]);
+
+// ─── Voice Horoscope Player ──────────────────────────────────────────────
+const VoiceHoroscopePlayer = ({ token, tier }) => {
+  const navigate = useNavigate();
+  const [audioUrl, setAudioUrl] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef(null);
+  const isPremium = VOICE_TIERS.has((tier || "").toLowerCase());
+
+  useEffect(() => {
+    return () => {
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
+    };
+  }, [audioUrl]);
+
+  const handlePlay = async () => {
+    if (!isPremium) {
+      navigate("/pricing");
+      return;
+    }
+    if (audioRef.current && audioUrl) {
+      if (playing) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play();
+      }
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await axios.get(`${API}/guidance/voice`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: "blob",
+      });
+      const url = URL.createObjectURL(res.data);
+      setAudioUrl(url);
+      // Wait for next tick so the <audio> element binds the src
+      setTimeout(() => {
+        if (audioRef.current) audioRef.current.play();
+      }, 50);
+    } catch (err) {
+      const status = err?.response?.status;
+      if (status === 403) {
+        toast.error("Voice horoscope is a premium feature. Upgrade to unlock daily audio readings.");
+        navigate("/pricing");
+      } else {
+        toast.error("Couldn't generate your voice horoscope. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      className="mt-5 flex items-center gap-3 rounded-xl border border-primary/15 bg-primary/5 p-3"
+      data-testid="voice-horoscope-player"
+    >
+      <button
+        onClick={handlePlay}
+        disabled={loading}
+        aria-label={isPremium ? (playing ? "Pause voice horoscope" : "Play voice horoscope") : "Unlock voice horoscope"}
+        className="w-11 h-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-sm hover:bg-primary/90 transition-colors disabled:opacity-60 flex-shrink-0"
+        data-testid="voice-horoscope-play-btn"
+      >
+        {loading ? (
+          <Loader2 className="w-5 h-5 animate-spin" />
+        ) : !isPremium ? (
+          <Lock className="w-5 h-5" />
+        ) : playing ? (
+          <Pause className="w-5 h-5" />
+        ) : (
+          <Play className="w-5 h-5 ml-0.5" />
+        )}
+      </button>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 text-foreground text-sm font-medium">
+          <Volume2 className="w-3.5 h-3.5 text-primary" />
+          Voice Horoscope
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {!isPremium
+            ? "Upgrade to listen to today's reading"
+            : loading
+            ? "Channeling your reading…"
+            : playing
+            ? "Now playing your daily reading"
+            : "Tap to hear today's reading"}
+        </p>
+      </div>
+      {audioUrl && (
+        <audio
+          ref={audioRef}
+          src={audioUrl}
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onEnded={() => setPlaying(false)}
+          preload="auto"
+          data-testid="voice-horoscope-audio"
+        />
+      )}
+    </div>
+  );
+};
 
 // ─── Sidebar groups definition ─────────────────────────────────────────
 const NAV_GROUPS = [
@@ -352,8 +465,9 @@ const DashboardOverview = () => {
               </div>
             ))}
           </div>
+          <VoiceHoroscopePlayer token={token} tier={user?.subscription_tier} />
           <Button
-            className="mt-6 bg-primary/10 text-primary hover:bg-primary/20 rounded-xl w-full sm:w-auto"
+            className="mt-4 bg-primary/10 text-primary hover:bg-primary/20 rounded-xl w-full sm:w-auto"
             onClick={() => navigate("/chat")}
             data-testid="ask-coach-btn"
           >
@@ -502,6 +616,14 @@ export default function Dashboard() {
             toast.success("Subscription activated! Welcome to your new plan.");
           });
         });
+    }
+    if (params.get("reading") === "success") {
+      window.history.replaceState({}, "", window.location.pathname);
+      import("sonner").then(({ toast }) => {
+        toast.success(
+          "Payment received — your personal reading is on its way. We'll email it within 48 hours."
+        );
+      });
     }
   }, [token, updateUser]);
 

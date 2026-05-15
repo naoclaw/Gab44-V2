@@ -15,10 +15,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { 
-  Sparkles, 
-  Users, 
-  MessageCircle, 
+import {
+  Sparkles,
+  Users,
+  MessageCircle,
   TrendingUp,
   Sun,
   Moon,
@@ -32,7 +32,10 @@ import {
   BarChart3,
   Calendar,
   Star,
-  Heart
+  Heart,
+  Receipt,
+  CheckCircle2,
+  Clock,
 } from "lucide-react";
 
 const TIER_COLORS = {
@@ -59,15 +62,35 @@ export default function AdminPage() {
   const [updating, setUpdating] = useState(null);
   const [blast, setBlast] = useState({ subject: "", body_html: "", tier_filter: "all" });
   const [blastSending, setBlastSending] = useState(false);
+  const [readingOrders, setReadingOrders] = useState([]);
+  const [readingOrderMeta, setReadingOrderMeta] = useState({ counts: {}, paid_total_cents: 0 });
+  const [readingFilter, setReadingFilter] = useState("all");
+  const [readingUpdating, setReadingUpdating] = useState(null);
 
   const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
+
+  const fetchReadingOrders = async (filter = readingFilter) => {
+    try {
+      const qs = filter && filter !== "all" ? `?status=${filter}&limit=100` : "?limit=100";
+      const res = await axios.get(`${API}/admin/reading-orders${qs}`, authHeaders);
+      setReadingOrders(res.data.orders || []);
+      setReadingOrderMeta({
+        counts: res.data.counts || {},
+        paid_total_cents: res.data.paid_total_cents || 0,
+      });
+    } catch (error) {
+      console.error("Error fetching reading orders:", error);
+      toast.error("Failed to load reading orders");
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);
     try {
       const [statsRes, usersRes] = await Promise.all([
         axios.get(`${API}/admin/stats`, authHeaders),
-        axios.get(`${API}/admin/users?limit=100`, authHeaders)
+        axios.get(`${API}/admin/users?limit=100`, authHeaders),
+        fetchReadingOrders(),
       ]);
       setStats(statsRes.data);
       setUsers(usersRes.data.users);
@@ -109,6 +132,28 @@ export default function AdminPage() {
     } finally {
       setUpdating(null);
     }
+  };
+
+  const updateReadingStatus = async (orderId, newStatus) => {
+    setReadingUpdating(orderId);
+    try {
+      await axios.put(
+        `${API}/admin/reading-orders/${orderId}/status?status=${newStatus}`,
+        {},
+        authHeaders
+      );
+      toast.success(`Order marked ${newStatus}`);
+      await fetchReadingOrders(readingFilter);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to update order");
+    } finally {
+      setReadingUpdating(null);
+    }
+  };
+
+  const handleReadingFilter = (next) => {
+    setReadingFilter(next);
+    fetchReadingOrders(next);
   };
 
   const upgradeAllUsers = async () => {
@@ -403,6 +448,146 @@ export default function AdminPage() {
             <div className="text-center py-12">
               <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">No users found</p>
+            </div>
+          )}
+        </div>
+
+        {/* Reading Orders Table */}
+        <div className="glass-card rounded-xl p-6 mb-8" data-testid="admin-reading-orders">
+          <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+            <div className="flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-primary" />
+              <h2 className="font-medium text-foreground">
+                Personal Readings ({readingOrders.length})
+              </h2>
+              <span className="text-xs text-muted-foreground ml-2">
+                Lifetime revenue: ${(readingOrderMeta.paid_total_cents / 100).toFixed(2)}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {[
+                { key: "all", label: "All" },
+                { key: "pending", label: `Pending (${readingOrderMeta.counts.pending || 0})` },
+                { key: "paid", label: `Paid (${readingOrderMeta.counts.paid || 0})` },
+                { key: "fulfilled", label: `Fulfilled (${readingOrderMeta.counts.fulfilled || 0})` },
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => handleReadingFilter(key)}
+                  className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                    readingFilter === key
+                      ? "bg-primary/15 text-primary border-primary/30"
+                      : "bg-muted/30 text-muted-foreground border-border hover:bg-muted/50"
+                  }`}
+                  data-testid={`reading-filter-${key}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {readingOrders.length === 0 ? (
+            <div className="text-center py-10">
+              <Receipt className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground">
+                No reading orders yet for this filter.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Buyer</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Birth</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Notes</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Created</th>
+                    <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {readingOrders.map((order) => {
+                    const statusColor =
+                      order.status === "paid"
+                        ? "bg-green-500/10 text-green-500 border-green-500/20"
+                        : order.status === "fulfilled"
+                        ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                        : order.status === "refunded"
+                        ? "bg-red-500/10 text-red-500 border-red-500/20"
+                        : "bg-amber-500/10 text-amber-500 border-amber-500/20";
+                    const StatusIcon =
+                      order.status === "fulfilled"
+                        ? CheckCircle2
+                        : order.status === "paid"
+                        ? Sparkles
+                        : Clock;
+
+                    const birthLine = [order.birth_date, order.birth_time]
+                      .filter(Boolean)
+                      .join(" • ");
+
+                    return (
+                      <tr
+                        key={order.id}
+                        className="border-b border-border/50 hover:bg-muted/30 transition-colors"
+                        data-testid={`reading-order-${order.id}`}
+                      >
+                        <td className="py-3 px-4">
+                          <p className="font-medium text-foreground text-sm">
+                            {order.name || "Guest"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {order.email || "—"}
+                          </p>
+                        </td>
+                        <td className="py-3 px-4 text-sm text-muted-foreground">
+                          <div>{birthLine || "—"}</div>
+                          {order.birth_place && (
+                            <div className="text-xs">{order.birth_place}</div>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 max-w-xs">
+                          <p className="text-xs text-muted-foreground truncate" title={order.notes || ""}>
+                            {order.notes || "—"}
+                          </p>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span
+                            className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border ${statusColor}`}
+                          >
+                            <StatusIcon className="w-3 h-3" />
+                            {order.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-xs text-muted-foreground whitespace-nowrap">
+                          {order.created_at
+                            ? new Date(order.created_at).toLocaleString()
+                            : "—"}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          {order.status === "paid" ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={readingUpdating === order.id}
+                              onClick={() => updateReadingStatus(order.id, "fulfilled")}
+                              className="h-8 px-3 text-xs rounded-lg"
+                              data-testid={`reading-fulfill-${order.id}`}
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                              Mark fulfilled
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

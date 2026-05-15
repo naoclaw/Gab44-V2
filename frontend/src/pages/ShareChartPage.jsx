@@ -5,11 +5,11 @@ import { useTheme } from "@/context/ThemeContext";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { 
-  Sparkles, 
-  Share2, 
-  Download, 
-  Copy, 
+import {
+  Sparkles,
+  Share2,
+  Download,
+  Copy,
   Check,
   Twitter,
   Facebook,
@@ -18,7 +18,9 @@ import {
   Moon,
   Star,
   ArrowLeft,
-  RefreshCw
+  RefreshCw,
+  Loader2,
+  Image as ImageIcon
 } from "lucide-react";
 
 const SIGN_SYMBOLS = {
@@ -155,6 +157,11 @@ export default function ShareChartPage() {
   const [generatingLink, setGeneratingLink] = useState(false);
   const [chartError, setChartError] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [previewMode, setPreviewMode] = useState("card"); // "card" | "wheel"
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState(false);
+  const [downloadingStyle, setDownloadingStyle] = useState(null); // "card" | "wheel" | null
   const cardRef = useRef(null);
 
   useEffect(() => {
@@ -178,6 +185,66 @@ export default function ShareChartPage() {
     };
     if (token) fetchChart();
   }, [token, retryCount]);
+
+  // Fetch the rendered chart image as a Blob URL whenever the user toggles
+  // between card / wheel preview. Object URL is revoked on cleanup so we
+  // don't leak — Blob URLs persist for the document lifetime otherwise.
+  useEffect(() => {
+    if (!token || !chart) return;
+    let active = true;
+    let createdUrl = null;
+    setPreviewLoading(true);
+    setPreviewError(false);
+    axios.get(`${API}/chart/image.png`, {
+      headers: { Authorization: `Bearer ${token}` },
+      params: { style: previewMode, size: previewMode === "wheel" ? 1200 : 1080 },
+      responseType: "blob",
+    })
+      .then(res => {
+        if (!active) return;
+        createdUrl = URL.createObjectURL(res.data);
+        setPreviewUrl(createdUrl);
+      })
+      .catch(err => {
+        if (!active) return;
+        console.error("Chart image preview failed:", err);
+        setPreviewError(true);
+      })
+      .finally(() => {
+        if (active) setPreviewLoading(false);
+      });
+    return () => {
+      active = false;
+      if (createdUrl) URL.revokeObjectURL(createdUrl);
+    };
+  }, [token, chart, previewMode]);
+
+  const downloadImage = async (style) => {
+    setDownloadingStyle(style);
+    try {
+      const res = await axios.get(`${API}/chart/image.png`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { style, size: style === "wheel" ? 1600 : 1080 },
+        responseType: "blob",
+      });
+      const blobUrl = URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      const safeName = (user?.name || "chart").replace(/[^A-Za-z0-9]+/g, "-").toLowerCase() || "chart";
+      a.download = `gab44-${safeName}-${style}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      // Defer revoke until the browser has had a tick to start the download
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+      toast.success("Chart image downloaded.");
+    } catch (err) {
+      console.error("Chart image download failed:", err);
+      toast.error("Couldn't download your chart image. Please try again.");
+    } finally {
+      setDownloadingStyle(null);
+    }
+  };
 
   const generateShareLink = async () => {
     if (shareToken) return; // already generated
@@ -316,8 +383,62 @@ export default function ShareChartPage() {
         <div className="grid md:grid-cols-2 gap-8">
           {/* Preview Card */}
           <div>
-            <h2 className="font-medium text-foreground mb-4">Preview</h2>
-            <div ref={cardRef} className="rounded-2xl overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-medium text-foreground">Preview</h2>
+              <div className="inline-flex rounded-xl bg-muted/40 p-1 text-xs" role="tablist">
+                <button
+                  type="button"
+                  onClick={() => setPreviewMode("card")}
+                  className={`px-3 py-1.5 rounded-lg transition-colors ${previewMode === "card" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                  data-testid="preview-mode-card"
+                  aria-pressed={previewMode === "card"}
+                >
+                  Share card
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewMode("wheel")}
+                  className={`px-3 py-1.5 rounded-lg transition-colors ${previewMode === "wheel" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                  data-testid="preview-mode-wheel"
+                  aria-pressed={previewMode === "wheel"}
+                >
+                  Natal wheel
+                </button>
+              </div>
+            </div>
+            <div
+              ref={cardRef}
+              className="rounded-2xl overflow-hidden shadow-2xl bg-[#0F0F14] aspect-square flex items-center justify-center"
+              data-testid="chart-image-preview"
+            >
+              {previewLoading && !previewUrl && (
+                <Loader2 className="w-10 h-10 text-amber-400 animate-spin" />
+              )}
+              {previewError && !previewLoading && (
+                <div className="text-center px-4">
+                  <ImageIcon className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">Couldn't render preview.</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3 rounded-lg"
+                    onClick={() => setPreviewMode(m => m)}
+                  >
+                    Retry
+                  </Button>
+                </div>
+              )}
+              {previewUrl && (
+                <img
+                  src={previewUrl}
+                  alt={`${user?.name || "Your"} ${previewMode === "wheel" ? "natal wheel" : "cosmic blueprint"}`}
+                  className="block w-full h-full object-contain"
+                  data-testid={`chart-image-${previewMode}`}
+                />
+              )}
+            </div>
+            {/* Fallback static card kept for users without a generated chart on backend */}
+            <div className="hidden">
               <ChartShareCard chart={chart} user={user} />
             </div>
           </div>
@@ -331,7 +452,19 @@ export default function ShareChartPage() {
               </h2>
               
               <div className="space-y-3">
-                <Button 
+                <Button
+                  onClick={() => downloadImage(previewMode)}
+                  disabled={downloadingStyle !== null}
+                  className="w-full bg-amber-500 hover:bg-amber-600 text-black rounded-xl justify-start gap-3 font-medium"
+                  data-testid="download-chart-image"
+                >
+                  {downloadingStyle ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+                  {downloadingStyle
+                    ? "Preparing image…"
+                    : `Download ${previewMode === "wheel" ? "natal wheel" : "share card"} (PNG)`}
+                </Button>
+
+                <Button
                   onClick={shareNative}
                   className="w-full bg-primary text-primary-foreground rounded-xl justify-start gap-3"
                   data-testid="share-native"
