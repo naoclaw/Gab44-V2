@@ -11,21 +11,6 @@ router = APIRouter(prefix='/performance', tags=['Optimization'])
 # In-memory response time tracking (bypasses MongoDB)
 RESPONSE_TIMES = []
 
-@router.middleware('http')
-async def track_response_time(request: Request, call_next):
-    start_time = time.time()
-    response = await call_next(request)
-    response_time = time.time() - start_time
-    RESPONSE_TIMES.append({
-        'path': request.url.path,
-        'method': request.method,
-        'response_time_ms': round(response_time * 1000),
-        'timestamp': datetime.utcnow().isoformat()
-    })
-    # Keep only last 1000 entries to prevent memory bloat
-    if len(RESPONSE_TIMES) > 1000:
-        RESPONSE_TIMES.pop(0)
-    return response
 
 @router.get('/response-time-stats')
 def get_response_time_stats(path: str | None = None):
