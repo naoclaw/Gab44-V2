@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import VoiceHoroscopePlayer from './VoiceHoroscopePlayer';
 
 /**
  * One-click checkout for the $19 Personal Astrology Reading.
@@ -201,6 +202,11 @@ export default function BuyReadingButton({
                 maxLength={2000}
                 data-testid="buy-reading-notes"
               />
+            </div>
+
+            <div className="pt-4 border-t border-purple-100">
+              <p className="text-sm text-purple-700 mb-2">Premium Feature Included:</p>
+              <VoiceHoroscopePlayer readingId="premium-reading-123" />
             </div>
 
             <DialogFooter className="gap-2 sm:gap-2">

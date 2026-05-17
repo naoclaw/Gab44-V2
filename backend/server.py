@@ -44,7 +44,7 @@ from cities import geocode_search
 from chart_image import render_wheel, render_share_card, to_png_bytes
 
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+load_dotenv('/root/secrets/all-keys.env')
 
 # ── Startup environment validation ───────────────────────────────────────────
 _REQUIRED_ENV_VARS = {
@@ -161,10 +161,12 @@ CHAT_DAILY_LIMITS: dict[str, int] = {
 
 app = FastAPI(title="Gab44 - Astrology AI Coaching Platform")
 api_router = APIRouter(prefix="/api")
-from voice_horoscope import router as voice_horoscope_router
-app.include_router(voice_horoscope_router)
-from birth_chart_image import router as birth_chart_router
-app.include_router(birth_chart_router)
+# Temporarily disabled for segmentation fault investigation
+# from voice_horoscope import router as voice_horoscope_router
+# app.include_router(voice_horoscope_router)
+# Temporarily disabled due to segmentation fault investigation
+# from birth_chart_image import router as birth_chart_router
+# app.include_router(birth_chart_router)
 from zodiac_seo import router as zodiac_seo_router
 app.include_router(zodiac_seo_router)
 from conversion_optimization import router as conversion_router
@@ -175,6 +177,28 @@ from performance_optimization import router as performance_router
 app.include_router(performance_router)
 from conversion_optimization import router as conversion_router
 app.include_router(conversion_router)
+
+# Temporary voice horoscope endpoint (bypasses disabled router segmentation fault)
+@api_router.get('/voice-horoscope/{readingId}')
+@track_endpoint_performance
+async def get_voice_horoscope(readingId: str, current_user: dict = Depends(get_optional_user)):
+    if not ELEVENLABS_API_KEY:
+        raise HTTPException(status_code=503, detail="Voice feature unavailable")
+    # Dummy horoscope text (replace with actual reading fetch when MongoDB is available)
+    dummy_horoscope = f"Premium voice horoscope for reading {readingId}: Your stars align for new opportunities this week."
+    try:
+        client = elevenlabs.ElevenLabs(api_key=ELEVENLABS_API_KEY)
+        audio = await client.textToSpeech.convert(
+            voiceId=ELEVENLABS_VOICE_ID,
+            outputFormat='mp3',
+            text=dummy_horoscope,
+            modelId=ELEVENLABS_MODEL_ID
+        )
+        return {'audioUrl': f'data:audio/mpeg;base64,{elevenlabs.to_base64(audio)}'}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Voice generation failed: {str(e)}")
+
+app.include_router(api_router)
 security = HTTPBearer()
 
 # Rate limiter (uses client IP address)
